@@ -12,6 +12,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "resolveJsonModule": true,
     "strict": true
   },
   "include": ["server.ts", "backend", "web-app/src", "web-app/vite.config.ts"]

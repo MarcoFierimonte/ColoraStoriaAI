@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { ServerConfig } from '../config/env.ts';
+import { calculateGenerationCost } from '../utils/costCalculator.ts';
 import {
   buildRasterColoringPrompt,
   buildSvgColoringPrompt,
@@ -25,7 +26,9 @@ function sanitizeSvgMarkup(rawSvg: string): string {
   const svgEnd = svg.lastIndexOf('</svg>');
   if (svgStart === -1 || svgEnd === -1) {
     throw new ProviderExecutionError(
-      'Il modello non ha restituito un disegno SVG valido. Riprova tra un istante.'
+      'Il modello non ha restituito un disegno SVG valido. Riprova tra un istante.',
+      502,
+      `Missing <svg>...</svg> tags in svgMarkup (length=${rawSvg.length}): ${rawSvg.slice(0, 400)}`
     );
   }
   svg = svg.slice(svgStart, svgEnd + 6);
@@ -37,9 +40,20 @@ function sanitizeSvgMarkup(rawSvg: string): string {
   return svg;
 }
 
+function formatRawError(error: unknown): string {
+  if (error instanceof Error) {
+    const extra =
+      'status' in error && (error as { status?: unknown }).status !== undefined
+        ? ` [status=${String((error as { status?: unknown }).status)}]`
+        : '';
+    return `${error.name}${extra}: ${error.message}`;
+  }
+  return String(error);
+}
+
 function mapGeminiError(error: unknown): never {
-  const message = error instanceof Error ? error.message : String(error);
-  const lower = message.toLowerCase();
+  const rawDetails = formatRawError(error);
+  const lower = rawDetails.toLowerCase();
 
   if (
     lower.includes('api_key_invalid') ||
@@ -49,27 +63,43 @@ function mapGeminiError(error: unknown): never {
   ) {
     throw new ProviderConfigurationError(
       'Chiave Gemini API non valida o mancante nelle impostazioni del server (Settings > Secrets).',
-      403
+      403,
+      rawDetails
+    );
+  }
+
+  if (
+    lower.includes('prepayment credits are depleted') ||
+    lower.includes('[status=402]') ||
+    lower.includes('"code":402')
+  ) {
+    throw new ProviderConfigurationError(
+      'Crediti Gemini API esauriti sul progetto collegato a GEMINI_API_KEY. Usa una chiave Free Tier o gestisci il piano su AI Studio (Settings > Secrets).',
+      402,
+      rawDetails
     );
   }
 
   if (lower.includes('resource_exhausted') || lower.includes('429')) {
     throw new ProviderExecutionError(
       'Limite momentaneo di richieste Gemini raggiunto. Attendi qualche secondo e riprova.',
-      429
+      429,
+      rawDetails
     );
   }
 
   if (lower.includes('not_found') || lower.includes('404')) {
     throw new ProviderExecutionError(
       'Il modello Gemini configurato non è disponibile. Verifica GEMINI_MODEL sul server.',
-      404
+      404,
+      rawDetails
     );
   }
 
   throw new ProviderExecutionError(
     'Errore durante la generazione con Gemini. Riprova tra qualche istante.',
-    502
+    502,
+    rawDetails
   );
 }
 
@@ -84,8 +114,10 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 2): Promise<T> {
       const isClientOrKeyError =
         msg.includes('api_key_invalid') ||
         msg.includes('permission_denied') ||
+        msg.includes('prepayment credits') ||
         msg.includes('not_found') ||
         msg.includes('400') ||
+        msg.includes('402') ||
         msg.includes('403') ||
         msg.includes('404');
       if (isClientOrKeyError || attempt === maxAttempts) {
@@ -95,6 +127,62 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 2): Promise<T> {
     }
   }
   throw lastError;
+}
+
+interface RawGeminiUsageMetadata {
+  promptTokenCount?: number;
+  cachedContentTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
+  candidatesTokensDetails?: Array<{
+    modality?: string;
+    tokenCount?: number;
+  }>;
+}
+
+function extractGeminiTokenCounts(
+  metadata: RawGeminiUsageMetadata | undefined,
+  mode: 'svg' | 'raster'
+) {
+  const inputTokens = metadata?.promptTokenCount ?? 0;
+  const cachedInputTokens = metadata?.cachedContentTokenCount ?? 0;
+  const thoughtsTokens = metadata?.thoughtsTokenCount ?? 0;
+
+  if (mode === 'svg') {
+    const textOutputTokens = (metadata?.candidatesTokenCount ?? 0) + thoughtsTokens;
+    return {
+      inputTokens,
+      cachedInputTokens,
+      textOutputTokens,
+      imageOutputTokens: 0,
+    };
+  }
+
+  const details = metadata?.candidatesTokensDetails ?? [];
+  let imageFromDetails = 0;
+  let textFromDetails = 0;
+  for (const item of details) {
+    const count = item.tokenCount ?? 0;
+    if (String(item.modality ?? '').toUpperCase() === 'IMAGE') {
+      imageFromDetails += count;
+    } else {
+      textFromDetails += count;
+    }
+  }
+
+  const imageOutputTokens =
+    imageFromDetails > 0
+      ? imageFromDetails
+      : (metadata?.candidatesTokenCount ?? 0);
+  const textOutputTokens =
+    thoughtsTokens + (imageFromDetails > 0 ? textFromDetails : 0);
+
+  return {
+    inputTokens,
+    cachedInputTokens,
+    textOutputTokens,
+    imageOutputTokens,
+  };
 }
 
 export class GeminiColoringProvider implements ColoringProvider {
@@ -128,7 +216,8 @@ export class GeminiColoringProvider implements ColoringProvider {
     if (!this.isConfigured()) {
       throw new ProviderConfigurationError(
         'GEMINI_API_KEY non è ancora configurata sul server. Aggiungila in Settings > Secrets per provare la generazione dal vivo.',
-        503
+        503,
+        'Missing process.env.GEMINI_API_KEY'
       );
     }
 
@@ -158,8 +247,10 @@ export class GeminiColoringProvider implements ColoringProvider {
     input: ColoringGenerationInput
   ): Promise<ColoringGenerationOutput> {
     const { prompt, version: promptVersion } = buildRasterColoringPrompt(
-      input.themeId
+      input.themeId,
+      input.promptVersionOverride
     );
+    const startedAt = Date.now();
     try {
       const response = await withRetry(() =>
         ai.models.generateContent({
@@ -184,6 +275,15 @@ export class GeminiColoringProvider implements ColoringProvider {
           },
         })
       );
+      const latencyMs = Math.max(0, Date.now() - startedAt);
+      const counts = extractGeminiTokenCounts(
+        response.usageMetadata as RawGeminiUsageMetadata | undefined,
+        'raster'
+      );
+      const usage = calculateGenerationCost({
+        model,
+        ...counts,
+      });
 
       for (const part of response.candidates?.[0]?.content?.parts ?? []) {
         if (part.inlineData?.data) {
@@ -195,12 +295,18 @@ export class GeminiColoringProvider implements ColoringProvider {
             outputFormat: 'raster',
             imageDataUrl: `data:${mime};base64,${part.inlineData.data}`,
             sceneSummary: 'Pagina da colorare generata direttamente dalla tua foto.',
+            latencyMs,
+            usage,
           };
         }
       }
 
+      const finishReason = response.candidates?.[0]?.finishReason ?? 'UNKNOWN';
+      const blockReason = response.promptFeedback?.blockReason ?? 'NONE';
       throw new ProviderExecutionError(
-        'Il modello immagine non ha restituito alcuna illustrazione. Riprova.'
+        'Il modello immagine non ha restituito alcuna illustrazione. Riprova.',
+        502,
+        `No inlineData image returned (model=${model}, finishReason=${finishReason}, blockReason=${blockReason}, text=${(response.text ?? '').slice(0, 300)})`
       );
     } catch (error) {
       if (
@@ -220,8 +326,10 @@ export class GeminiColoringProvider implements ColoringProvider {
     input: ColoringGenerationInput
   ): Promise<ColoringGenerationOutput> {
     const { prompt, version: promptVersion } = buildSvgColoringPrompt(
-      input.themeId
+      input.themeId,
+      input.promptVersionOverride
     );
+    const startedAt = Date.now();
     try {
       const response = await withRetry(() =>
         ai.models.generateContent({
@@ -260,18 +368,41 @@ export class GeminiColoringProvider implements ColoringProvider {
           },
         })
       );
+      const latencyMs = Math.max(0, Date.now() - startedAt);
+      const counts = extractGeminiTokenCounts(
+        response.usageMetadata as RawGeminiUsageMetadata | undefined,
+        'svg'
+      );
+      const usage = calculateGenerationCost({
+        model,
+        ...counts,
+      });
 
       const rawText = (response.text ?? '').trim();
       if (!rawText) {
+        const finishReason = response.candidates?.[0]?.finishReason ?? 'UNKNOWN';
+        const blockReason = response.promptFeedback?.blockReason ?? 'NONE';
         throw new ProviderExecutionError(
-          'Risposta vuota ricevuta dal modello Gemini. Riprova.'
+          'Risposta vuota ricevuta dal modello Gemini. Riprova.',
+          502,
+          `Empty response.text (model=${model}, finishReason=${finishReason}, blockReason=${blockReason})`
         );
       }
 
-      const parsed = JSON.parse(rawText) as {
-        sceneSummary?: string;
-        svgMarkup?: string;
-      };
+      let parsed: { sceneSummary?: string; svgMarkup?: string };
+      try {
+        parsed = JSON.parse(rawText) as {
+          sceneSummary?: string;
+          svgMarkup?: string;
+        };
+      } catch (parseErr) {
+        const finishReason = response.candidates?.[0]?.finishReason ?? 'UNKNOWN';
+        throw new ProviderExecutionError(
+          'Il modello ha restituito un formato non interpretabile. Riprova.',
+          502,
+          `JSON.parse failed (${parseErr instanceof Error ? parseErr.message : String(parseErr)}, model=${model}, finishReason=${finishReason}): ${rawText.slice(0, 400)}`
+        );
+      }
 
       const cleanSvg = sanitizeSvgMarkup(parsed.svgMarkup ?? '');
       const svgBase64 = Buffer.from(cleanSvg, 'utf8').toString('base64');
@@ -286,6 +417,8 @@ export class GeminiColoringProvider implements ColoringProvider {
         sceneSummary:
           parsed.sceneSummary?.trim() ||
           'Pagina da colorare vettoriale generata dalla tua foto.',
+        latencyMs,
+        usage,
       };
     } catch (error) {
       if (
@@ -293,11 +426,6 @@ export class GeminiColoringProvider implements ColoringProvider {
         error instanceof ProviderExecutionError
       ) {
         throw error;
-      }
-      if (error instanceof SyntaxError) {
-        throw new ProviderExecutionError(
-          'Il modello ha restituito un formato non interpretabile. Riprova.'
-        );
       }
       mapGeminiError(error);
     }

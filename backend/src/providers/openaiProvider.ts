@@ -1,4 +1,5 @@
 import type { ServerConfig } from '../config/env.ts';
+import { calculateGenerationCost } from '../utils/costCalculator.ts';
 import { buildRasterColoringPrompt } from '../utils/prompts.ts';
 import {
   ProviderConfigurationError,
@@ -44,10 +45,16 @@ export class OpenAIColoringProvider implements ColoringProvider {
     }
 
     const { prompt, version: promptVersion } = buildRasterColoringPrompt(
-      input.themeId
+      input.themeId,
+      input.promptVersionOverride
     );
     const formData = new FormData();
-    const ext = input.mimeType === 'image/png' ? 'png' : input.mimeType === 'image/webp' ? 'webp' : 'jpg';
+    const ext =
+      input.mimeType === 'image/png'
+        ? 'png'
+        : input.mimeType === 'image/webp'
+          ? 'webp'
+          : 'jpg';
     const imageBytes = new Uint8Array(input.imageBuffer);
     const imageBlob = new Blob([imageBytes], { type: input.mimeType });
     formData.append('image', imageBlob, `photo.${ext}`);
@@ -55,6 +62,7 @@ export class OpenAIColoringProvider implements ColoringProvider {
     formData.append('prompt', prompt);
     formData.append('size', '1024x1536');
 
+    const startedAt = Date.now();
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
       headers: {
@@ -62,30 +70,59 @@ export class OpenAIColoringProvider implements ColoringProvider {
       },
       body: formData,
     });
+    const latencyMs = Math.max(0, Date.now() - startedAt);
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
+      const rawDetails = `OpenAI HTTP ${response.status} ${response.statusText}: ${errBody.slice(0, 600)}`;
       if (response.status === 401 || response.status === 403) {
         throw new ProviderConfigurationError(
           'Chiave OpenAI non valida o non autorizzata.',
-          403
+          403,
+          rawDetails
         );
       }
       if (response.status === 429) {
         throw new ProviderExecutionError(
           'Limite di richieste OpenAI raggiunto. Riprova tra qualche secondo.',
-          429
+          429,
+          rawDetails
         );
       }
       throw new ProviderExecutionError(
         `Errore OpenAI (${response.status}): ${errBody.slice(0, 140) || 'richiesta non riuscita'}.`,
-        502
+        502,
+        rawDetails
       );
     }
 
     const payload = (await response.json()) as {
       data?: Array<{ b64_json?: string; url?: string }>;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        input_tokens_details?: { cached_tokens?: number };
+        output_tokens_details?: { image_tokens?: number; text_tokens?: number };
+      };
     };
+
+    const inputTokens = payload.usage?.input_tokens ?? 0;
+    const cachedInputTokens = payload.usage?.input_tokens_details?.cached_tokens ?? 0;
+    const imageOutputTokens =
+      payload.usage?.output_tokens_details?.image_tokens ??
+      payload.usage?.output_tokens ??
+      0;
+    const textOutputTokens =
+      payload.usage?.output_tokens_details?.text_tokens ??
+      Math.max(0, (payload.usage?.output_tokens ?? 0) - imageOutputTokens);
+
+    const usage = calculateGenerationCost({
+      model: this.config.openaiModel,
+      inputTokens,
+      cachedInputTokens,
+      textOutputTokens,
+      imageOutputTokens,
+    });
 
     const first = payload.data?.[0];
     if (first?.b64_json) {
@@ -96,6 +133,8 @@ export class OpenAIColoringProvider implements ColoringProvider {
         outputFormat: 'raster',
         imageDataUrl: `data:image/png;base64,${first.b64_json}`,
         sceneSummary: 'Pagina da colorare generata con OpenAI a partire dalla tua foto.',
+        latencyMs,
+        usage,
       };
     }
     if (first?.url) {
@@ -106,6 +145,8 @@ export class OpenAIColoringProvider implements ColoringProvider {
         outputFormat: 'raster',
         imageDataUrl: first.url,
         sceneSummary: 'Pagina da colorare generata con OpenAI a partire dalla tua foto.',
+        latencyMs,
+        usage,
       };
     }
 

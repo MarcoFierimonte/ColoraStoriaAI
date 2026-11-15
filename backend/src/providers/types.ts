@@ -1,4 +1,5 @@
 import type { SupportedProviderId } from '../config/env.ts';
+import type { UsageBreakdown } from '../utils/costCalculator.ts';
 
 export const ALLOWED_THEME_IDS = [
   'pirati',
@@ -15,6 +16,7 @@ export interface ColoringGenerationInput {
   imageBuffer: Buffer;
   mimeType: string;
   themeId: ThemeId;
+  promptVersionOverride?: string;
 }
 
 export interface ColoringGenerationOutput {
@@ -25,6 +27,8 @@ export interface ColoringGenerationOutput {
   imageDataUrl: string;
   svgMarkup?: string;
   sceneSummary: string;
+  latencyMs: number;
+  usage: UsageBreakdown;
 }
 
 export interface ProviderStatus {
@@ -48,20 +52,24 @@ export interface ColoringProvider {
 
 export class ProviderConfigurationError extends Error {
   readonly statusCode: number;
+  readonly rawDetails?: string;
 
-  constructor(message: string, statusCode = 503) {
+  constructor(message: string, statusCode = 503, rawDetails?: string) {
     super(message);
     this.name = 'ProviderConfigurationError';
     this.statusCode = statusCode;
+    this.rawDetails = rawDetails;
   }
 }
 
 export class ProviderExecutionError extends Error {
   readonly statusCode: number;
+  readonly rawDetails?: string;
 
-  constructor(message: string, statusCode = 502) {
+  constructor(message: string, statusCode = 502, rawDetails?: string) {
     super(message);
     this.name = 'ProviderExecutionError';
     this.statusCode = statusCode;
+    this.rawDetails = rawDetails;
   }
 }

@@ -2,24 +2,32 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'rea
 import {
   AlertCircle,
   Check,
+  Copy,
   Download,
   ImagePlus,
   Loader2,
   RotateCcw,
+  SlidersHorizontal,
   Sun,
   Trash2,
   UserCheck,
 } from 'lucide-react';
 import { ORDER_CONFIG } from '../config/orderConfig';
+import { useAuth } from '../contexts/AuthContext';
 import { BOOK_THEMES, type ThemeId } from '../data/themes';
 import {
+  ColoringApiError,
   generateColoringPageApi,
+  type AdminDebugInfo,
   type ColoringGenerationResponse,
+  type ProviderId,
 } from '../services/coloringApi';
+import { saveGenerationLog } from '../services/firestoreLogs';
 import {
   validateSinglePhotoFile,
   type ValidatedPhoto,
 } from '../utils/photoValidation';
+import { AdminTelemetryPanel } from './AdminTelemetryPanel';
 
 interface PhotoGeneratorSectionProps {
   externalTrigger?: number;
@@ -61,8 +69,20 @@ async function downloadColoringResultAsPng(result: ColoringGenerationResponse) {
 export function PhotoGeneratorSection({
   externalTrigger = 0,
 }: PhotoGeneratorSectionProps) {
+  const {
+    user,
+    isAdmin,
+    idToken,
+    promptVersions,
+    activePromptVersion,
+    providers,
+  } = useAuth();
+
   const [selectedThemeId, setSelectedThemeId] = useState<ThemeId | null>('pirati');
   const [photo, setPhoto] = useState<ValidatedPhoto | null>(null);
+
+  const [selectedPromptVersion, setSelectedPromptVersion] = useState<string>('');
+  const [selectedProviderId, setSelectedProviderId] = useState<ProviderId | ''>('');
 
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -71,12 +91,38 @@ export function PhotoGeneratorSection({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [apiErrorDetails, setApiErrorDetails] = useState<AdminDebugInfo | null>(
+    null
+  );
+  const [copiedError, setCopiedError] = useState(false);
   const [result, setResult] = useState<ColoringGenerationResponse | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
   const photoRef = useRef<ValidatedPhoto | null>(photo);
   photoRef.current = photo;
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedPromptVersion('');
+      setSelectedProviderId('');
+      return;
+    }
+
+    if (activePromptVersion && !selectedPromptVersion) {
+      setSelectedPromptVersion(activePromptVersion);
+    }
+    const defaultProvider = providers.find((p) => p.isDefault);
+    if (defaultProvider && !selectedProviderId) {
+      setSelectedProviderId(defaultProvider.id);
+    }
+  }, [
+    isAdmin,
+    activePromptVersion,
+    providers,
+    selectedPromptVersion,
+    selectedProviderId,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -91,6 +137,7 @@ export function PhotoGeneratorSection({
     setIsValidatingPhoto(true);
     setPhotoError(null);
     setApiError(null);
+    setApiErrorDetails(null);
 
     const { accepted, rejected } = await validateSinglePhotoFile(files[0]);
     if (rejected) {
@@ -120,12 +167,46 @@ export function PhotoGeneratorSection({
     setResult(null);
     setPhotoError(null);
     setApiError(null);
+    setApiErrorDetails(null);
+    setCopiedError(false);
+  };
+
+  const handleCopyAdminError = async () => {
+    if (!apiError) return;
+    const lines: string[] = [`Errore: ${apiError}`];
+    if (apiErrorDetails) {
+      if (apiErrorDetails.statusCode !== undefined) {
+        lines.push(
+          `HTTP: ${apiErrorDetails.statusCode} ${apiErrorDetails.statusText ?? ''} (${apiErrorDetails.contentType ?? 'unknown'})`.trim()
+        );
+      }
+      if (apiErrorDetails.backendDetails) {
+        lines.push(
+          `Classe: ${apiErrorDetails.backendDetails.errorName ?? 'Error'} · Provider: ${apiErrorDetails.backendDetails.provider ?? 'default'}`
+        );
+        if (apiErrorDetails.backendDetails.rawMessage) {
+          lines.push(`Raw message:\n${apiErrorDetails.backendDetails.rawMessage}`);
+        }
+      }
+      if (apiErrorDetails.rawBodySnippet) {
+        lines.push(`Raw response:\n${apiErrorDetails.rawBodySnippet}`);
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n\n'));
+      setCopiedError(true);
+      window.setTimeout(() => setCopiedError(false), 2000);
+    } catch {
+      // Fallback ignored if clipboard permissions are blocked
+    }
   };
 
   const runGeneration = async () => {
     setThemeError(null);
     setPhotoError(null);
     setApiError(null);
+    setApiErrorDetails(null);
+    setCopiedError(false);
 
     if (!selectedThemeId) {
       setThemeError('Scegli uno dei sei mondi illustrati.');
@@ -138,20 +219,48 @@ export function PhotoGeneratorSection({
 
     setIsGenerating(true);
     try {
+      const freshToken =
+        isAdmin && user ? await user.getIdToken() : idToken ?? undefined;
+
       const generated = await generateColoringPageApi({
         file: photo.file,
         themeId: selectedThemeId,
+        providerId: isAdmin && selectedProviderId ? selectedProviderId : undefined,
+        promptVersion:
+          isAdmin && selectedPromptVersion ? selectedPromptVersion : undefined,
+        idToken: freshToken,
       });
       setResult(generated);
+
+      if (isAdmin && user && generated.adminTelemetry) {
+        void saveGenerationLog({
+          adminUid: user.uid,
+          themeId: selectedThemeId,
+          telemetry: generated.adminTelemetry,
+        }).catch((err) => {
+          console.warn('Firestore generation log save failed:', err);
+        });
+      }
+
       window.setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 60);
     } catch (err) {
-      setApiError(
-        err instanceof Error
-          ? err.message
-          : 'Errore imprevisto durante la generazione. Riprova.'
-      );
+      if (err instanceof ColoringApiError) {
+        setApiError(err.message);
+        setApiErrorDetails(err.adminDebugInfo ?? null);
+      } else {
+        setApiError(
+          err instanceof Error
+            ? err.message
+            : 'Errore imprevisto durante la generazione. Riprova.'
+        );
+        setApiErrorDetails(
+          err instanceof Error
+            ? { rawBodySnippet: `${err.name}: ${err.message}` }
+            : { rawBodySnippet: String(err) }
+        );
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -387,22 +496,139 @@ export function PhotoGeneratorSection({
             </p>
           </div>
 
+          {isAdmin && (
+            <div className="rounded-xl border border-zinc-200 bg-[#FBFBF9] p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#B83B1F]" aria-hidden="true" />
+                <span>Controlli Admin</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="block space-y-1">
+                  <span className="text-xs font-medium text-zinc-700">
+                    Versione prompt
+                  </span>
+                  <select
+                    value={selectedPromptVersion}
+                    onChange={(e) => setSelectedPromptVersion(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-[#B83B1F] focus:outline-none"
+                  >
+                    {promptVersions.map((ver) => (
+                      <option key={ver} value={ver}>
+                        {ver}
+                        {ver === activePromptVersion ? ' (attiva)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block space-y-1">
+                  <span className="text-xs font-medium text-zinc-700">
+                    Provider AI configurato
+                  </span>
+                  <select
+                    value={selectedProviderId}
+                    onChange={(e) =>
+                      setSelectedProviderId(e.target.value as ProviderId)
+                    }
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-[#B83B1F] focus:outline-none"
+                  >
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id} disabled={!p.configured}>
+                        {p.label} · {p.model}
+                        {!p.configured ? ' (non configurato)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+
           {apiError && (
             <div
-              className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3"
               role="alert"
             >
               <div className="flex items-start gap-2 text-sm text-red-800">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{apiError}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => void runGeneration()}
-                className="text-sm font-semibold text-red-900 underline hover:no-underline cursor-pointer"
-              >
-                Riprova generazione
-              </button>
+
+              {isAdmin && apiErrorDetails && (
+                <div className="rounded-lg border border-red-200 bg-white p-3 space-y-2 text-xs text-red-950">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-[11px] uppercase tracking-wider text-red-700">
+                      Dettaglio errore completo (Admin)
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyAdminError()}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-300 bg-[#FBFBF9] hover:bg-zinc-100 text-[11px] font-medium text-zinc-800 transition-colors cursor-pointer shrink-0"
+                    >
+                      {copiedError ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-700" aria-hidden="true" />
+                          <span>Copiato</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                          <span>Copia</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="font-mono-num space-y-1 break-words">
+                    {apiErrorDetails.statusCode !== undefined && (
+                      <p>
+                        HTTP: {apiErrorDetails.statusCode}{' '}
+                        {apiErrorDetails.statusText ?? ''}{' '}
+                        {apiErrorDetails.contentType
+                          ? `(${apiErrorDetails.contentType})`
+                          : ''}
+                      </p>
+                    )}
+                    {apiErrorDetails.backendDetails && (
+                      <>
+                        <p>
+                          Classe: {apiErrorDetails.backendDetails.errorName ?? 'Error'} ·
+                          Provider: {apiErrorDetails.backendDetails.provider ?? 'default'}
+                        </p>
+                        {apiErrorDetails.backendDetails.rawMessage && (
+                          <pre className="mt-1 whitespace-pre-wrap rounded bg-red-50/70 p-2 text-[11px] text-red-900 overflow-x-auto">
+                            {apiErrorDetails.backendDetails.rawMessage}
+                          </pre>
+                        )}
+                      </>
+                    )}
+                    {apiErrorDetails.rawBodySnippet && (
+                      <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-50 border border-zinc-200 p-2 text-[11px] text-zinc-800 overflow-x-auto">
+                        {apiErrorDetails.rawBodySnippet}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => void runGeneration()}
+                  className="text-sm font-semibold text-red-900 underline hover:no-underline cursor-pointer"
+                >
+                  Riprova generazione
+                </button>
+                {apiErrorDetails?.isProxyCookieCheck && (
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="text-sm font-semibold text-zinc-800 underline hover:no-underline cursor-pointer"
+                  >
+                    Ricarica la pagina
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -490,6 +716,11 @@ export function PhotoGeneratorSection({
             </figure>
           </div>
         </div>
+      )}
+
+      {/* Telemetria costi e storico Firestore visibile solo all'Admin autenticato */}
+      {isAdmin && (
+        <AdminTelemetryPanel latestTelemetry={result?.adminTelemetry ?? null} />
       )}
     </div>
   );

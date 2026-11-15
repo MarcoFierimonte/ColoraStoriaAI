@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
+import { verifyOptionalAdmin } from '../middleware/adminAuth.ts';
 import { getColoringProvider, listProviderStatuses } from '../providers/index.ts';
 import {
   ALLOWED_THEME_IDS,
@@ -7,7 +8,7 @@ import {
   ProviderExecutionError,
   type ThemeId,
 } from '../providers/types.ts';
-import { getActivePromptVersion } from '../utils/prompts.ts';
+import { getActivePromptVersion, listPromptVersions } from '../utils/prompts.ts';
 
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -47,6 +48,19 @@ export function createColoringRouter(): Router {
     });
   });
 
+  router.get('/admin/session', async (req: Request, res: Response) => {
+    const adminCtx = await verifyOptionalAdmin(req);
+    res.json({
+      authenticated: adminCtx.authenticated,
+      isAdmin: adminCtx.isAdmin,
+      email: adminCtx.email ?? null,
+      uid: adminCtx.uid ?? null,
+      promptVersions: adminCtx.isAdmin ? listPromptVersions() : [],
+      activePromptVersion: adminCtx.isAdmin ? getActivePromptVersion() : null,
+      providers: adminCtx.isAdmin ? listProviderStatuses() : [],
+    });
+  });
+
   router.post(
     '/coloring/generate',
     (req: Request, res: Response, next: NextFunction) => {
@@ -69,50 +83,138 @@ export function createColoringRouter(): Router {
       });
     },
     async (req: Request, res: Response) => {
+      let isAdminUser = false;
+      let requestedProviderName: string | undefined;
       try {
+        const adminCtx = await verifyOptionalAdmin(req);
+        isAdminUser = adminCtx.isAdmin;
         const file = req.file;
         if (!file) {
           res.status(400).json({
             error: 'Seleziona una foto prima di avviare la generazione.',
+            ...(isAdminUser
+              ? {
+                  adminErrorDetails: {
+                    statusCode: 400,
+                    errorName: 'ValidationError',
+                    rawMessage: 'req.file is missing in multipart/form-data request',
+                    timestamp: new Date().toISOString(),
+                  },
+                }
+              : {}),
           });
           return;
         }
 
-        const rawTheme = typeof req.body?.theme === 'string' ? req.body.theme.trim() : '';
+        const rawTheme =
+          typeof req.body?.theme === 'string' ? req.body.theme.trim() : '';
         if (!isAllowedThemeId(rawTheme)) {
           res.status(400).json({
             error: 'Seleziona uno dei sei mondi illustrati disponibili.',
+            ...(isAdminUser
+              ? {
+                  adminErrorDetails: {
+                    statusCode: 400,
+                    errorName: 'ValidationError',
+                    rawMessage: `Invalid themeId received: "${rawTheme}"`,
+                    timestamp: new Date().toISOString(),
+                  },
+                }
+              : {}),
           });
           return;
         }
 
         const requestedProvider =
-          typeof req.body?.provider === 'string' ? req.body.provider.trim() : undefined;
+          adminCtx.isAdmin && typeof req.body?.provider === 'string'
+            ? req.body.provider.trim()
+            : undefined;
+        requestedProviderName = requestedProvider;
+        const requestedPromptVersion =
+          adminCtx.isAdmin && typeof req.body?.promptVersion === 'string'
+            ? req.body.promptVersion.trim()
+            : undefined;
+
         const provider = getColoringProvider(requestedProvider);
 
         const result = await provider.generateColoringPage({
           imageBuffer: file.buffer,
           mimeType: file.mimetype,
           themeId: rawTheme,
+          promptVersionOverride: requestedPromptVersion || undefined,
         });
 
-        res.json({
+        console.info(
+          `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} theme=${rawTheme} format=${result.outputFormat} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
+        );
+
+        const responsePayload: Record<string, unknown> = {
           ok: true,
-          ...result,
-        });
+          provider: result.provider,
+          model: result.model,
+          outputFormat: result.outputFormat,
+          imageDataUrl: result.imageDataUrl,
+          svgMarkup: result.svgMarkup,
+          sceneSummary: result.sceneSummary,
+        };
+
+        if (adminCtx.isAdmin) {
+          responsePayload.adminTelemetry = {
+            provider: result.provider,
+            model: result.model,
+            promptVersion: result.promptVersion,
+            outputFormat: result.outputFormat,
+            latencyMs: result.latencyMs,
+            ...result.usage,
+          };
+        }
+
+        res.json(responsePayload);
       } catch (error) {
         if (
           error instanceof ProviderConfigurationError ||
           error instanceof ProviderExecutionError
         ) {
-          res.status(error.statusCode).json({ error: error.message });
+          console.error(
+            `[${error.name}] status=${error.statusCode} message="${error.message}" raw="${error.rawDetails ?? ''}"`
+          );
+          res.status(error.statusCode).json({
+            error: error.message,
+            ...(isAdminUser
+              ? {
+                  adminErrorDetails: {
+                    statusCode: error.statusCode,
+                    errorName: error.name,
+                    provider: requestedProviderName ?? 'default',
+                    rawMessage: error.rawDetails || error.message,
+                    timestamp: new Date().toISOString(),
+                  },
+                }
+              : {}),
+          });
           return;
         }
 
         console.error('Unexpected coloring generation error:', error);
+        const rawUnexpected =
+          error instanceof Error
+            ? `${error.name}: ${error.message}\n${error.stack ?? ''}`
+            : String(error);
         res.status(500).json({
           error:
             'Errore imprevisto sul server durante la creazione della pagina. Riprova tra poco.',
+          ...(isAdminUser
+            ? {
+                adminErrorDetails: {
+                  statusCode: 500,
+                  errorName:
+                    error instanceof Error ? error.name : 'UnexpectedError',
+                  provider: requestedProviderName ?? 'default',
+                  rawMessage: rawUnexpected.slice(0, 1500),
+                  timestamp: new Date().toISOString(),
+                },
+              }
+            : {}),
         });
       }
     }

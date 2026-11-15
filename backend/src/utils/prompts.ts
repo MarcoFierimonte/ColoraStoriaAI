@@ -25,13 +25,13 @@ function extractVersionNumber(version: string): number {
   return match ? Number(match[1]) : -1;
 }
 
-function resolveActivePromptVersion(): string {
+function readPromptsConfig(): {
+  activeVersion: string;
+  availableVersions: string[];
+} {
   const configPath = path.join(PROMPTS_ROOT, 'config.json');
   const rawConfig = fs.readFileSync(configPath, 'utf8');
   const parsed = JSON.parse(rawConfig) as PromptsConfigFile;
-
-  const envOverride = getServerConfig().promptVersion;
-  const requested = envOverride || parsed.activeVersion || 'latest';
 
   const availableVersions = (parsed.versions ?? [])
     .map((v) => v.trim())
@@ -40,6 +40,24 @@ function resolveActivePromptVersion(): string {
   if (availableVersions.length === 0) {
     throw new Error('Nessuna versione prompt trovata in prompts/config.json');
   }
+
+  return {
+    activeVersion: parsed.activeVersion || 'latest',
+    availableVersions,
+  };
+}
+
+export function listPromptVersions(): string[] {
+  const { availableVersions } = readPromptsConfig();
+  return [...availableVersions].sort(
+    (a, b) => extractVersionNumber(a) - extractVersionNumber(b)
+  );
+}
+
+function resolveActivePromptVersion(): string {
+  const { activeVersion, availableVersions } = readPromptsConfig();
+  const envOverride = getServerConfig().promptVersion;
+  const requested = envOverride || activeVersion || 'latest';
 
   if (requested !== 'latest') {
     if (!availableVersions.includes(requested)) {
@@ -57,7 +75,16 @@ function resolveActivePromptVersion(): string {
 }
 
 function loadPromptBundle(versionOverride?: string): PromptBundle {
-  const version = versionOverride || resolveActivePromptVersion();
+  const { availableVersions } = readPromptsConfig();
+  const requested = versionOverride?.trim();
+  const version = requested || resolveActivePromptVersion();
+
+  if (!availableVersions.includes(version)) {
+    throw new Error(
+      `Versione prompt "${version}" non trovata tra quelle configurate (${availableVersions.join(', ')})`
+    );
+  }
+
   const versionDir = path.join(PROMPTS_ROOT, version);
 
   const basePrompt = fs

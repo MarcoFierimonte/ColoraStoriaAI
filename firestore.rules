@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny all reads/writes unless explicitly allowed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email == 'marco.fierimonte@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        request.auth.token.email_verified == true &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidAdminDoc(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'role', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.role == 'admin' &&
+        data.createdAt == request.time;
+    }
+
+    function isValidGenerationLog(data) {
+      return data.keys().hasAll([
+          'adminUid',
+          'provider',
+          'model',
+          'promptVersion',
+          'themeId',
+          'outputFormat',
+          'inputTokens',
+          'cachedInputTokens',
+          'textOutputTokens',
+          'imageOutputTokens',
+          'estimatedCostUsd',
+          'latencyMs',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'adminUid',
+          'provider',
+          'model',
+          'promptVersion',
+          'themeId',
+          'outputFormat',
+          'inputTokens',
+          'cachedInputTokens',
+          'textOutputTokens',
+          'imageOutputTokens',
+          'estimatedCostUsd',
+          'latencyMs',
+          'createdAt'
+        ]) &&
+        data.adminUid is string &&
+        data.adminUid == request.auth.uid &&
+        data.adminUid.size() >= 1 && data.adminUid.size() <= 128 &&
+        data.adminUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.provider in ['gemini', 'openai'] &&
+        data.model is string && data.model.size() >= 1 && data.model.size() <= 80 &&
+        data.promptVersion is string && data.promptVersion.size() >= 2 && data.promptVersion.size() <= 20 &&
+        data.promptVersion.matches('^v[0-9]+$') &&
+        data.themeId in ['pirati', 'unicorni', 'draghi', 'spazio', 'dinosauri', 'principessa'] &&
+        data.outputFormat in ['svg', 'raster'] &&
+        data.inputTokens is int && data.inputTokens >= 0 && data.inputTokens <= 1000000 &&
+        data.cachedInputTokens is int && data.cachedInputTokens >= 0 && data.cachedInputTokens <= 1000000 &&
+        data.textOutputTokens is int && data.textOutputTokens >= 0 && data.textOutputTokens <= 1000000 &&
+        data.imageOutputTokens is int && data.imageOutputTokens >= 0 && data.imageOutputTokens <= 1000000 &&
+        (data.estimatedCostUsd is float || data.estimatedCostUsd is int) &&
+        data.estimatedCostUsd >= 0 && data.estimatedCostUsd <= 100 &&
+        data.latencyMs is int && data.latencyMs >= 0 && data.latencyMs <= 600000 &&
+        data.createdAt == request.time;
+    }
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isBootstrappedAdmin());
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() && isValidId(adminId) && isValidAdminDoc(incoming()) && incoming().uid == adminId;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+
+    match /generation_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isBootstrappedAdmin() && resource.data.adminUid == request.auth.uid;
+      allow create: if isValidId(logId) && isValidGenerationLog(incoming()) && isAdmin();
+      allow update: if false;
+      allow delete: if isValidId(logId) && isAdmin();
+    }
+  }
+}

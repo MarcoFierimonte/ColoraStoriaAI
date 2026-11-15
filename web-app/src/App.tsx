@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { LogOut, ShieldCheck, X } from 'lucide-react';
 import { HeroComparison } from './components/HeroComparison';
 import { HowItWorks } from './components/HowItWorks';
-import { PhotoGeneratorSection } from './components/PhotoGeneratorSection';
 import { LegalModal, type LegalTopic } from './components/LegalModal';
+import { PhotoGeneratorSection } from './components/PhotoGeneratorSection';
+import { useAuth } from './contexts/AuthContext';
 
 export default function App() {
+  const {
+    user,
+    isAdmin,
+    isSigningIn,
+    authNotice,
+    signInWithGoogle,
+    signOutUser,
+    clearAuthNotice,
+  } = useAuth();
+
   const [activeLegalTopic, setActiveLegalTopic] = useState<LegalTopic | null>(null);
   const [isGeneratorVisible, setIsGeneratorVisible] = useState(false);
   const [externalTrigger, setExternalTrigger] = useState(0);
@@ -164,6 +175,25 @@ export default function App() {
         </section>
       </main>
 
+      {authNotice && (
+        <div
+          role="status"
+          className="border-t border-amber-200 bg-amber-50 py-3 px-4 sm:px-6 lg:px-8"
+        >
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 text-xs sm:text-sm text-amber-900">
+            <span>{authNotice}</span>
+            <button
+              type="button"
+              onClick={clearAuthNotice}
+              aria-label="Chiudi avviso"
+              className="p-1 rounded-md hover:bg-amber-100 text-amber-800 cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 5. Footer minimo */}
       <footer className="border-t border-zinc-200 bg-white py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -203,6 +233,38 @@ export default function App() {
             >
               Informazioni sul recesso
             </button>
+
+            <span className="h-3.5 w-px bg-zinc-300 hidden sm:inline-block" aria-hidden="true" />
+
+            {!user ? (
+              <button
+                type="button"
+                disabled={isSigningIn}
+                onClick={() => void signInWithGoogle()}
+                className="text-xs text-zinc-500 hover:text-zinc-900 underline-offset-4 hover:underline cursor-pointer whitespace-nowrap disabled:opacity-60"
+              >
+                {isSigningIn ? 'Accesso...' : 'Area riservata'}
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-2 text-xs">
+                {isAdmin && (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 font-medium text-emerald-800">
+                    Admin
+                  </span>
+                )}
+                <span className="text-zinc-600 max-w-[180px] truncate">
+                  {user.email}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void signOutUser()}
+                  className="inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-900 underline-offset-4 hover:underline cursor-pointer whitespace-nowrap"
+                >
+                  <LogOut className="w-3 h-3" aria-hidden="true" />
+                  Esci
+                </button>
+              </div>
+            )}
           </nav>
         </div>
       </footer>

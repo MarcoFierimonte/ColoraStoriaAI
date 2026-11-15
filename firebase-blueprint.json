@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator record",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified administrator email",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin"],
+          "description": "Assigned privilege role"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation"
+        }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "GenerationLog": {
+      "title": "GenerationLog",
+      "description": "Per-generation token usage and cost record for admin telemetry",
+      "type": "object",
+      "properties": {
+        "adminUid": {
+          "type": "string",
+          "description": "Firebase UID of the admin who triggered the test generation",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["gemini", "openai"],
+          "description": "AI provider used"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "promptVersion": {
+          "type": "string",
+          "description": "Version tag from prompts/config.json",
+          "minLength": 2,
+          "maxLength": 20,
+          "pattern": "^v[0-9]+$"
+        },
+        "themeId": {
+          "type": "string",
+          "enum": ["pirati", "unicorni", "draghi", "spazio", "dinosauri", "principessa"],
+          "description": "Selected coloring book theme"
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["svg", "raster"],
+          "description": "Output asset format"
+        },
+        "inputTokens": {
+          "type": "integer",
+          "description": "Total input tokens"
+        },
+        "cachedInputTokens": {
+          "type": "integer",
+          "description": "Cached input tokens"
+        },
+        "textOutputTokens": {
+          "type": "integer",
+          "description": "Text and reasoning output tokens"
+        },
+        "imageOutputTokens": {
+          "type": "integer",
+          "description": "Image output tokens"
+        },
+        "estimatedCostUsd": {
+          "type": "number",
+          "description": "Estimated single-image cost in USD"
+        },
+        "latencyMs": {
+          "type": "integer",
+          "description": "End-to-end provider call duration in milliseconds"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of generation"
+        }
+      },
+      "required": [
+        "adminUid",
+        "provider",
+        "model",
+        "promptVersion",
+        "themeId",
+        "outputFormat",
+        "inputTokens",
+        "cachedInputTokens",
+        "textOutputTokens",
+        "imageOutputTokens",
+        "estimatedCostUsd",
+        "latencyMs",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/AdminUser"
+      },
+      "description": "Verified administrator role documents"
+    },
+    "/generation_logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/GenerationLog"
+      },
+      "description": "Admin-only AI generation usage and cost logs"
+    }
+  }
+}
