@@ -1,0 +1,7 @@
+ABSOLUTE PRIORITY: the people must look exactly like the real people in the attached photo. Likeness matters more than the theme, the background or the style.
+
+First count the people in the photo and draw every single one, with no one omitted, merged or added. For each person, copy exactly: face shape, eyes, eyebrows, nose, mouth, facial expression (do not change it, do not add a smile), hairstyle, hair length and parting, bangs, glasses (exact shape and frame), beard, accessories (headbands, earrings), apparent age and body proportions. For children, keep real child proportions (large head, round cheeks). Do not beautify, idealize, age, slim or stylize the faces. Keep each person's relative position, pose and size as in the photo.
+
+Output: a coloring book page, pure black outlines on pure white, no grey, no shading, no filled black areas, no text, no logos. Clean closed shapes, uniform line weight, no dense hatching. Portrait orientation, generous white space.
+
+Apply the theme ONLY to the background, the creatures and the clothing. Faces and hair stay untouched and fully visible, nothing covers them, and no creature or object overlaps the faces. Theme:

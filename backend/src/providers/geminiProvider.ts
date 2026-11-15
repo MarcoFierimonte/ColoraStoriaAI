@@ -157,6 +157,9 @@ export class GeminiColoringProvider implements ColoringProvider {
     base64ImageData: string,
     input: ColoringGenerationInput
   ): Promise<ColoringGenerationOutput> {
+    const { prompt, version: promptVersion } = buildRasterColoringPrompt(
+      input.themeId
+    );
     try {
       const response = await withRetry(() =>
         ai.models.generateContent({
@@ -170,7 +173,7 @@ export class GeminiColoringProvider implements ColoringProvider {
                 },
               },
               {
-                text: buildRasterColoringPrompt(input.themeId),
+                text: prompt,
               },
             ],
           },
@@ -188,6 +191,7 @@ export class GeminiColoringProvider implements ColoringProvider {
           return {
             provider: this.id,
             model,
+            promptVersion,
             outputFormat: 'raster',
             imageDataUrl: `data:${mime};base64,${part.inlineData.data}`,
             sceneSummary: 'Pagina da colorare generata direttamente dalla tua foto.',
@@ -215,6 +219,9 @@ export class GeminiColoringProvider implements ColoringProvider {
     base64ImageData: string,
     input: ColoringGenerationInput
   ): Promise<ColoringGenerationOutput> {
+    const { prompt, version: promptVersion } = buildSvgColoringPrompt(
+      input.themeId
+    );
     try {
       const response = await withRetry(() =>
         ai.models.generateContent({
@@ -228,7 +235,7 @@ export class GeminiColoringProvider implements ColoringProvider {
                 },
               },
               {
-                text: buildSvgColoringPrompt(input.themeId),
+                text: prompt,
               },
             ],
           },
@@ -272,6 +279,7 @@ export class GeminiColoringProvider implements ColoringProvider {
       return {
         provider: this.id,
         model,
+        promptVersion,
         outputFormat: 'svg',
         imageDataUrl: `data:image/svg+xml;base64,${svgBase64}`,
         svgMarkup: cleanSvg,

@@ -7,6 +7,7 @@ import {
   ProviderExecutionError,
   type ThemeId,
 } from '../providers/types.ts';
+import { getActivePromptVersion } from '../utils/prompts.ts';
 
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -34,7 +35,10 @@ export function createColoringRouter(): Router {
   const router = Router();
 
   router.get('/health', (_req: Request, res: Response) => {
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      promptVersion: getActivePromptVersion(),
+    });
   });
 
   router.get('/providers', (_req: Request, res: Response) => {

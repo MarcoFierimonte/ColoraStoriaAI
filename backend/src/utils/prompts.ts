@@ -1,67 +1,116 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { getServerConfig } from '../config/env.ts';
 import type { ThemeId } from '../providers/types.ts';
 
-interface ThemePromptMeta {
-  labelIt: string;
-  worldElementsEn: string;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROMPTS_ROOT = path.resolve(__dirname, '../../../prompts');
+
+interface PromptsConfigFile {
+  activeVersion?: string;
+  versions?: string[];
 }
 
-export const THEME_PROMPT_META: Record<ThemeId, ThemePromptMeta> = {
-  pirati: {
-    labelIt: 'Pirati',
-    worldElementsEn:
-      'a friendly wooden pirate ship, gentle ocean waves, a compass or spyglass, a treasure map, and a palm-tree island',
-  },
-  unicorni: {
-    labelIt: 'Unicorni',
-    worldElementsEn:
-      'a gentle smiling unicorn, a sweeping rainbow, fluffy clouds, twinkling stars, and meadow flowers',
-  },
-  draghi: {
-    labelIt: 'Draghi',
-    worldElementsEn:
-      'a cheerful friendly baby dragon with rounded wings, rolling hills, distant storybook castle towers, and puffy clouds',
-  },
-  spazio: {
-    labelIt: 'Spazio',
-    worldElementsEn:
-      'a playful space rocket, ringed planets, a smiling crescent moon, floating stars, and a gentle astronaut helmet or suit',
-  },
-  dinosauri: {
-    labelIt: 'Dinosauri',
-    worldElementsEn:
-      'a friendly long-necked dinosaur, giant fern leaves, rounded prehistoric hills, and a calm volcano in the background',
-  },
-  principessa: {
-    labelIt: 'Principessa',
-    worldElementsEn:
-      'a fairytale storybook castle, blooming garden arches, butterflies, stars, and a small crown or royal cape',
-  },
-};
-
-export function buildRasterColoringPrompt(themeId: ThemeId): string {
-  const meta = THEME_PROMPT_META[themeId];
-  return [
-    'Transform the subject from the provided photograph into a clean black-and-white children coloring book page.',
-    'Preserve the subject facial expression, hairstyle, pose, and distinctive features in a warm, recognizable storybook line-art style.',
-    `Place the subject inside a themed scene featuring ${meta.worldElementsEn}.`,
-    'Output strictly pure black ink outlines on a pure white background (#FFFFFF).',
-    'No gray shading, no gradients, no crosshatching, no color fills, and no text or watermarks.',
-    'Keep shapes large, open, and crisp so children can easily color them with crayons or markers.',
-  ].join(' ');
+interface PromptBundle {
+  version: string;
+  basePrompt: string;
+  themes: Record<ThemeId, string>;
+  svgAdapter: string;
 }
 
-export function buildSvgColoringPrompt(themeId: ThemeId): string {
-  const meta = THEME_PROMPT_META[themeId];
-  return [
-    'You are an expert children coloring-book illustrator creating crisp black-and-white vector line art.',
-    'Analyze the uploaded photograph carefully: observe the main person or subject (hairstyle, glasses or hat if any, facial expression, clothing silhouette, and pose).',
-    `Redraw that recognizable subject as the central hero of a storybook coloring page themed around "${meta.labelIt}" featuring ${meta.worldElementsEn}.`,
-    'Rules for the SVG output:',
-    '1. Output valid standalone SVG with viewBox="0 0 800 1000" and xmlns="http://www.w3.org/2000/svg".',
-    '2. Start with a pure white background <rect width="800" height="1000" fill="#FFFFFF" /> and include a neat rounded outer frame.',
-    '3. Draw ONLY crisp black outlines (stroke="#111111", stroke-width between 3 and 5, stroke-linecap="round", stroke-linejoin="round") and white/none fills (fill="#FFFFFF" or fill="none") so overlapping shapes stay clean.',
-    '4. Use NO gray shading, NO gradients, NO colored fills, NO <image>, NO <script>, and NO text labels.',
-    '5. Build rich, expressive, child-friendly vector paths (25 to 60 well-crafted paths/shapes) with large open areas easy to color with crayons.',
-    '6. Also write a brief warm description in Italian (1-2 sentences, field "sceneSummary") describing the generated coloring page.',
-  ].join('\n');
+function extractVersionNumber(version: string): number {
+  const match = /^v(\d+)$/i.exec(version.trim());
+  return match ? Number(match[1]) : -1;
+}
+
+function resolveActivePromptVersion(): string {
+  const configPath = path.join(PROMPTS_ROOT, 'config.json');
+  const rawConfig = fs.readFileSync(configPath, 'utf8');
+  const parsed = JSON.parse(rawConfig) as PromptsConfigFile;
+
+  const envOverride = getServerConfig().promptVersion;
+  const requested = envOverride || parsed.activeVersion || 'latest';
+
+  const availableVersions = (parsed.versions ?? [])
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  if (availableVersions.length === 0) {
+    throw new Error('Nessuna versione prompt trovata in prompts/config.json');
+  }
+
+  if (requested !== 'latest') {
+    if (!availableVersions.includes(requested)) {
+      throw new Error(
+        `Versione prompt "${requested}" non trovata tra quelle configurate (${availableVersions.join(', ')})`
+      );
+    }
+    return requested;
+  }
+
+  const sorted = [...availableVersions].sort(
+    (a, b) => extractVersionNumber(a) - extractVersionNumber(b)
+  );
+  return sorted[sorted.length - 1];
+}
+
+function loadPromptBundle(versionOverride?: string): PromptBundle {
+  const version = versionOverride || resolveActivePromptVersion();
+  const versionDir = path.join(PROMPTS_ROOT, version);
+
+  const basePrompt = fs
+    .readFileSync(path.join(versionDir, 'base.txt'), 'utf8')
+    .trim();
+  const themes = JSON.parse(
+    fs.readFileSync(path.join(versionDir, 'themes.json'), 'utf8')
+  ) as Record<ThemeId, string>;
+  const svgAdapterPath = path.join(versionDir, 'svg-adapter.txt');
+  const svgAdapter = fs.existsSync(svgAdapterPath)
+    ? fs.readFileSync(svgAdapterPath, 'utf8').trim()
+    : '';
+
+  return {
+    version,
+    basePrompt,
+    themes,
+    svgAdapter,
+  };
+}
+
+export function getActivePromptVersion(): string {
+  return resolveActivePromptVersion();
+}
+
+export function buildRasterColoringPrompt(
+  themeId: ThemeId,
+  versionOverride?: string
+): { prompt: string; version: string } {
+  const bundle = loadPromptBundle(versionOverride);
+  const themeBlock = bundle.themes[themeId];
+  if (!themeBlock) {
+    throw new Error(
+      `Blocco tema "${themeId}" mancante nella versione prompt ${bundle.version}`
+    );
+  }
+  return {
+    version: bundle.version,
+    prompt: `${bundle.basePrompt}\n${themeBlock}`,
+  };
+}
+
+export function buildSvgColoringPrompt(
+  themeId: ThemeId,
+  versionOverride?: string
+): { prompt: string; version: string } {
+  const { prompt, version } = buildRasterColoringPrompt(themeId, versionOverride);
+  const bundle = loadPromptBundle(version);
+  const combined = bundle.svgAdapter
+    ? `${prompt}\n\n${bundle.svgAdapter}`
+    : prompt;
+  return {
+    version,
+    prompt: combined,
+  };
 }

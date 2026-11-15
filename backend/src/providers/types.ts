@@ -20,6 +20,7 @@ export interface ColoringGenerationInput {
 export interface ColoringGenerationOutput {
   provider: SupportedProviderId;
   model: string;
+  promptVersion: string;
   outputFormat: 'svg' | 'raster';
   imageDataUrl: string;
   svgMarkup?: string;

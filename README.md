@@ -5,6 +5,7 @@ Web app that turns personal photos into printable coloring-book pages using a se
 ## Repository Layout
 - `web-app/` — React + TypeScript + Tailwind CSS frontend (`web-app/README.md`).
 - `backend/` — Express + TypeScript API server with pluggable AI providers (`backend/README.md`).
+- `prompts/` — Versioned prompt library and `config.json` version selector (`prompts/README.md`).
 - `server.ts` — Root entry point delegating to `backend/server.ts`.
 - `.env.example` — Required server-side environment variables.
 
@@ -17,6 +18,7 @@ npm run dev
 ## Environment Variables
 Copy `.env.example` or set secrets in your hosting environment:
 - `AI_PROVIDER=gemini` (`gemini` or `openai`)
+- `PROMPT_VERSION` — Optional override (defaults to `prompts/config.json` `activeVersion: "latest"`)
 - `GEMINI_API_KEY` — Required for the default Gemini provider
 - `GEMINI_MODEL=gemini-4-hydrogen` — Free tier default model
 - `OPENAI_API_KEY` / `OPENAI_MODEL=gpt-image-1` — Optional OpenAI configuration

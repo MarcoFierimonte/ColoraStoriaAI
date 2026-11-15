@@ -1,0 +1,5 @@
+VECTOR SVG OUTPUT FORMAT (for SVG-capable text/vision models):
+Render the complete scene above as a valid standalone SVG with viewBox="0 0 800 1000" and xmlns="http://www.w3.org/2000/svg".
+Start with <rect width="800" height="1000" fill="#FFFFFF" /> and use ONLY pure black strokes (stroke="#111111", stroke-width="3" to "5", stroke-linecap="round", stroke-linejoin="round") and fill="#FFFFFF" or fill="none".
+No grey, no shading, no gradients, no filled black areas, no <image>, no <script>, and no text/logos inside the SVG.
+Also provide a brief warm 1-2 sentence Italian summary in "sceneSummary" describing the generated coloring page.
