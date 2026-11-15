@@ -1,26 +1,28 @@
 import { useState } from 'react';
-import { BookOpen, ImagePlus, MailCheck } from 'lucide-react';
-import { ORDER_CONFIG, VISUAL_PLACEHOLDERS } from '../config/orderConfig';
+import { BookOpen, ImagePlus, Printer } from 'lucide-react';
+import { VISUAL_PLACEHOLDERS } from '../config/orderConfig';
 
 const STEPS = [
   {
     number: '01',
     title: 'Scegli il mondo',
     description:
-      'Seleziona uno dei sei mondi illustrati disponibili e scrivi il titolo da stampare sulla copertina.',
+      'Seleziona uno dei sei mondi illustrati in stile libro da colorare.',
     Icon: BookOpen,
   },
   {
     number: '02',
-    title: 'Carica le foto',
-    description: `Carica da ${ORDER_CONFIG.minPhotos} a ${ORDER_CONFIG.maxPhotos} foto nitide e luminose, poi mettile nell’ordine che preferisci.`,
+    title: 'Carica una foto',
+    description:
+      'Inserisci una foto nitida e luminosa con il volto ben visibile.',
     Icon: ImagePlus,
   },
   {
     number: '03',
-    title: 'Ricevi il PDF via email',
-    description: `In ${ORDER_CONFIG.estimatedDelivery} ricevi nella tua casella email il libro completo pronto da stampare su fogli A4.`,
-    Icon: MailCheck,
+    title: 'Ottieni il disegno pronto',
+    description:
+      'Il server trasforma la foto in una pagina in bianco e nero pronta da scaricare e stampare.',
+    Icon: Printer,
   },
 ];
 
@@ -44,7 +46,7 @@ export function HowItWorks() {
                 Come funziona
               </h2>
               <p className="mt-3 text-base sm:text-lg text-zinc-600 leading-relaxed">
-                Tre passaggi semplici per trasformare i ricordi di famiglia in pagine pronte per matite e pennarelli.
+                Tre passaggi semplici per trasformare una fotografia in una pagina pronta per matite e pennarelli.
               </p>
             </div>
 
