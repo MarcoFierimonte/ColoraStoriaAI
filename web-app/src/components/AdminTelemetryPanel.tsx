@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import type { AdminTelemetry } from '../services/coloringApi';
+import { useAuth } from '../modules/auth';
+import type { AdminTelemetry } from '../modules/coloring-api';
 import {
   deleteGenerationLog,
   subscribeGenerationLogs,
   type GenerationLogRecord,
-} from '../services/firestoreLogs';
+} from '../modules/database';
 import { TempModelCostEstimatorPanel } from './TempModelCostEstimatorPanel';
 
 interface AdminTelemetryPanelProps {

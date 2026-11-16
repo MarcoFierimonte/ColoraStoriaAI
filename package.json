@@ -10,7 +10,7 @@
     "prebuild": "[ -d node_modules/.bin ] || bun install || npm install",
     "build": "vite build --config web-app/vite.config.ts",
     "prelint": "[ -d node_modules/.bin ] || bun install || npm install",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && eslint .",
     "prompts:sync": "node prompts/sync-manual.mjs"
   },
   "dependencies": {

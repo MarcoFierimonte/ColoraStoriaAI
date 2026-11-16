@@ -1,14 +1,26 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
-import { verifyOptionalAdmin } from '../middleware/adminAuth.ts';
-import { getColoringProvider, listProviderStatuses } from '../providers/index.ts';
 import {
-  ALLOWED_THEME_IDS,
+  isAllowedThemeId,
+  type AdminSessionResponse,
+  type ColoringGenerationResponse,
+  type HealthResponse,
+  type ProvidersListResponse,
+} from '../../../shared/types/index.ts';
+import {
   ProviderConfigurationError,
   ProviderExecutionError,
-  type ThemeId,
-} from '../providers/types.ts';
-import { getActivePromptVersion, listPromptVersions } from '../utils/prompts.ts';
+  aiProviderRegistry,
+  type AiProviderRegistry,
+} from '../modules/ai-providers/index.ts';
+import {
+  authTokenVerifier,
+  type AuthTokenVerifier,
+} from '../modules/auth/index.ts';
+import {
+  promptRepository,
+  type PromptRepository,
+} from '../modules/prompts/index.ts';
 
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -28,37 +40,50 @@ const upload = multer({
   },
 });
 
-function isAllowedThemeId(value: string): value is ThemeId {
-  return (ALLOWED_THEME_IDS as readonly string[]).includes(value);
+export interface ColoringRouterDeps {
+  providers: AiProviderRegistry;
+  auth: AuthTokenVerifier;
+  prompts: PromptRepository;
 }
 
-export function createColoringRouter(): Router {
+export function createColoringRouter(
+  deps: ColoringRouterDeps = {
+    providers: aiProviderRegistry,
+    auth: authTokenVerifier,
+    prompts: promptRepository,
+  }
+): Router {
   const router = Router();
 
   router.get('/health', (_req: Request, res: Response) => {
-    res.json({
+    const payload: HealthResponse = {
       ok: true,
-      promptVersion: getActivePromptVersion(),
-    });
+      promptVersion: deps.prompts.getActiveVersion(),
+    };
+    res.json(payload);
   });
 
   router.get('/providers', (_req: Request, res: Response) => {
-    res.json({
-      providers: listProviderStatuses(),
-    });
+    const payload: ProvidersListResponse = {
+      providers: deps.providers.listStatuses(),
+    };
+    res.json(payload);
   });
 
   router.get('/admin/session', async (req: Request, res: Response) => {
-    const adminCtx = await verifyOptionalAdmin(req);
-    res.json({
+    const adminCtx = await deps.auth.verifyOptionalRequest(req);
+    const payload: AdminSessionResponse = {
       authenticated: adminCtx.authenticated,
       isAdmin: adminCtx.isAdmin,
       email: adminCtx.email ?? null,
       uid: adminCtx.uid ?? null,
-      promptVersions: adminCtx.isAdmin ? listPromptVersions() : [],
-      activePromptVersion: adminCtx.isAdmin ? getActivePromptVersion() : null,
-      providers: adminCtx.isAdmin ? listProviderStatuses() : [],
-    });
+      promptVersions: adminCtx.isAdmin ? deps.prompts.listVersions() : [],
+      activePromptVersion: adminCtx.isAdmin
+        ? deps.prompts.getActiveVersion()
+        : null,
+      providers: adminCtx.isAdmin ? deps.providers.listStatuses() : [],
+    };
+    res.json(payload);
   });
 
   router.post(
@@ -86,7 +111,7 @@ export function createColoringRouter(): Router {
       let isAdminUser = false;
       let requestedProviderName: string | undefined;
       try {
-        const adminCtx = await verifyOptionalAdmin(req);
+        const adminCtx = await deps.auth.verifyOptionalRequest(req);
         isAdminUser = adminCtx.isAdmin;
         const file = req.file;
         if (!file) {
@@ -135,7 +160,7 @@ export function createColoringRouter(): Router {
             ? req.body.promptVersion.trim()
             : undefined;
 
-        const provider = getColoringProvider(requestedProvider);
+        const provider = deps.providers.getProvider(requestedProvider);
 
         const result = await provider.generateColoringPage({
           imageBuffer: file.buffer,
@@ -148,7 +173,7 @@ export function createColoringRouter(): Router {
           `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} theme=${rawTheme} format=${result.outputFormat} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
         );
 
-        const responsePayload: Record<string, unknown> = {
+        const responsePayload: ColoringGenerationResponse = {
           ok: true,
           provider: result.provider,
           model: result.model,
@@ -156,18 +181,19 @@ export function createColoringRouter(): Router {
           imageDataUrl: result.imageDataUrl,
           svgMarkup: result.svgMarkup,
           sceneSummary: result.sceneSummary,
+          ...(adminCtx.isAdmin
+            ? {
+                adminTelemetry: {
+                  provider: result.provider,
+                  model: result.model,
+                  promptVersion: result.promptVersion,
+                  outputFormat: result.outputFormat,
+                  latencyMs: result.latencyMs,
+                  ...result.usage,
+                },
+              }
+            : {}),
         };
-
-        if (adminCtx.isAdmin) {
-          responsePayload.adminTelemetry = {
-            provider: result.provider,
-            model: result.model,
-            promptVersion: result.promptVersion,
-            outputFormat: result.outputFormat,
-            latencyMs: result.latencyMs,
-            ...result.usage,
-          };
-        }
 
         res.json(responsePayload);
       } catch (error) {

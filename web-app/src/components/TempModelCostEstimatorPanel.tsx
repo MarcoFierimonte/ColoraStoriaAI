@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AdminTelemetry } from '../services/coloringApi';
+import type { AdminTelemetry } from '../modules/coloring-api';
 
 /**
  * TEMPORARY ISOLATED MODULE

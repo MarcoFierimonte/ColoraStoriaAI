@@ -1,12 +1,7 @@
 import type { ReactNode } from 'react';
+import type { ThemeId } from '../../../shared/types/index.ts';
 
-export type ThemeId =
-  | 'pirati'
-  | 'unicorni'
-  | 'draghi'
-  | 'spazio'
-  | 'dinosauri'
-  | 'principessa';
+export type { ThemeId };
 
 export interface BookTheme {
   id: ThemeId;

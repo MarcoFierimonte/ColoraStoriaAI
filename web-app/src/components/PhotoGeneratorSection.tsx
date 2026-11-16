@@ -13,20 +13,20 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { ORDER_CONFIG } from '../config/orderConfig';
-import { useAuth } from '../contexts/AuthContext';
 import { BOOK_THEMES, type ThemeId } from '../data/themes';
+import { useAuth } from '../modules/auth';
 import {
   ColoringApiError,
   generateColoringPageApi,
   type AdminDebugInfo,
   type ColoringGenerationResponse,
   type ProviderId,
-} from '../services/coloringApi';
-import { saveGenerationLog } from '../services/firestoreLogs';
+} from '../modules/coloring-api';
+import { saveGenerationLog } from '../modules/database';
 import {
   validateSinglePhotoFile,
   type ValidatedPhoto,
-} from '../utils/photoValidation';
+} from '../modules/media-validation';
 import { AdminTelemetryPanel } from './AdminTelemetryPanel';
 
 interface PhotoGeneratorSectionProps {
@@ -76,6 +76,7 @@ export function PhotoGeneratorSection({
     promptVersions,
     activePromptVersion,
     providers,
+    refreshIdToken,
   } = useAuth();
 
   const [selectedThemeId, setSelectedThemeId] = useState<ThemeId | null>('pirati');
@@ -219,8 +220,7 @@ export function PhotoGeneratorSection({
 
     setIsGenerating(true);
     try {
-      const freshToken =
-        isAdmin && user ? await user.getIdToken() : idToken ?? undefined;
+      const freshToken = isAdmin && user ? await refreshIdToken() : idToken;
 
       const generated = await generateColoringPageApi({
         file: photo.file,

@@ -3,8 +3,11 @@
 Web app that turns personal photos into printable coloring-book pages using a server-side, multi-provider AI backend.
 
 ## Repository Layout
-- `web-app/` — React + TypeScript + Tailwind CSS frontend (`web-app/README.md`).
-- `backend/` — Express + TypeScript API server with pluggable AI providers, Firebase Admin verification, and token cost calculation (`backend/README.md`).
+- `AGENTS.md` — Template engineering guidelines enforcing strict Interface vs. Implementation module separation across frontend and backend.
+- `shared/` — Cross-stack TypeScript domain contracts and API DTOs (`shared/types/`) shared by `backend/` and `web-app/`.
+- `web-app/` — React + TypeScript + Tailwind CSS frontend with domain modules under `web-app/src/modules/` (`web-app/README.md`).
+- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` (`backend/README.md`).
+- `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
 - `prompts/` — Versioned prompt library and `config.json` version selector (`prompts/README.md`).
 - `pricing/` — AI model cost estimates for Standard and Batch APIs (`pricing/ai/image-generation-costs.md`).
 - `firebase-blueprint.json` & `firestore.rules` — Firestore schema blueprint and hardened security rules.
@@ -87,5 +90,5 @@ flowchart LR
 - `npm run dev` — Starts Express + Vite dev server on port `3000`.
 - `npm run build` — Builds `web-app/` into `dist/`.
 - `npm run start` — Runs the production server on port `3000`.
-- `npm run lint` — Runs TypeScript checks (`tsc --noEmit`).
+- `npm run lint` — Runs TypeScript checks (`tsc --noEmit`) and ESLint architectural & Firestore rules checks (`eslint .`).
 - `npm run prompts:sync` — Regenerates `manual-test.json` inside every `prompts/v*` folder.

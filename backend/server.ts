@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { getServerConfig } from './src/config/env.ts';
+import { getServerConfig } from './src/modules/config/index.ts';
 import { createColoringRouter } from './src/routes/coloringRoutes.ts';
 
 const __filename = fileURLToPath(import.meta.url);

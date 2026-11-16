@@ -4,7 +4,7 @@ import { HeroComparison } from './components/HeroComparison';
 import { HowItWorks } from './components/HowItWorks';
 import { LegalModal, type LegalTopic } from './components/LegalModal';
 import { PhotoGeneratorSection } from './components/PhotoGeneratorSection';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './modules/auth';
 
 export default function App() {
   const {
