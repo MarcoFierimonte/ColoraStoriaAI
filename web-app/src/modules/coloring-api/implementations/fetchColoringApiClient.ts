@@ -6,7 +6,6 @@ import {
   type ColoringApiClient,
   type ColoringGenerationResponse,
   type GenerateColoringPageRequest,
-  type ProviderStatus,
 } from '../coloringApi.interface';
 
 export class FetchColoringApiClient implements ColoringApiClient {
@@ -14,17 +13,6 @@ export class FetchColoringApiClient implements ColoringApiClient {
 
   constructor(baseUrl = '/api') {
     this.baseUrl = baseUrl.replace(/\/$/, '');
-  }
-
-  async fetchProviders(): Promise<ProviderStatus[]> {
-    const response = await fetch(`${this.baseUrl}/providers`, {
-      credentials: 'same-origin',
-    });
-    if (!response.ok) {
-      throw new Error('Impossibile verificare i provider AI disponibili.');
-    }
-    const data = (await response.json()) as { providers?: ProviderStatus[] };
-    return data.providers ?? [];
   }
 
   async fetchAdminSession(
@@ -68,6 +56,12 @@ export class FetchColoringApiClient implements ColoringApiClient {
     const headers: Record<string, string> = {};
     if (params.idToken) {
       headers.Authorization = `Bearer ${params.idToken}`;
+    }
+    if (params.turnstileToken) {
+      headers['X-Turnstile-Token'] = params.turnstileToken;
+    }
+    if (params.appCheckToken) {
+      headers['X-Firebase-AppCheck'] = params.appCheckToken;
     }
 
     let response: Response;

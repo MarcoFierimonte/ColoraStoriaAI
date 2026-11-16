@@ -35,14 +35,16 @@ modules/<module-name>/
 | Module | Interface (`*.interface.ts`) | Implementation(s) (`implementations/`) | Responsibility |
 | :--- | :--- | :--- | :--- |
 | `config` | `config.interface.ts` (`ConfigService`, `ServerConfig`) | `envConfigService.ts` | Reads & normalizes server environment variables |
-| `auth` | `auth.interface.ts` (`AuthTokenVerifier`, `AdminAuthContext`) | `firebaseAdminTokenVerifier.ts` | Verifies optional Bearer ID tokens & checks `ADMIN_EMAILS` |
+| `auth` | `auth.interface.ts` (`AuthTokenVerifier`, `AdminAuthContext`) | `firebaseAdminTokenVerifier.ts` | Verifies optional Bearer ID tokens (`admin` custom claim or `ADMIN_EMAILS`) |
+| `bot-protection` | `botProtection.interface.ts` (`BotProtectionVerifier`) | `defaultBotProtectionVerifier.ts` | Anti-bot verification (Cloudflare Turnstile / Firebase App Check) |
+| `media-validation` | `mediaValidation.interface.ts` (`ServerMediaValidator`) | `bufferImageValidator.ts` | Server-side JPEG/PNG/WebP magic-bytes & dimension verification |
 | `ai-providers` | `aiProvider.interface.ts` (`ColoringProvider`, `AiProviderRegistry`, errors) | `geminiColoringProvider.ts`, `openaiColoringProvider.ts`, `defaultAiProviderRegistry.ts` | Multi-provider AI generation & provider registry |
 | `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts from `prompts/` & `prompts/config.json` |
 | `cost-estimation` | `costEstimation.interface.ts` (`CostEstimator`, `UsageBreakdown`) | `staticRateCardCostEstimator.ts` | Computes token & image generation costs per model |
 
 Delivery layer (`backend/src/routes/coloringRoutes.ts`):
-- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts }` interfaces.
-- `backend/server.ts` mounts `/api`, serves Vite middleware in dev (`hmr: false`), and uses `app.use(...)` (Express 5-safe) for production SPA fallback.
+- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts, botProtection, mediaValidator }` interfaces.
+- `backend/server.ts` configures `helmet` CSP (`crossOriginOpenerPolicy: same-origin-allow-popups`), `trust proxy`, global JSON error handler, `/api`, serves Vite middleware only when `NODE_ENV === 'development'`, and uses `app.use(...)` (Express 5-safe) for production SPA fallback.
 
 ### Frontend (`web-app/src/modules/`)
 | Module | Interface (`*.interface.ts`) | Implementation(s) (`implementations/`) | Responsibility |
@@ -86,9 +88,10 @@ Delivery layer (`backend/src/routes/coloringRoutes.ts`):
 
 - **Prompts (`prompts/`)**: Prompts are versioned under `prompts/v*` and selected via `prompts/config.json` (`activeVersion: "latest"` or pinned) or `PROMPT_VERSION`. After editing prompt files, run `npm run prompts:sync`.
 - **Pricing (`pricing/`)**: Document model pricing and cost assumptions in `pricing/` and keep rates synchronized with `staticRateCardCostEstimator.ts`.
+- **Technical Wiki (`docs/WIKI.md`)**: **MUST stay up to date.** Whenever you add or remove a library, tool, security layer, module, or architectural pattern, add or update its brief plain-language entry ("Cos'è" + "Come e dov'è usato") in `docs/WIKI.md` (written in accessible Italian for the project owner).
 - **Language**:
   - Source code, TypeScript symbols, comments, `AGENTS.md`, and `README.md` files: **English**.
-  - End-user UI strings in `web-app/`: **Italian** (unless localized for a new template target).
+  - `docs/WIKI.md` and end-user UI strings in `web-app/`: **Italian** (unless localized for a new template target).
 
 ---
 
@@ -96,4 +99,5 @@ Delivery layer (`backend/src/routes/coloringRoutes.ts`):
 
 1. Run `npm run lint` (`tsc --noEmit && eslint .`) — validates TypeScript types, module boundaries (`no-restricted-imports` in `eslint.config.mjs`), and `firestore.rules` security checks in one pass.
 2. Run production bundle check: `npm run build`.
-3. Ensure the server boots cleanly on port `3000` and `GET /api/health` returns `{ "ok": true, ... }`.
+3. Confirm `docs/WIKI.md` is updated if any dependencies, modules, security controls, or architectural choices changed.
+4. Ensure the server boots cleanly on port `3000` and `GET /api/health` returns `{ "ok": true }`.

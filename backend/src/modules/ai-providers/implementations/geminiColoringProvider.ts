@@ -37,64 +37,55 @@ function sanitizeSvgMarkup(rawSvg: string): string {
   return svg;
 }
 
+function extractErrorStatus(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null) {
+    if (
+      'status' in error &&
+      typeof (error as { status?: unknown }).status === 'number'
+    ) {
+      return (error as { status: number }).status;
+    }
+    if (
+      'statusCode' in error &&
+      typeof (error as { statusCode?: unknown }).statusCode === 'number'
+    ) {
+      return (error as { statusCode: number }).statusCode;
+    }
+  }
+  return undefined;
+}
+
 function formatRawError(error: unknown): string {
   if (error instanceof Error) {
-    const extra =
-      'status' in error && (error as { status?: unknown }).status !== undefined
-        ? ` [status=${String((error as { status?: unknown }).status)}]`
-        : '';
+    const status = extractErrorStatus(error);
+    const extra = status !== undefined ? ` [status=${status}]` : '';
     return `${error.name}${extra}: ${error.message}`;
   }
   return String(error);
 }
 
 function mapGeminiError(error: unknown): never {
+  const status = extractErrorStatus(error);
   const rawDetails = formatRawError(error);
-  const lower = rawDetails.toLowerCase();
 
-  if (
-    lower.includes('api_key_invalid') ||
-    lower.includes('api key not valid') ||
-    lower.includes('permission_denied') ||
-    lower.includes('403')
-  ) {
+  if (status === 401 || status === 403 || status === 402 || status === 404) {
     throw new ProviderConfigurationError(
-      'Chiave Gemini API non valida o mancante nelle impostazioni del server (Settings > Secrets).',
-      403,
+      'Servizio di generazione temporaneamente non disponibile. Riprova più tardi.',
+      503,
       rawDetails
     );
   }
 
-  if (
-    lower.includes('prepayment credits are depleted') ||
-    lower.includes('[status=402]') ||
-    lower.includes('"code":402')
-  ) {
-    throw new ProviderConfigurationError(
-      'Crediti Gemini API esauriti sul progetto collegato a GEMINI_API_KEY. Usa una chiave Free Tier o gestisci il piano su AI Studio (Settings > Secrets).',
-      402,
-      rawDetails
-    );
-  }
-
-  if (lower.includes('resource_exhausted') || lower.includes('429')) {
+  if (status === 429) {
     throw new ProviderExecutionError(
-      'Limite momentaneo di richieste Gemini raggiunto. Attendi qualche secondo e riprova.',
+      'Limite momentaneo di richieste raggiunto. Attendi qualche secondo e riprova.',
       429,
       rawDetails
     );
   }
 
-  if (lower.includes('not_found') || lower.includes('404')) {
-    throw new ProviderExecutionError(
-      'Il modello Gemini configurato non è disponibile. Verifica GEMINI_MODEL sul server.',
-      404,
-      rawDetails
-    );
-  }
-
   throw new ProviderExecutionError(
-    'Errore durante la generazione con Gemini. Riprova tra qualche istante.',
+    'Errore durante la generazione del disegno. Riprova tra qualche istante.',
     502,
     rawDetails
   );
@@ -107,17 +98,14 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 2): Promise<T> {
       return await fn();
     } catch (error) {
       lastError = error;
-      const msg = error instanceof Error ? error.message.toLowerCase() : '';
-      const isClientOrKeyError =
-        msg.includes('api_key_invalid') ||
-        msg.includes('permission_denied') ||
-        msg.includes('prepayment credits') ||
-        msg.includes('not_found') ||
-        msg.includes('400') ||
-        msg.includes('402') ||
-        msg.includes('403') ||
-        msg.includes('404');
-      if (isClientOrKeyError || attempt === maxAttempts) {
+      const status = extractErrorStatus(error);
+      const isNonRetryable =
+        status === 400 ||
+        status === 401 ||
+        status === 402 ||
+        status === 403 ||
+        status === 404;
+      if (isNonRetryable || attempt === maxAttempts) {
         throw error;
       }
       await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
@@ -220,7 +208,7 @@ export class GeminiColoringProvider implements ColoringProvider {
   ): Promise<ColoringGenerationOutput> {
     if (!this.isConfigured()) {
       throw new ProviderConfigurationError(
-        'GEMINI_API_KEY non è ancora configurata sul server. Aggiungila in Settings > Secrets per provare la generazione dal vivo.',
+        'Servizio di generazione temporaneamente non disponibile.',
         503,
         'Missing process.env.GEMINI_API_KEY'
       );

@@ -43,10 +43,11 @@ export interface GenerateColoringPageRequest {
   providerId?: ProviderId;
   promptVersion?: string;
   idToken?: string | null;
+  turnstileToken?: string | null;
+  appCheckToken?: string | null;
 }
 
 export interface ColoringApiClient {
-  fetchProviders(): Promise<ProviderStatus[]>;
   fetchAdminSession(idToken?: string | null): Promise<AdminSessionResponse>;
   generateColoringPage(
     params: GenerateColoringPageRequest

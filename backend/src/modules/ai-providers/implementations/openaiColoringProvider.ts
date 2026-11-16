@@ -47,7 +47,7 @@ export class OpenAIColoringProvider implements ColoringProvider {
   ): Promise<ColoringGenerationOutput> {
     if (!this.isConfigured()) {
       throw new ProviderConfigurationError(
-        'OPENAI_API_KEY non è configurata sul server. Aggiungi la chiave nelle variabili d’ambiente per utilizzare OpenAI.',
+        'Servizio di generazione temporaneamente non disponibile.',
         503,
         'Missing process.env.OPENAI_API_KEY'
       );
@@ -87,20 +87,20 @@ export class OpenAIColoringProvider implements ColoringProvider {
       const rawDetails = `OpenAI HTTP ${response.status} ${response.statusText}: ${errBody.slice(0, 600)}`;
       if (response.status === 401 || response.status === 403) {
         throw new ProviderConfigurationError(
-          'Chiave OpenAI non valida o non autorizzata.',
-          403,
+          'Servizio di generazione temporaneamente non disponibile.',
+          503,
           rawDetails
         );
       }
       if (response.status === 429) {
         throw new ProviderExecutionError(
-          'Limite di richieste OpenAI raggiunto. Riprova tra qualche secondo.',
+          'Limite momentaneo di richieste raggiunto. Attendi qualche secondo e riprova.',
           429,
           rawDetails
         );
       }
       throw new ProviderExecutionError(
-        `Errore OpenAI (${response.status}): ${errBody.slice(0, 140) || 'richiesta non riuscita'}.`,
+        'Errore durante la generazione del disegno. Riprova tra qualche istante.',
         502,
         rawDetails
       );

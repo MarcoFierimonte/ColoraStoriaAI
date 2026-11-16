@@ -1,6 +1,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
+import helmet from 'helmet';
+import { botProtectionVerifier } from './src/modules/bot-protection/index.ts';
 import { getServerConfig } from './src/modules/config/index.ts';
 import { createColoringRouter } from './src/routes/coloringRoutes.ts';
 
@@ -14,10 +20,70 @@ export async function startServer() {
   const config = getServerConfig();
   const app = express();
 
+  app.disable('x-powered-by');
+  app.set('trust proxy', 1);
+
+  app.use(
+    helmet({
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+      crossOriginEmbedderPolicy: false,
+      xFrameOptions: false,
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: config.isDevelopment
+            ? ["'self'", "'unsafe-inline'", 'https://challenges.cloudflare.com']
+            : ["'self'", 'https://challenges.cloudflare.com'],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://fonts.googleapis.com',
+          ],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          imgSrc: [
+            "'self'",
+            'data:',
+            'blob:',
+            'https://*.googleusercontent.com',
+          ],
+          connectSrc: [
+            "'self'",
+            'https://identitytoolkit.googleapis.com',
+            'https://securetoken.googleapis.com',
+            'https://firestore.googleapis.com',
+            'https://*.googleapis.com',
+            'https://challenges.cloudflare.com',
+          ],
+          frameSrc: [
+            "'self'",
+            'https://*.firebaseapp.com',
+            'https://*.web.app',
+            'https://accounts.google.com',
+            'https://challenges.cloudflare.com',
+          ],
+          frameAncestors: [
+            "'self'",
+            'https://aistudio.google.com',
+            'https://*.aistudio.google.com',
+            'https://*.google.com',
+          ],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          ...(config.isDevelopment ? { upgradeInsecureRequests: null } : {}),
+        },
+      },
+    })
+  );
+
   app.use(express.json({ limit: '2mb' }));
   app.use('/api', createColoringRouter());
+  app.use('/api', (_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Endpoint non trovato.' });
+  });
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (config.isDevelopment) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       configFile: path.resolve(WEB_APP_DIR, 'vite.config.ts'),
@@ -31,14 +97,37 @@ export async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(DIST_DIR));
-    app.use((_req, res) => {
+    app.use((_req: Request, res: Response) => {
       res.sendFile(path.resolve(DIST_DIR, 'index.html'));
     });
   }
 
+  // Global Express 5 error handler: never leak stack traces or internal details
+  app.use(
+    (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+      console.error('[EXPRESS ERROR]', err);
+      if (res.headersSent) return;
+
+      if (err instanceof SyntaxError && 'body' in err) {
+        res.status(400).json({ error: 'Richiesta JSON non valida.' });
+        return;
+      }
+
+      res.status(500).json({
+        error: 'Errore interno del server. Riprova tra poco.',
+      });
+    }
+  );
+
+  if (!config.isDevelopment && !botProtectionVerifier.isEnforced()) {
+    console.warn(
+      '[SECURITY WARNING] Running outside development without TURNSTILE_SECRET_KEY or APP_CHECK_ENABLED=true.'
+    );
+  }
+
   app.listen(config.port, '0.0.0.0', () => {
     console.log(
-      `ColoraStoria server listening on http://0.0.0.0:${config.port} (default provider: ${config.defaultProvider})`
+      `ColoraStoria server listening on http://0.0.0.0:${config.port} (mode: ${config.isDevelopment ? 'development' : 'production'}, default provider: ${config.defaultProvider})`
     );
   });
 }

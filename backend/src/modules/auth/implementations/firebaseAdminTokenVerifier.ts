@@ -75,10 +75,12 @@ export class FirebaseAdminTokenVerifier implements AuthTokenVerifier {
       const email = decoded.email?.toLowerCase();
       const emailVerified = decoded.email_verified === true;
       const { adminEmails } = this.configService.getConfig();
-
-      const isAdmin = Boolean(
-        email && emailVerified && adminEmails.includes(email)
+      const hasAdminClaim = decoded.admin === true;
+      const hasAdminEmail = Boolean(
+        email && adminEmails.includes(email)
       );
+
+      const isAdmin = Boolean(emailVerified && (hasAdminClaim || hasAdminEmail));
 
       return {
         authenticated: true,

@@ -82,9 +82,4 @@ export interface ColoringErrorResponse {
 
 export interface HealthResponse {
   ok: true;
-  promptVersion: string;
-}
-
-export interface ProvidersListResponse {
-  providers: ProviderStatus[];
 }

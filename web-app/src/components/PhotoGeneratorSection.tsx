@@ -28,6 +28,7 @@ import {
   type ValidatedPhoto,
 } from '../modules/media-validation';
 import { AdminTelemetryPanel } from './AdminTelemetryPanel';
+import { TURNSTILE_SITE_KEY, TurnstileWidget } from './TurnstileWidget';
 
 interface PhotoGeneratorSectionProps {
   externalTrigger?: number;
@@ -96,6 +97,8 @@ export function PhotoGeneratorSection({
     null
   );
   const [copiedError, setCopiedError] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetCounter, setTurnstileResetCounter] = useState(0);
   const [result, setResult] = useState<ColoringGenerationResponse | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -218,6 +221,11 @@ export function PhotoGeneratorSection({
       return;
     }
 
+    if (TURNSTILE_SITE_KEY && !isAdmin && !turnstileToken) {
+      setApiError('Completa la verifica di sicurezza prima di generare.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const freshToken = isAdmin && user ? await refreshIdToken() : idToken;
@@ -229,6 +237,7 @@ export function PhotoGeneratorSection({
         promptVersion:
           isAdmin && selectedPromptVersion ? selectedPromptVersion : undefined,
         idToken: freshToken,
+        turnstileToken,
       });
       setResult(generated);
 
@@ -263,6 +272,9 @@ export function PhotoGeneratorSection({
       }
     } finally {
       setIsGenerating(false);
+      if (TURNSTILE_SITE_KEY) {
+        setTurnstileResetCounter((c) => c + 1);
+      }
     }
   };
 
@@ -630,6 +642,13 @@ export function PhotoGeneratorSection({
                 )}
               </div>
             </div>
+          )}
+
+          {TURNSTILE_SITE_KEY && !isAdmin && (
+            <TurnstileWidget
+              resetCounter={turnstileResetCounter}
+              onTokenChange={setTurnstileToken}
+            />
           )}
 
           <div>

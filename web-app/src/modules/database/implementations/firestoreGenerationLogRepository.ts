@@ -64,20 +64,11 @@ export class FirestoreGenerationLogRepository
   implements GenerationLogRepository
 {
   async ensureAdminProfile(profile: AdminProfileInput): Promise<void> {
-    const adminPath = `admins/${profile.uid}`;
     try {
       const ref = doc(db, 'admins', profile.uid);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        await setDoc(ref, {
-          uid: profile.uid.slice(0, 128),
-          email: profile.email.slice(0, 254),
-          role: 'admin',
-          createdAt: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, adminPath);
+      await getDoc(ref);
+    } catch {
+      // Admin privilege is verified via Firebase Auth custom claim `{ admin: true }`
     }
   }
 

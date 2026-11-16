@@ -4,6 +4,7 @@ export type SupportedProviderId = ProviderId;
 
 export interface ServerConfig {
   port: number;
+  isDevelopment: boolean;
   defaultProvider: SupportedProviderId;
   promptVersion: string;
   adminEmails: string[];
@@ -11,6 +12,9 @@ export interface ServerConfig {
   geminiModel: string;
   openaiApiKey: string;
   openaiModel: string;
+  turnstileSecretKey: string;
+  appCheckEnabled: boolean;
+  botProtectionRequired: boolean;
 }
 
 export interface ConfigService {

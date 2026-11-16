@@ -3,7 +3,6 @@ import type {
   ColoringApiClient,
   ColoringGenerationResponse,
   GenerateColoringPageRequest,
-  ProviderStatus,
 } from './coloringApi.interface';
 import { FetchColoringApiClient } from './implementations/fetchColoringApiClient';
 
@@ -23,10 +22,6 @@ export { FetchColoringApiClient } from './implementations/fetchColoringApiClient
 
 export const coloringApiClient: ColoringApiClient =
   new FetchColoringApiClient('/api');
-
-export function fetchAvailableProviders(): Promise<ProviderStatus[]> {
-  return coloringApiClient.fetchProviders();
-}
 
 export function fetchAdminSession(
   idToken?: string | null

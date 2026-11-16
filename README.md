@@ -3,7 +3,8 @@
 Web app that turns personal photos into printable coloring-book pages using a server-side, multi-provider AI backend.
 
 ## Repository Layout
-- `AGENTS.md` — Template engineering guidelines enforcing strict Interface vs. Implementation module separation across frontend and backend.
+- `AGENTS.md` — Template engineering guidelines enforcing strict Interface vs. Implementation module separation and wiki maintenance.
+- `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
 - `shared/` — Cross-stack TypeScript domain contracts and API DTOs (`shared/types/`) shared by `backend/` and `web-app/`.
 - `web-app/` — React + TypeScript + Tailwind CSS frontend with domain modules under `web-app/src/modules/` (`web-app/README.md`).
 - `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` (`backend/README.md`).
@@ -27,7 +28,9 @@ Copy `.env.example` or set secrets in your hosting environment:
 - `GEMINI_API_KEY` — Required for the default Gemini provider
 - `GEMINI_MODEL=gemini-4-hydrogen` — Free tier default model
 - `OPENAI_API_KEY` / `OPENAI_MODEL=gpt-image-1` — Optional OpenAI configuration
-- `ADMIN_EMAILS=marco.fierimonte@gmail.com` — Comma-separated verified Google emails allowed to view Admin telemetry
+- `ADMIN_EMAILS` — Optional comma-separated verified Google emails allowed to view Admin telemetry (empty = none; prefer setting Firebase custom claim `{ admin: true }` via `scripts/set-admin-claim.ts`)
+- `TURNSTILE_SECRET_KEY` / `VITE_TURNSTILE_SITE_KEY` — Optional free Cloudflare Turnstile anti-bot keys (recommended before public deploy)
+- `APP_CHECK_ENABLED` — Set to `true` if using Firebase App Check instead of Turnstile
 
 ## Architecture & MVP Roadmap
 
@@ -87,8 +90,36 @@ flowchart LR
 - **Pending for Final MVP:** Multi-photo upload (`10–15` photos with reorder), custom cover title, email input & 3 mandatory legal checkboxes, Stripe Checkout + webhook verification, billing-enabled raster image model (`gemini-nano-banana-2.1`) for high facial likeness, A4 PDF generation, automated email delivery, and order confirmation screen.
 
 ## Scripts
-- `npm run dev` — Starts Express + Vite dev server on port `3000`.
+- `npm run dev` — Starts Express + Vite dev server (`NODE_ENV=development`) on port `3000`.
 - `npm run build` — Builds `web-app/` into `dist/`.
-- `npm run start` — Runs the production server on port `3000`.
+- `npm run start` — Runs the production server (`NODE_ENV=production`) on port `3000`.
 - `npm run lint` — Runs TypeScript checks (`tsc --noEmit`) and ESLint architectural & Firestore rules checks (`eslint .`).
 - `npm run prompts:sync` — Regenerates `manual-test.json` inside every `prompts/v*` folder.
+
+## Production Deployment & Security Hardening (Google Cloud Run)
+
+1. **Secrets in Secret Manager (never plain env vars)**:
+   Store `GEMINI_API_KEY` (and `TURNSTILE_SECRET_KEY` / `OPENAI_API_KEY`) in **Google Cloud Secret Manager** and mount them on Cloud Run:
+   ```bash
+   gcloud run deploy colorastoria \
+     --source . \
+     --region europe-west1 \
+     --max-instances 2 \
+     --concurrency 10 \
+     --set-env-vars "NODE_ENV=production,AI_PROVIDER=gemini,GEMINI_MODEL=gemini-4-hydrogen" \
+     --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,TURNSTILE_SECRET_KEY=TURNSTILE_SECRET_KEY:latest"
+   ```
+   Using `--max-instances 2 --concurrency 10` caps worst-case memory/instance scaling while preventing surprise Cloud Run bills.
+2. **GCP Billing Budget Alerts**:
+   In **GCP Billing > Budgets & alerts**, create a monthly budget (e.g. `€10`) with email notifications at `50%`, `90%`, and `100%` of spend.
+3. **Restrict API Keys in Google Cloud Console (`APIs & Services > Credentials`)**:
+   - **Firebase Web API Key** (present in public `firebase-applet-config.json`): restrict **Application restrictions** to **HTTP referrers** matching your production/preview domains (`https://your-domain/*`) and restrict **API restrictions** strictly to **Identity Toolkit API**, **Token Service API**, and **Cloud Firestore API**.
+   - **Gemini API Key (`GEMINI_API_KEY`)**: restrict **API restrictions** strictly to **Generative Language API** (do not reuse keys across unrelated GCP services).
+4. **Anti-Bot Protection on `POST /api/coloring/generate`**:
+   Server IP rate-limiting (`express-rate-limit` with `app.set('trust proxy', 1)`) is active by default. Before opening the app publicly with billing enabled, enable **Cloudflare Turnstile** (`TURNSTILE_SECRET_KEY` + `VITE_TURNSTILE_SITE_KEY` at build time) or **Firebase App Check** (`APP_CHECK_ENABLED=true`).
+5. **Granting Admin Access (`custom claim`)**:
+   Run the one-time Firebase Admin SDK script instead of hardcoding admin emails:
+   ```bash
+   npx tsx scripts/set-admin-claim.ts admin@yourdomain.com
+   ```
+   Then sign out and sign in again to refresh the ID token (`firestore.rules` checks `request.auth.token.admin == true && request.auth.token.email_verified == true`).

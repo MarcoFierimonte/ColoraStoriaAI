@@ -11,7 +11,6 @@ export {
   type HealthResponse,
   type ProviderId,
   type ProviderStatus,
-  type ProvidersListResponse,
   type ThemeId,
   type UsageBreakdown,
 } from './coloring.ts';
