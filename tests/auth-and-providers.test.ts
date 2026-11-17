@@ -11,6 +11,7 @@ test('parseServerConfig validates defaults, --port CLI override, and fails fast 
   const defaults = parseServerConfig({}, []);
   assert.equal(defaults.port, 3000);
   assert.equal(defaults.defaultProvider, 'gemini');
+  assert.equal(defaults.geminiModel, 'gemini-nano-banana-2.1');
   assert.deepEqual(defaults.adminEmails, []);
 
   const cliOverride = parseServerConfig({ PORT: '8080' }, ['node', 'server.ts', '--port', '3000']);
@@ -108,6 +109,7 @@ test('DefaultAiProviderRegistry selects default, override, and fallback provider
   const openaiStatus = statuses.find((s) => s.id === 'openai');
   assert.equal(geminiStatus?.isDefault, true);
   assert.equal(geminiStatus?.configured, true);
+  assert.equal(geminiStatus?.model, 'gemini-nano-banana-2.1');
   assert.equal(openaiStatus?.isDefault, false);
   assert.equal(openaiStatus?.configured, false);
 });

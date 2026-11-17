@@ -28,9 +28,9 @@ variable "gemini_api_key" {
 }
 
 variable "gemini_model" {
-  description = "Default Gemini model for line-art coloring pages (default: gemini-4-hydrogen, free-tier SVG line-art)."
+  description = "Default Gemini model for line-art coloring pages (default: gemini-nano-banana-2.1, high-quality raster line-art)."
   type        = string
-  default     = "gemini-4-hydrogen"
+  default     = "gemini-nano-banana-2.1"
 }
 
 variable "ai_provider" {

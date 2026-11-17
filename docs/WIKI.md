@@ -98,7 +98,7 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Google GenAI SDK (`@google/genai`)
 - **Cos’è:** La libreria ufficiale di Google per chiamare i modelli Gemini.
-- **Come e dov’è usato:** Incapsulata esclusivamente dentro `backend/src/modules/ai-providers/implementations/geminiColoringProvider.ts`. Supporta sia la generazione vettoriale SVG (`gemini-4-hydrogen`, Free Tier) sia la generazione immagine raster (`gemini-nano-banana-2.1`, ecc.).
+- **Come e dov’è usato:** Incapsulata esclusivamente dentro `backend/src/modules/ai-providers/implementations/geminiColoringProvider.ts`. Supporta sia la generazione immagine raster ad alta fedeltà fisionomica (`gemini-nano-banana-2.1`, predefinito) sia la modalità vettoriale SVG (`gemini-4-hydrogen`).
 
 ### OpenAI Image API (via `fetch`)
 - **Cos’è:** Adapter HTTP verso l’endpoint `/v1/images/edits` di OpenAI tramite `fetch` nativo di Node.

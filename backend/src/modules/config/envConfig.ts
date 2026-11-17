@@ -127,7 +127,7 @@ export function parseServerConfig(
     promptVersion: data.PROMPT_VERSION.trim(),
     adminEmails: parseAdminEmails(data.ADMIN_EMAILS),
     geminiApiKey: data.GEMINI_API_KEY.trim(),
-    geminiModel: data.GEMINI_MODEL.trim() || 'gemini-4-hydrogen',
+    geminiModel: data.GEMINI_MODEL.trim() || 'gemini-nano-banana-2.1',
     openaiApiKey: data.OPENAI_API_KEY.trim(),
     openaiModel: data.OPENAI_MODEL.trim() || 'gpt-image-1',
     turnstileSecretKey,

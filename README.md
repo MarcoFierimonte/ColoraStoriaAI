@@ -30,7 +30,7 @@ Copy `.env.example` or set secrets in your hosting environment:
 - `AI_PROVIDER=gemini` (`gemini` or `openai`)
 - `PROMPT_VERSION` — Optional override (defaults to `prompts/config.json` `activeVersion: "latest"`)
 - `GEMINI_API_KEY` — Required for the default Gemini provider
-- `GEMINI_MODEL=gemini-4-hydrogen` — Free tier default model
+- `GEMINI_MODEL=gemini-nano-banana-2.1` — Default high-quality raster image model (supports face likeness)
 - `OPENAI_API_KEY` / `OPENAI_MODEL=gpt-image-1` — Optional OpenAI configuration
 - `ADMIN_EMAILS` — Optional comma-separated verified Google emails allowed to view Admin telemetry (empty = none; prefer setting Firebase custom claim `{ admin: true }` via `scripts/set-admin-claim.ts`)
 - `TURNSTILE_SECRET_KEY` / `VITE_TURNSTILE_SITE_KEY` — Optional free Cloudflare Turnstile anti-bot keys (recommended before public deploy)
@@ -118,7 +118,7 @@ The repository includes a multi-stage `Dockerfile` (`node:24-slim`, production-o
      --concurrency 10 \
      --cpu 1 \
      --memory 512Mi \
-     --set-env-vars "NODE_ENV=production,AI_PROVIDER=gemini,GEMINI_MODEL=gemini-4-hydrogen" \
+     --set-env-vars "NODE_ENV=production,AI_PROVIDER=gemini,GEMINI_MODEL=gemini-nano-banana-2.1" \
      --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,TURNSTILE_SECRET_KEY=TURNSTILE_SECRET_KEY:latest"
    ```
    - `--min-instances 0` keeps idle costs at `$0` (Cloud Run Free Tier includes 2M requests, 360k GB-seconds, and 180k vCPU-seconds/month).

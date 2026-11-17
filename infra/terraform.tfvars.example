@@ -18,8 +18,8 @@ app_name = "colorastoria"
 # Chiave API Gemini (obbligatoria - Generative Language API)
 gemini_api_key = "AIzaSy..."
 
-# Modello Gemini e provider predefinito
-gemini_model = "gemini-4-hydrogen"
+# Modello Gemini e provider predefinito (alta qualità raster)
+gemini_model = "gemini-nano-banana-2.1"
 ai_provider  = "gemini"
 
 # Indirizzi email con privilegi Admin (separati da virgola)
