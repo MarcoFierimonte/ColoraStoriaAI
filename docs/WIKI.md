@@ -52,7 +52,7 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### `helmet` & Content-Security-Policy (CSP)
 - **Cos’è:** Un middleware di sicurezza per Express che aggiunge automaticamente intestazioni HTTP protettive nelle risposte del server. La **CSP** dice al browser esattamente da quali domini può scaricare script, font, immagini o aprire frame, bloccando attacchi XSS (script malevoli iniettati) e clickjacking.
-- **Come e dov’è usato:** Configurato in `backend/server.ts`. Imposta anche `crossOriginOpenerPolicy: 'same-origin-allow-popups'` (indispensabile per non bloccare il popup di Google Login `signInWithPopup`), `frameAncestors` (per l’anteprima AI Studio) e `upgradeInsecureRequests` solo in produzione.
+- **Come e dov’è usato:** Configurato in `backend/server.ts`. Imposta anche `crossOriginOpenerPolicy: 'same-origin-allow-popups'` e autorizza in `scriptSrc`/`connectSrc`/`workerSrc`/`childSrc`/`frameSrc` i domini e protocolli necessari per Cloudflare Turnstile (`data:`, `blob:`, `*.cloudflare.com`, `challenges.cloudflare.com`, `*.cloudflarecaptcha.com`) e Firebase Google Sign-In (`apis.google.com`, `www.gstatic.com`, `*.firebaseapp.com`, `*.web.app`), oltre a `frameAncestors` per l’anteprima AI Studio e `upgradeInsecureRequests` solo in produzione.
 
 ### Disattivazione `X-Powered-By` & `trust proxy`
 - **Cos’è:** Due impostazioni Express di sicurezza e rete. `disable('x-powered-by')` nasconde che il server usa Express (meno info utili per chi attacca); `set('trust proxy', 1)` dice a Express di leggere l’IP reale del visitatore dall’header `X-Forwarded-For` invece dell’IP interno del bilanciatore di Cloud Run.
@@ -154,11 +154,11 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Firebase Admin SDK (`firebase-admin`) & Custom Claim `admin`
 - **Cos’è:** La libreria ufficiale lato server per verificare la validità crittografica dei token Firebase degli utenti e gestire ruoli/permessi in modo sicuro. Un **Custom Claim** (`{ admin: true }`) è un’etichetta firmata da Google dentro il token di autenticazione che il client non può falsificare.
-- **Come e dov’è usato:** Modulo `backend/src/modules/auth/` (`FirebaseAdminTokenVerifier`) e script una tantum `scripts/set-admin-claim.ts` (assegna il ruolo admin via CLI senza salvare email personali nel codice).
+- **Come e dov’è usato:** Modulo `backend/src/modules/auth/` (`FirebaseAdminTokenVerifier`) e script una tantum `scripts/set-admin-claim.ts` (assegna il ruolo admin via CLI senza salvare email personali nel codice). `ADMIN_EMAILS` abilita controlli e telemetria live Admin (`isAdmin`), mentre la lettura/scrittura dello storico persistente su Firestore viene attivata solo quando il token possiede effettivamente il custom claim `admin: true` (`hasAdminClaim`), evitando errori di permessi su Firestore.
 
 ### Cloud Firestore (`firebase/firestore`)
 - **Cos’è:** Database NoSQL gestito in cloud da Google con aggiornamenti in tempo reale (`onSnapshot`).
-- **Come e dov’è usato:** Modulo `web-app/src/modules/database/` (`firebaseAppInstance.ts` con il `firestoreDatabaseId` specifico e test di connessione iniziale + `FirestoreGenerationLogRepository`). Salva e mostra in tempo reale nella tabella Admin lo storico di costi, modelli e token (`generation_logs`).
+- **Come e dov’è usato:** Modulo `web-app/src/modules/database/` (`firebaseAppInstance.ts` con il `firestoreDatabaseId` specifico e test di connessione iniziale + `FirestoreGenerationLogRepository`). Salva e mostra in tempo reale nella tabella Admin lo storico di costi, modelli e token (`generation_logs`) quando `hasAdminClaim` è attivo.
 
 ### Firestore Security Rules (`firestore.rules`) & `firebase-blueprint.json`
 - **Cos’è:** Le regole di sicurezza (`firestore.rules`) agiscono come un firewall direttamente sul database Firestore: decidono chi può leggere/scrivere cosa e verificano tipo, lunghezza e timestamp di ogni campo. `firebase-blueprint.json` è lo schema di riferimento della struttura dati.

@@ -44,7 +44,11 @@ test('FirebaseAdminTokenVerifier enforces email_verified and custom claim / allo
   const verifier = new FirebaseAdminTokenVerifier(config);
 
   const anonymous = await verifier.verifyOptionalRequest({ headers: {} });
-  assert.deepEqual(anonymous, { authenticated: false, isAdmin: false });
+  assert.deepEqual(anonymous, {
+    authenticated: false,
+    isAdmin: false,
+    hasAdminClaim: false,
+  });
 
   const claimAdmin = verifier.evaluateDecodedToken({
     uid: 'u1',
@@ -54,6 +58,7 @@ test('FirebaseAdminTokenVerifier enforces email_verified and custom claim / allo
   });
   assert.equal(claimAdmin.authenticated, true);
   assert.equal(claimAdmin.isAdmin, true);
+  assert.equal(claimAdmin.hasAdminClaim, true);
 
   const unverifiedClaim = verifier.evaluateDecodedToken({
     uid: 'u2',
@@ -62,6 +67,7 @@ test('FirebaseAdminTokenVerifier enforces email_verified and custom claim / allo
     admin: true,
   });
   assert.equal(unverifiedClaim.isAdmin, false);
+  assert.equal(unverifiedClaim.hasAdminClaim, false);
 
   const allowlistAdmin = verifier.evaluateDecodedToken({
     uid: 'u3',
@@ -69,6 +75,7 @@ test('FirebaseAdminTokenVerifier enforces email_verified and custom claim / allo
     email_verified: true,
   });
   assert.equal(allowlistAdmin.isAdmin, true);
+  assert.equal(allowlistAdmin.hasAdminClaim, false);
 
   const regularUser = verifier.evaluateDecodedToken({
     uid: 'u4',
@@ -77,6 +84,7 @@ test('FirebaseAdminTokenVerifier enforces email_verified and custom claim / allo
   });
   assert.equal(regularUser.authenticated, true);
   assert.equal(regularUser.isAdmin, false);
+  assert.equal(regularUser.hasAdminClaim, false);
 });
 
 test('DefaultAiProviderRegistry selects default, override, and fallback provider', () => {

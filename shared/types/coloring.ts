@@ -54,6 +54,7 @@ export interface AdminErrorDetails {
 export interface AdminSessionResponse {
   authenticated: boolean;
   isAdmin: boolean;
+  hasAdminClaim?: boolean;
   email: string | null;
   uid: string | null;
   promptVersions: string[];

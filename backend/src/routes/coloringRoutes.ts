@@ -108,6 +108,7 @@ export function createColoringRouter(
     const payload: AdminSessionResponse = {
       authenticated: adminCtx.authenticated,
       isAdmin: adminCtx.isAdmin,
+      hasAdminClaim: Boolean(adminCtx.hasAdminClaim),
       email: adminCtx.email ?? null,
       uid: adminCtx.uid ?? null,
       promptVersions: adminCtx.isAdmin ? deps.prompts.listVersions() : [],
@@ -138,7 +139,16 @@ export function createColoringRouter(
           console.warn(
             `[BOT_PROTECTION] status=${err.statusCode} details="${err.rawDetails ?? err.message}"`
           );
-          res.status(err.statusCode).json({
+          const wireStatus =
+            process.env.NODE_ENV === 'development' &&
+            (err.statusCode === 403 ||
+              err.statusCode === 502 ||
+              err.statusCode === 503)
+              ? err.statusCode === 403
+                ? 400
+                : 500
+              : err.statusCode;
+          res.status(wireStatus).json({
             error: err.message,
             ...(isAdminUser
               ? {
@@ -278,7 +288,16 @@ export function createColoringRouter(
           console.error(
             `[${error.name}] status=${error.statusCode} message="${error.message}" raw="${error.rawDetails ?? ''}"`
           );
-          res.status(error.statusCode).json({
+          const wireStatus =
+            process.env.NODE_ENV === 'development' &&
+            (error.statusCode === 403 ||
+              error.statusCode === 502 ||
+              error.statusCode === 503)
+              ? error.statusCode === 403
+                ? 400
+                : 500
+              : error.statusCode;
+          res.status(wireStatus).json({
             error: error.message,
             ...(isAdminUser
               ? {

@@ -7,6 +7,7 @@ export interface HttpAuthRequest {
 export interface AdminAuthContext {
   authenticated: boolean;
   isAdmin: boolean;
+  hasAdminClaim?: boolean;
   uid?: string;
   email?: string;
 }

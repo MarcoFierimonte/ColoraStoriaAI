@@ -33,8 +33,19 @@ export async function startServer() {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: config.isDevelopment
-            ? ["'self'", "'unsafe-inline'", 'https://challenges.cloudflare.com']
-            : ["'self'", 'https://challenges.cloudflare.com'],
+            ? [
+                "'self'",
+                "'unsafe-inline'",
+                'https://challenges.cloudflare.com',
+                'https://apis.google.com',
+                'https://www.gstatic.com',
+              ]
+            : [
+                "'self'",
+                'https://challenges.cloudflare.com',
+                'https://apis.google.com',
+                'https://www.gstatic.com',
+              ],
           styleSrc: ["'self'", "'unsafe-inline'"],
           fontSrc: ["'self'", 'data:'],
           imgSrc: [
@@ -45,10 +56,23 @@ export async function startServer() {
           ],
           connectSrc: [
             "'self'",
+            'data:',
+            'blob:',
             'https://identitytoolkit.googleapis.com',
             'https://securetoken.googleapis.com',
             'https://firestore.googleapis.com',
             'https://*.googleapis.com',
+            'https://*.firebaseapp.com',
+            'https://*.web.app',
+            'https://apis.google.com',
+            'https://challenges.cloudflare.com',
+            'https://*.cloudflare.com',
+            'https://*.cloudflarecaptcha.com',
+          ],
+          workerSrc: ["'self'", 'blob:'],
+          childSrc: [
+            "'self'",
+            'blob:',
             'https://challenges.cloudflare.com',
           ],
           frameSrc: [

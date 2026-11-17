@@ -22,22 +22,33 @@ export class FetchColoringApiClient implements ColoringApiClient {
     if (idToken) {
       headers.Authorization = `Bearer ${idToken}`;
     }
-    const response = await fetch(`${this.baseUrl}/admin/session`, {
-      headers,
-      credentials: 'same-origin',
-    });
-    if (!response.ok) {
-      return {
-        authenticated: false,
-        isAdmin: false,
-        email: null,
-        uid: null,
-        promptVersions: [],
-        activePromptVersion: null,
-        providers: [],
-      };
+    const fallbackSession: AdminSessionResponse = {
+      authenticated: false,
+      isAdmin: false,
+      hasAdminClaim: false,
+      email: null,
+      uid: null,
+      promptVersions: [],
+      activePromptVersion: null,
+      providers: [],
+    };
+
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/session`, {
+        headers,
+        credentials: 'include',
+      });
+      const contentType = response.headers.get('content-type') ?? '';
+      if (
+        !response.ok ||
+        !contentType.toLowerCase().includes('application/json')
+      ) {
+        return fallbackSession;
+      }
+      return (await response.json()) as AdminSessionResponse;
+    } catch {
+      return fallbackSession;
     }
-    return (await response.json()) as AdminSessionResponse;
   }
 
   async generateColoringPage(
@@ -64,17 +75,67 @@ export class FetchColoringApiClient implements ColoringApiClient {
       headers['X-Firebase-AppCheck'] = params.appCheckToken;
     }
 
+    // Warm the preview proxy session cache with a bodyless GET before sending multipart POST,
+    // and catch any 302 auth redirect cleanly before it turns into a cross-origin CORS failure.
+    try {
+      const healthResponse = await fetch(`${this.baseUrl}/health`, {
+        method: 'GET',
+        credentials: 'include',
+        redirect: 'manual',
+      });
+      const healthCt = healthResponse.headers.get('content-type') ?? '';
+      if (
+        healthResponse.type === 'opaqueredirect' ||
+        healthCt.toLowerCase().includes('text/html')
+      ) {
+        console.error('[ColoringApiClient] Health pre-check intercepted by proxy:', {
+          status: healthResponse.status,
+          type: healthResponse.type,
+          contentType: healthCt,
+        });
+        throw new ColoringApiError(
+          'Sessione di anteprima scaduta o bloccata dal controllo cookie/proxy. Ricarica la pagina e riprova.',
+          {
+            statusCode: healthResponse.status,
+            statusText:
+              healthResponse.type === 'opaqueredirect'
+                ? 'opaqueredirect'
+                : healthResponse.statusText,
+            contentType: healthCt || null,
+            isProxyCookieCheck: true,
+            rawBodySnippet:
+              'Pre-check GET /api/health intercepted by preview proxy redirect/HTML.',
+          }
+        );
+      }
+    } catch (preErr) {
+      if (preErr instanceof ColoringApiError) {
+        throw preErr;
+      }
+      const rawPreMsg =
+        preErr instanceof Error ? preErr.message : String(preErr);
+      console.error('[ColoringApiClient] Health pre-check network error:', rawPreMsg);
+      throw new ColoringApiError(
+        'Impossibile raggiungere il server per la generazione. Riprova.',
+        {
+          rawBodySnippet: `Network/Fetch pre-check error: ${rawPreMsg}`,
+        }
+      );
+    }
+
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl}/coloring/generate`, {
         method: 'POST',
         headers,
-        credentials: 'same-origin',
+        credentials: 'include',
+        redirect: 'manual',
         body: formData,
       });
     } catch (networkErr) {
       const rawMsg =
         networkErr instanceof Error ? networkErr.message : String(networkErr);
+      console.error('[ColoringApiClient] Network error:', rawMsg);
       throw new ColoringApiError(
         'Impossibile raggiungere il server per la generazione. Riprova.',
         {
@@ -83,11 +144,19 @@ export class FetchColoringApiClient implements ColoringApiClient {
       );
     }
 
-    const contentType = response.headers.get('content-type');
-    const rawText = await response.text().catch(() => '');
+    const isOpaqueRedirect = response.type === 'opaqueredirect';
+    const contentType = response.headers.get('content-type') ?? '';
+    const isHtmlResponse = contentType.toLowerCase().includes('text/html');
+    const rawText = isOpaqueRedirect
+      ? ''
+      : await response.text().catch(() => '');
     const isProxyCookieCheck =
-      Boolean(contentType?.includes('text/html')) &&
-      rawText.includes('<title>Cookie check</title>');
+      isOpaqueRedirect ||
+      isHtmlResponse ||
+      rawText.includes('<title>Cookie check</title>') ||
+      rawText.includes('applet-auth-bridge') ||
+      (response.redirected &&
+        !contentType.toLowerCase().includes('application/json'));
 
     let payload:
       | ColoringGenerationResponse
@@ -95,7 +164,7 @@ export class FetchColoringApiClient implements ColoringApiClient {
       | null = null;
     let parseErrorMessage: string | null = null;
 
-    if (rawText) {
+    if (rawText && !isHtmlResponse) {
       try {
         payload = JSON.parse(rawText) as
           | ColoringGenerationResponse
@@ -108,16 +177,19 @@ export class FetchColoringApiClient implements ColoringApiClient {
 
     const debugInfo: AdminDebugInfo = {
       statusCode: response.status,
-      statusText: response.statusText,
-      contentType,
+      statusText: isOpaqueRedirect ? 'opaqueredirect' : response.statusText,
+      contentType: contentType || null,
       isProxyCookieCheck,
       backendDetails:
         payload && 'adminErrorDetails' in payload
           ? payload.adminErrorDetails
           : undefined,
       rawBodySnippet:
-        parseErrorMessage || !payload || !response.ok
+        isOpaqueRedirect || parseErrorMessage || !payload || !response.ok
           ? [
+              isOpaqueRedirect
+                ? 'HTTP 3xx redirect intercepted on POST /api/coloring/generate.'
+                : null,
               parseErrorMessage ? `JSON parse error: ${parseErrorMessage}` : null,
               rawText ? rawText.slice(0, 1200) : '<empty response body>',
             ]
@@ -126,19 +198,44 @@ export class FetchColoringApiClient implements ColoringApiClient {
           : undefined,
     };
 
+    if (isProxyCookieCheck) {
+      console.error('[ColoringApiClient] Proxy/HTML interception:', {
+        status: response.status,
+        type: response.type,
+        redirected: response.redirected,
+        contentType,
+        snippet: rawText.slice(0, 200),
+      });
+      throw new ColoringApiError(
+        'Sessione di anteprima scaduta o bloccata dal controllo cookie/proxy. Ricarica la pagina e riprova.',
+        debugInfo
+      );
+    }
+
     if (!response.ok) {
       const message =
         payload && 'error' in payload && payload.error
           ? payload.error
-          : 'Si è verificato un errore durante la generazione. Riprova.';
+          : `Si è verificato un errore durante la generazione (HTTP ${response.status}). Riprova.`;
+      if (!payload || !('error' in payload) || !payload.error) {
+        console.error('[ColoringApiClient] Non-JSON error response:', {
+          status: response.status,
+          contentType,
+          snippet: rawText.slice(0, 200),
+        });
+      }
       throw new ColoringApiError(message, debugInfo);
     }
 
     if (!payload || !('imageDataUrl' in payload)) {
+      console.error('[ColoringApiClient] Invalid JSON response from server:', {
+        status: response.status,
+        contentType,
+        parseErrorMessage,
+        snippet: rawText.slice(0, 200),
+      });
       throw new ColoringApiError(
-        isProxyCookieCheck
-          ? 'Sessione di anteprima scaduta o bloccata dal controllo cookie. Ricarica la pagina e riprova.'
-          : 'Risposta non valida ricevuta dal server.',
+        `Risposta non valida ricevuta dal server (HTTP ${response.status}, ${contentType ?? 'formato sconosciuto'}).`,
         debugInfo
       );
     }

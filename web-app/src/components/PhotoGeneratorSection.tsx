@@ -73,6 +73,7 @@ export function PhotoGeneratorSection({
   const {
     user,
     isAdmin,
+    hasAdminClaim,
     idToken,
     promptVersions,
     activePromptVersion,
@@ -241,7 +242,7 @@ export function PhotoGeneratorSection({
       });
       setResult(generated);
 
-      if (isAdmin && user && generated.adminTelemetry) {
+      if (isAdmin && hasAdminClaim && user && generated.adminTelemetry) {
         void saveGenerationLog({
           adminUid: user.uid,
           themeId: selectedThemeId,

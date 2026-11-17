@@ -18,6 +18,7 @@ export interface AuthContextValue {
   user: AuthUserSummary | null;
   authReady: boolean;
   isAdmin: boolean;
+  hasAdminClaim: boolean;
   idToken: string | null;
   promptVersions: string[];
   activePromptVersion: string | null;

@@ -58,23 +58,23 @@ export class FirebaseAdminTokenVerifier implements AuthTokenVerifier {
     const rawHeader = req.headers.authorization;
     const authHeader = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { authenticated: false, isAdmin: false };
+      return { authenticated: false, isAdmin: false, hasAdminClaim: false };
     }
 
     const token = authHeader.slice('Bearer '.length).trim();
     if (!token) {
-      return { authenticated: false, isAdmin: false };
+      return { authenticated: false, isAdmin: false, hasAdminClaim: false };
     }
 
     if (!this.ensureFirebaseAdmin()) {
-      return { authenticated: false, isAdmin: false };
+      return { authenticated: false, isAdmin: false, hasAdminClaim: false };
     }
 
     try {
       const decoded = await getAuth().verifyIdToken(token);
       return this.evaluateDecodedToken(decoded);
     } catch {
-      return { authenticated: false, isAdmin: false };
+      return { authenticated: false, isAdmin: false, hasAdminClaim: false };
     }
   }
 
@@ -96,6 +96,7 @@ export class FirebaseAdminTokenVerifier implements AuthTokenVerifier {
     return {
       authenticated: true,
       isAdmin,
+      hasAdminClaim: Boolean(emailVerified && hasAdminClaim),
       uid: decoded.uid,
       email: decoded.email,
     };

@@ -31,14 +31,15 @@ function formatDateTime(ms: number | null): string {
 export function AdminTelemetryPanel({
   latestTelemetry,
 }: AdminTelemetryPanelProps) {
-  const { user, authReady, isAdmin } = useAuth();
+  const { user, authReady, isAdmin, hasAdminClaim } = useAuth();
   const [logs, setLogs] = useState<GenerationLogRecord[]>([]);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
-    if (!authReady || !isAdmin || !user) {
+    if (!authReady || !isAdmin || !hasAdminClaim || !user) {
       setLogs([]);
+      setLogsError(null);
       return;
     }
 
@@ -58,7 +59,7 @@ export function AdminTelemetryPanel({
     );
 
     return () => unsubscribe();
-  }, [authReady, isAdmin, user]);
+  }, [authReady, isAdmin, hasAdminClaim, user]);
 
   if (!isAdmin) return null;
 
@@ -159,7 +160,9 @@ export function AdminTelemetryPanel({
               Storico test Admin su Firestore ({logs.length})
             </h4>
             <p className="text-xs text-zinc-600">
-              {logs.length > 0 ? (
+              {!hasAdminClaim ? (
+                'Storico Firestore disattivato in questa sessione (richiede custom claim Firebase { admin: true }). Telemetria live e controlli Admin attivi.'
+              ) : logs.length > 0 ? (
                 <>
                   Media costo/pagina:{' '}
                   <span className="font-mono-num font-medium text-zinc-900">
@@ -190,7 +193,32 @@ export function AdminTelemetryPanel({
               </p>
             )}
 
-            {logs.length === 0 ? (
+            {!hasAdminClaim ? (
+              <div className="px-5 py-5 text-sm text-zinc-700 space-y-2">
+                <p>
+                  Sei autenticato come Admin tramite{' '}
+                  <code className="font-mono-num text-xs bg-zinc-100 px-1.5 py-0.5 rounded">
+                    ADMIN_EMAILS
+                  </code>
+                  : i controlli prompt/provider e la telemetria della singola generazione qui sopra funzionano normalmente.
+                </p>
+                <p className="text-xs text-zinc-600">
+                  Per sicurezza, le regole di Firestore richiedono il custom claim firmato{' '}
+                  <code className="font-mono-num bg-zinc-100 px-1.5 py-0.5 rounded">
+                    {'{ admin: true }'}
+                  </code>{' '}
+                  per leggere o salvare lo storico persistente su{' '}
+                  <code className="font-mono-num bg-zinc-100 px-1.5 py-0.5 rounded">
+                    generation_logs
+                  </code>
+                  . Per abilitarlo esegui{' '}
+                  <code className="font-mono-num bg-zinc-100 px-1.5 py-0.5 rounded">
+                    npx tsx scripts/set-admin-claim.ts {user?.email ?? '<email>'}
+                  </code>{' '}
+                  e poi effettua di nuovo l’accesso.
+                </p>
+              </div>
+            ) : logs.length === 0 ? (
               <p className="px-5 py-6 text-sm text-zinc-600">
                 Nessun log salvato al momento. Avvia una generazione per registrare costi e token.
               </p>

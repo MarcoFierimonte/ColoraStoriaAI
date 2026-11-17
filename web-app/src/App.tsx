@@ -265,15 +265,23 @@ export default function App() {
       {authNotice && (
         <div
           role="status"
-          className="border-t border-amber-200 bg-amber-50 py-3 px-4 sm:px-6 lg:px-8"
+          className={`border-t py-3 px-4 sm:px-6 lg:px-8 ${
+            isAdmin
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+              : 'border-amber-200 bg-amber-50 text-amber-950'
+          }`}
         >
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 text-xs sm:text-sm text-amber-900">
-            <span>{authNotice}</span>
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 text-xs sm:text-sm">
+            <span className="font-medium">{authNotice}</span>
             <button
               type="button"
               onClick={clearAuthNotice}
               aria-label="Chiudi avviso"
-              className="p-1 rounded-md hover:bg-amber-100 text-amber-800 cursor-pointer shrink-0"
+              className={`p-1 rounded-md cursor-pointer shrink-0 ${
+                isAdmin
+                  ? 'hover:bg-emerald-100 text-emerald-800'
+                  : 'hover:bg-amber-100 text-amber-800'
+              }`}
             >
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -330,9 +338,13 @@ export default function App() {
               </button>
             ) : (
               <div className="inline-flex items-center gap-2 text-xs">
-                {isAdmin && (
+                {isAdmin ? (
                   <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 font-medium text-emerald-800">
                     Admin
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 font-medium text-zinc-600">
+                    Utente
                   </span>
                 )}
                 <span className="text-zinc-600 max-w-[180px] truncate">
