@@ -4,3 +4,12 @@ dist
 .env.local
 .DS_Store
 *.log
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+[._]terraform*
+*.tfvars
+!*.tfvars.example

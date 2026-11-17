@@ -31,7 +31,8 @@ function formatDateTime(ms: number | null): string {
 export function AdminTelemetryPanel({
   latestTelemetry,
 }: AdminTelemetryPanelProps) {
-  const { user, authReady, isAdmin, hasAdminClaim } = useAuth();
+  const { user, authReady, isAdmin, hasAdminClaim, refreshAdminSession } =
+    useAuth();
   const [logs, setLogs] = useState<GenerationLogRecord[]>([]);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -217,6 +218,15 @@ export function AdminTelemetryPanel({
                   </code>{' '}
                   e poi effettua di nuovo l’accesso.
                 </p>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => void refreshAdminSession()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    Verifica claim adesso
+                  </button>
+                </div>
               </div>
             ) : logs.length === 0 ? (
               <p className="px-5 py-6 text-sm text-zinc-600">

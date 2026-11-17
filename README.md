@@ -14,6 +14,7 @@ Web app that turns personal photos into printable coloring-book pages using a se
 - `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
 - `prompts/` — Versioned prompt library and `config.json` version selector (`prompts/README.md`).
 - `pricing/` — AI model cost estimates for Standard and Batch APIs (`pricing/ai/image-generation-costs.md`).
+- `infra/` — Infrastructure as Code (Terraform) to automatically provision Cloud Run, Artifact Registry, Secret Manager, Firestore, and Firebase Auth (`infra/README.md`).
 - `firebase-blueprint.json` & `firestore.rules` — Firestore schema blueprint and hardened security rules.
 - `server.ts` — Root entry point delegating to `backend/server.ts`.
 - `.env.example` — Required server-side environment variables.

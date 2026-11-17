@@ -50,7 +50,7 @@ export function AuthProvider({
   const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   const syncAdminSession = useCallback(
-    async (authUser: AuthUserSummary | null) => {
+    async (authUser: AuthUserSummary | null, forceTokenRefresh = false) => {
       if (!authUser) {
         setIsAdmin(false);
         setHasAdminClaim(false);
@@ -62,8 +62,19 @@ export function AuthProvider({
       }
 
       try {
-        const token = await gateway.getIdToken();
-        const session = await apiClient.fetchAdminSession(token);
+        let token = await gateway.getIdToken(forceTokenRefresh);
+        let session = await apiClient.fetchAdminSession(token);
+
+        // If the user is identified as admin via email allowlist, but the token doesn't have custom claims yet,
+        // force a token refresh from Firebase Auth in case custom claims were recently updated on the server.
+        if (session.isAdmin && !session.hasAdminClaim && !forceTokenRefresh) {
+          const freshToken = await gateway.getIdToken(true);
+          if (freshToken && freshToken !== token) {
+            token = freshToken;
+            session = await apiClient.fetchAdminSession(token);
+          }
+        }
+
         const claimActive = Boolean(session.hasAdminClaim);
         setIdToken(token);
         setIsAdmin(session.isAdmin);
@@ -74,7 +85,9 @@ export function AuthProvider({
 
         if (session.isAdmin && authUser.email) {
           setAuthNotice(
-            `Accesso Admin completato con successo (${authUser.email}). Controlli e telemetria abilitati.`
+            claimActive
+              ? `Accesso Admin completato con successo (${authUser.email}). Controlli, telemetria e storico Firestore abilitati.`
+              : `Accesso Admin completato con successo (${authUser.email}). Controlli e telemetria live abilitati.`
           );
           if (claimActive) {
             void logRepository
@@ -172,9 +185,18 @@ export function AuthProvider({
     setAuthNotice(null);
   }, []);
 
-  const refreshIdToken = useCallback(() => {
-    return gateway.getIdToken();
-  }, [gateway]);
+  const refreshIdToken = useCallback(
+    (forceRefresh = true) => {
+      return gateway.getIdToken(forceRefresh);
+    },
+    [gateway]
+  );
+
+  const refreshAdminSession = useCallback(async () => {
+    if (user) {
+      await syncAdminSession(user, true);
+    }
+  }, [user, syncAdminSession]);
 
   return (
     <AuthContext.Provider
@@ -193,6 +215,7 @@ export function AuthProvider({
         signOutUser,
         clearAuthNotice,
         refreshIdToken,
+        refreshAdminSession,
       }}
     >
       {children}

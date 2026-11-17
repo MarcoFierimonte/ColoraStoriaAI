@@ -28,5 +28,6 @@ export interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
   clearAuthNotice: () => void;
-  refreshIdToken: () => Promise<string | null>;
+  refreshIdToken: (forceRefresh?: boolean) => Promise<string | null>;
+  refreshAdminSession: () => Promise<void>;
 }

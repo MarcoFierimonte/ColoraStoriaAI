@@ -183,3 +183,7 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 ### Docker Multi-Stage (`Dockerfile`) & `npm` con `package-lock.json`
 - **Cos’è:** Il `Dockerfile` crea un’immagine di produzione leggera e isolata (`node:24-slim`) compilando prima il frontend e installando poi solo le dipendenze necessarie a runtime (`npm ci --omit=dev`), eseguendo l’app con utente non privilegiato (`USER node`). Tutto il progetto usa `npm` e `package-lock.json` come unico package manager.
 - **Come e dov’è usato:** Nella root (`Dockerfile`, `.dockerignore`, `package.json`, `package-lock.json`), pronto per il deploy su Cloud Run Free Tier documentato in `README.md`.
+
+### Infrastructure as Code (`infra/`, Terraform)
+- **Cos’è:** Lo standard universale per definire e ricreare risorse cloud tramite codice dichiarativo e versionabile, senza dipendere da configurazioni manuali nella console web.
+- **Come e dov’è usato:** Cartella `infra/`. Automatizza in un unico comando (`terraform apply`) il provisioning completo di Cloud Run v2 (con limiti Free Tier: scale-to-zero e max 2 istanze), Artifact Registry, Secret Manager (`GEMINI_API_KEY`, `TURNSTILE_SECRET_KEY`), database Cloud Firestore nativo, deploy automatico di `firestore.rules`, registrazione Web App Firebase, Identity Platform (Google Sign-In) e Service Account dedicato con privilegi minimi. Documentato in `infra/README.md`.

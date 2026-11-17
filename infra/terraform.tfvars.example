@@ -1,0 +1,36 @@
+# ==============================================================================
+# ColoraStoriaAI - Esempio di configurazione variabili Terraform
+# ==============================================================================
+# Copia questo file in `terraform.tfvars` e compila con i tuoi valori:
+#   cp terraform.tfvars.example terraform.tfvars
+# ==============================================================================
+
+# ID del progetto Google Cloud (es. il tuo progetto GCP)
+project_id = "il-tuo-project-id"
+
+# Regione per Cloud Run, Artifact Registry e Firestore
+region           = "europe-west1"
+firestore_region = "europe-west1"
+
+# Nome base per le risorse
+app_name = "colorastoria"
+
+# Chiave API Gemini (obbligatoria - Generative Language API)
+gemini_api_key = "AIzaSy..."
+
+# Modello Gemini e provider predefinito
+gemini_model = "gemini-4-hydrogen"
+ai_provider  = "gemini"
+
+# Indirizzi email con privilegi Admin (separati da virgola)
+admin_emails = "marco.fierimonte@gmail.com"
+
+# Protezione anti-bot Cloudflare Turnstile (opzionale: lascia vuoto se non usato)
+turnstile_site_key   = ""
+turnstile_secret_key = ""
+
+# ID del database Firestore ((default) per istanze standard)
+firestore_database_id = "(default)"
+
+# Dominio personalizzato opzionale (es. "colorastoria.com") per i domini autorizzati Auth
+custom_domain = ""
