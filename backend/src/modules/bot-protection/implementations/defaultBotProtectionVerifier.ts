@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAppCheck } from 'firebase-admin/app-check';
-import type { ConfigService } from '../../config/config.interface.ts';
+import { getServerConfig, type ServerConfig } from '../../config/index.ts';
 import {
   BotProtectionError,
   type BotVerificationRequest,
@@ -31,14 +31,14 @@ function readHeader(
 }
 
 export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
-  private readonly configService: ConfigService;
+  private readonly config: ServerConfig;
   private readonly firebaseConfigPath: string;
 
   constructor(
-    configService: ConfigService,
+    config: ServerConfig = getServerConfig(),
     firebaseConfigPath = DEFAULT_FIREBASE_CONFIG_PATH
   ) {
-    this.configService = configService;
+    this.config = config;
     this.firebaseConfigPath = firebaseConfigPath;
   }
 
@@ -58,11 +58,10 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
   }
 
   isEnforced(): boolean {
-    const config = this.configService.getConfig();
     return Boolean(
-      config.turnstileSecretKey ||
-        config.appCheckEnabled ||
-        config.botProtectionRequired
+      this.config.turnstileSecretKey ||
+        this.config.appCheckEnabled ||
+        this.config.botProtectionRequired
     );
   }
 
@@ -73,9 +72,7 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
       return { verified: true, provider: 'admin-bypass' };
     }
 
-    const config = this.configService.getConfig();
-
-    if (config.turnstileSecretKey) {
+    if (this.config.turnstileSecretKey) {
       const token = readHeader(req.headers, 'x-turnstile-token');
       if (!token) {
         throw new BotProtectionError(
@@ -87,7 +84,7 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
 
       try {
         const body = new URLSearchParams({
-          secret: config.turnstileSecretKey,
+          secret: this.config.turnstileSecretKey,
           response: token,
         });
         if (req.clientIp) {
@@ -119,7 +116,7 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
       }
     }
 
-    if (config.appCheckEnabled) {
+    if (this.config.appCheckEnabled) {
       const token = readHeader(req.headers, 'x-firebase-appcheck');
       if (!token) {
         throw new BotProtectionError(
@@ -147,7 +144,7 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
       }
     }
 
-    if (config.botProtectionRequired) {
+    if (this.config.botProtectionRequired) {
       throw new BotProtectionError(
         'Protezione anti-bot non configurata sul server.',
         503,

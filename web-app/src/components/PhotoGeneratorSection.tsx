@@ -378,7 +378,10 @@ export function PhotoGeneratorSection({
             </ul>
             <p className="text-xs text-zinc-500 pt-1">
               Formati accettati: {ORDER_CONFIG.acceptedExtensionsLabel} · Almeno{' '}
-              <span className="font-mono-num">400×400 px</span> · Max{' '}
+              <span className="font-mono-num">
+                {ORDER_CONFIG.minWidthPx}×{ORDER_CONFIG.minHeightPx} px
+              </span>{' '}
+              · Max{' '}
               <span className="font-mono-num">{ORDER_CONFIG.maxFileSizeMb} MB</span>.
             </p>
           </div>

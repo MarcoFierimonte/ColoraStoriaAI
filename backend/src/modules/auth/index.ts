@@ -1,4 +1,4 @@
-import { configService } from '../config/index.ts';
+import { serverConfig } from '../config/index.ts';
 import type {
   AdminAuthContext,
   AuthTokenVerifier,
@@ -14,7 +14,7 @@ export type {
 export { FirebaseAdminTokenVerifier } from './implementations/firebaseAdminTokenVerifier.ts';
 
 export const authTokenVerifier: AuthTokenVerifier =
-  new FirebaseAdminTokenVerifier(configService);
+  new FirebaseAdminTokenVerifier(serverConfig);
 
 export async function verifyOptionalAdmin(
   req: HttpAuthRequest

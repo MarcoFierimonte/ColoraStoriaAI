@@ -5,9 +5,12 @@ Web app that turns personal photos into printable coloring-book pages using a se
 ## Repository Layout
 - `AGENTS.md` — Template engineering guidelines enforcing strict Interface vs. Implementation module separation and wiki maintenance.
 - `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
-- `shared/` — Cross-stack TypeScript domain contracts and API DTOs (`shared/types/`) shared by `backend/` and `web-app/`.
-- `web-app/` — React + TypeScript + Tailwind CSS frontend with domain modules under `web-app/src/modules/` (`web-app/README.md`).
-- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` (`backend/README.md`).
+- `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/themes (`shared/config/`) shared by `backend/` and `web-app/`.
+- `web-app/` — React + TypeScript + Tailwind CSS frontend with domain modules under `web-app/src/modules/`, self-hosted `@fontsource` fonts, and real-URL legal routes (`web-app/README.md`).
+- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` and Zod startup env validation (`backend/README.md`).
+- `tests/` — Native Node test runner suite (`node --test`) verifying upload validation, auth/providers, and config/rules consistency.
+- `Dockerfile` & `.dockerignore` — Multi-stage non-root production container (`node:24-slim`).
+- `.github/workflows/ci.yml` — Automated CI running `lint`, `test`, `build`, and `npm audit`.
 - `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
 - `prompts/` — Versioned prompt library and `config.json` version selector (`prompts/README.md`).
 - `pricing/` — AI model cost estimates for Standard and Batch APIs (`pricing/ai/image-generation-costs.md`).
@@ -94,22 +97,32 @@ flowchart LR
 - `npm run build` — Builds `web-app/` into `dist/`.
 - `npm run start` — Runs the production server (`NODE_ENV=production`) on port `3000`.
 - `npm run lint` — Runs TypeScript checks (`tsc --noEmit`) and ESLint architectural & Firestore rules checks (`eslint .`).
+- `npm test` — Runs unit and theme/rules consistency tests (`node --test tests/*.test.ts`).
 - `npm run prompts:sync` — Regenerates `manual-test.json` inside every `prompts/v*` folder.
 
-## Production Deployment & Security Hardening (Google Cloud Run)
+## Deploy su Cloud Run (Free Tier & Container)
+
+The repository includes a multi-stage `Dockerfile` (`node:24-slim`, production-only `npm ci --omit=dev`, non-root `USER node`, `PORT=8080`).
 
 1. **Secrets in Secret Manager (never plain env vars)**:
-   Store `GEMINI_API_KEY` (and `TURNSTILE_SECRET_KEY` / `OPENAI_API_KEY`) in **Google Cloud Secret Manager** and mount them on Cloud Run:
+   Store `GEMINI_API_KEY` (and optionally `TURNSTILE_SECRET_KEY` / `OPENAI_API_KEY`) in **Google Cloud Secret Manager** and grant the Cloud Run runtime service account `roles/secretmanager.secretAccessor`.
+2. **Build & Deploy staying within Cloud Run Free Tier**:
    ```bash
    gcloud run deploy colorastoria \
      --source . \
      --region europe-west1 \
+     --allow-unauthenticated \
+     --min-instances 0 \
      --max-instances 2 \
      --concurrency 10 \
+     --cpu 1 \
+     --memory 512Mi \
      --set-env-vars "NODE_ENV=production,AI_PROVIDER=gemini,GEMINI_MODEL=gemini-4-hydrogen" \
      --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,TURNSTILE_SECRET_KEY=TURNSTILE_SECRET_KEY:latest"
    ```
-   Using `--max-instances 2 --concurrency 10` caps worst-case memory/instance scaling while preventing surprise Cloud Run bills.
+   - `--min-instances 0` keeps idle costs at `$0` (Cloud Run Free Tier includes 2M requests, 360k GB-seconds, and 180k vCPU-seconds/month).
+   - `--max-instances 2 --concurrency 10` caps memory usage (`multer.memoryStorage()` buffers) and prevents surprise scaling bills.
+   - If using Cloudflare Turnstile, bake `VITE_TURNSTILE_SITE_KEY` at build time (via `--build-env-vars` or Docker `--build-arg VITE_TURNSTILE_SITE_KEY=...`).
 2. **GCP Billing Budget Alerts**:
    In **GCP Billing > Budgets & alerts**, create a monthly budget (e.g. `€10`) with email notifications at `50%`, `90%`, and `100%` of spend.
 3. **Restrict API Keys in Google Cloud Console (`APIs & Services > Credentials`)**:

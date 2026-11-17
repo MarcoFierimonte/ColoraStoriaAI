@@ -22,7 +22,8 @@ function loadImageDimensions(
 export class BrowserPhotoValidator implements MediaValidator {
   async validateSinglePhoto(file: File): Promise<PhotoValidationResult> {
     const maxBytes = ORDER_CONFIG.maxFileSizeMb * 1024 * 1024;
-    const minDim = 400;
+    const minWidth = ORDER_CONFIG.minWidthPx;
+    const minHeight = ORDER_CONFIG.minHeightPx;
 
     if (!ORDER_CONFIG.acceptedMimeTypes.includes(file.type)) {
       return {
@@ -46,12 +47,12 @@ export class BrowserPhotoValidator implements MediaValidator {
     const previewUrl = URL.createObjectURL(file);
     try {
       const { width, height } = await loadImageDimensions(previewUrl);
-      if (width < minDim || height < minDim) {
+      if (width < minWidth || height < minHeight) {
         URL.revokeObjectURL(previewUrl);
         return {
           rejected: {
             fileName: file.name,
-            reason: `Risoluzione troppo bassa (${width} × ${height} px). Servono almeno ${minDim} × ${minDim} px.`,
+            reason: `Risoluzione troppo bassa (${width} × ${height} px). Servono almeno ${minWidth} × ${minHeight} px.`,
           },
         };
       }

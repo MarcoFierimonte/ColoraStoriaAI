@@ -1,6 +1,6 @@
 # ColoraStoria Prompts
 
-Versioned prompt library used by `backend/src/utils/prompts.ts`.
+Versioned prompt library loaded by `backend/src/modules/prompts/`.
 
 ## Configuration (`config.json`)
 - `"activeVersion": "latest"` — Automatically selects the highest version in `"versions"` (e.g. `v2` over `v1`).

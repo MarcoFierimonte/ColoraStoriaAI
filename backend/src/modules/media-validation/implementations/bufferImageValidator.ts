@@ -1,13 +1,17 @@
 import {
+  MAX_PHOTO_DIMENSION_PX,
+  MIN_PHOTO_DIMENSION_PX,
+} from '../../../../../shared/config/index.ts';
+import {
   ImageValidationError,
   type ServerMediaValidator,
   type ValidatedImageResult,
   type VerifiedImageMime,
 } from '../mediaValidation.interface.ts';
 
-const MIN_WIDTH_PX = 400;
-const MIN_HEIGHT_PX = 400;
-const MAX_DIMENSION_PX = 16000;
+const MIN_WIDTH_PX = MIN_PHOTO_DIMENSION_PX;
+const MIN_HEIGHT_PX = MIN_PHOTO_DIMENSION_PX;
+const MAX_DIMENSION_PX = MAX_PHOTO_DIMENSION_PX;
 
 const JPEG_SOF_MARKERS = new Set([
   0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,

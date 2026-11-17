@@ -1,17 +1,21 @@
 import {
   ALLOWED_THEME_IDS,
   type ColoringOutputFormat,
+  type ProviderId,
   type ProviderStatus,
   type ThemeId,
+  type UsageBreakdown,
 } from '../../../../shared/types/index.ts';
-import type { SupportedProviderId } from '../config/config.interface.ts';
-import type { UsageBreakdown } from '../cost-estimation/costEstimation.interface.ts';
+
+export type SupportedProviderId = ProviderId;
 
 export {
   ALLOWED_THEME_IDS,
   type ColoringOutputFormat,
+  type ProviderId,
   type ProviderStatus,
   type ThemeId,
+  type UsageBreakdown,
 };
 
 export interface ColoringGenerationInput {

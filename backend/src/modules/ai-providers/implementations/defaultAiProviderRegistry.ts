@@ -1,8 +1,8 @@
-import type {
-  ConfigService,
-  SupportedProviderId,
-} from '../../config/config.interface.ts';
-import type { CostEstimator } from '../../cost-estimation/costEstimation.interface.ts';
+import {
+  getServerConfig,
+  type ServerConfig,
+  type SupportedProviderId,
+} from '../../config/index.ts';
 import type { PromptRepository } from '../../prompts/promptRepository.interface.ts';
 import type {
   AiProviderRegistry,
@@ -13,51 +13,43 @@ import { GeminiColoringProvider } from './geminiColoringProvider.ts';
 import { OpenAIColoringProvider } from './openaiColoringProvider.ts';
 
 export class DefaultAiProviderRegistry implements AiProviderRegistry {
-  private readonly configService: ConfigService;
+  private readonly config: ServerConfig;
   private readonly promptRepository: PromptRepository;
-  private readonly costEstimator: CostEstimator;
 
   constructor(params: {
-    configService: ConfigService;
+    config?: ServerConfig;
     promptRepository: PromptRepository;
-    costEstimator: CostEstimator;
   }) {
-    this.configService = params.configService;
+    this.config = params.config ?? getServerConfig();
     this.promptRepository = params.promptRepository;
-    this.costEstimator = params.costEstimator;
   }
 
   private buildProviderMap(): Record<SupportedProviderId, ColoringProvider> {
-    const config = this.configService.getConfig();
     return {
       gemini: new GeminiColoringProvider({
-        config,
+        config: this.config,
         promptRepository: this.promptRepository,
-        costEstimator: this.costEstimator,
       }),
       openai: new OpenAIColoringProvider({
-        config,
+        config: this.config,
         promptRepository: this.promptRepository,
-        costEstimator: this.costEstimator,
       }),
     };
   }
 
   getProvider(requestedId?: string): ColoringProvider {
-    const config = this.configService.getConfig();
     const providers = this.buildProviderMap();
     const id: SupportedProviderId =
       requestedId === 'openai' || requestedId === 'gemini'
         ? requestedId
-        : config.defaultProvider;
+        : this.config.defaultProvider;
     return providers[id];
   }
 
   listStatuses(): ProviderStatus[] {
-    const config = this.configService.getConfig();
     const providers = this.buildProviderMap();
     return (Object.values(providers) as ColoringProvider[]).map((provider) =>
-      provider.getStatus(provider.id === config.defaultProvider)
+      provider.getStatus(provider.id === this.config.defaultProvider)
     );
   }
 }

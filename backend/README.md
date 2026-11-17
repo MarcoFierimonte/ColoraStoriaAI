@@ -3,15 +3,15 @@
 Express 5 + TypeScript API server organized into self-contained modules with separated interfaces (`*.interface.ts`) and implementations (`implementations/`).
 
 ## Structure
-- `server.ts` — Express server entry point (`helmet` CSP + `same-origin-allow-popups`, `trust proxy`, global JSON error handler; mounts `/api/*`; serves Vite middleware strictly when `NODE_ENV === 'development'`, otherwise static `dist/`).
+- `server.ts` — Express server entry point (`helmet` CSP + `same-origin-allow-popups`, `trust proxy`, global JSON error handler, listen error handling + `SIGTERM`/`SIGINT` graceful shutdown; mounts `/api/*`; serves Vite middleware strictly when `NODE_ENV === 'development'`, otherwise static `dist/`).
 - `src/routes/coloringRoutes.ts` — `createColoringRouter(deps)` exposing `GET /api/health`, `GET /api/admin/session`, and rate-limited `POST /api/coloring/generate`.
-- `src/modules/config/` — `ConfigService` interface + `EnvConfigService` reading server env vars (no hardcoded admin emails).
+- `src/modules/config/` — Zod-validated `serverConfig` module (`envConfig.ts`) failing fast on invalid startup env vars (no hardcoded admin emails).
 - `src/modules/auth/` — `AuthTokenVerifier` interface + `FirebaseAdminTokenVerifier` verifying Firebase ID tokens (`admin` custom claim or `ADMIN_EMAILS`).
 - `src/modules/bot-protection/` — `BotProtectionVerifier` interface + `DefaultBotProtectionVerifier` (Cloudflare Turnstile & Firebase App Check).
-- `src/modules/media-validation/` — `ServerMediaValidator` interface + `BufferImageValidator` (server-side JPEG/PNG/WebP magic-bytes & minimum 400×400 resolution validation).
+- `src/modules/media-validation/` — `ServerMediaValidator` interface + `BufferImageValidator` (server-side JPEG/PNG/WebP magic-bytes & resolution validation using `shared/config/` limits).
 - `src/modules/ai-providers/` — `ColoringProvider` & `AiProviderRegistry` interfaces + `GeminiColoringProvider` (maps errors via numeric `error.status`), `OpenAIColoringProvider`, and `DefaultAiProviderRegistry`.
 - `src/modules/prompts/` — `PromptRepository` interface + `FilesystemPromptRepository` loading versioned prompts from `prompts/`.
-- `src/modules/cost-estimation/` — `CostEstimator` interface + `StaticRateCardCostEstimator` computing token/image costs.
+- `src/modules/cost-estimation/` — `calculateGenerationCost` (`rateCardCostEstimator.ts`) computing token/image costs and logging a warning for unmapped models.
 
 ## Endpoints
 - `GET /api/health` — Returns `{ ok: true }`.

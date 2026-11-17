@@ -1,4 +1,4 @@
-import { configService } from '../config/index.ts';
+import { serverConfig } from '../config/index.ts';
 import type { BotProtectionVerifier } from './botProtection.interface.ts';
 import { DefaultBotProtectionVerifier } from './implementations/defaultBotProtectionVerifier.ts';
 
@@ -12,4 +12,4 @@ export {
 export { DefaultBotProtectionVerifier } from './implementations/defaultBotProtectionVerifier.ts';
 
 export const botProtectionVerifier: BotProtectionVerifier =
-  new DefaultBotProtectionVerifier(configService);
+  new DefaultBotProtectionVerifier(serverConfig);

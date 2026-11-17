@@ -2,6 +2,12 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import {
+  ACCEPTED_IMAGE_EXTENSIONS_LABEL,
+  ACCEPTED_IMAGE_MIME_TYPES,
+  MAX_UPLOAD_FILE_BYTES,
+  MAX_UPLOAD_FILE_SIZE_MB,
+} from '../../../shared/config/index.ts';
+import {
   isAllowedThemeId,
   type AdminSessionResponse,
   type ColoringGenerationResponse,
@@ -33,18 +39,21 @@ import {
   type PromptRepository,
 } from '../modules/prompts/index.ts';
 
-const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_MIME_TYPES = new Set<string>(ACCEPTED_IMAGE_MIME_TYPES);
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: MAX_UPLOAD_BYTES,
+    fileSize: MAX_UPLOAD_FILE_BYTES,
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      cb(new Error('Formato non supportato. Carica un file JPG, PNG o WebP.'));
+      cb(
+        new Error(
+          `Formato non supportato. Carica un file ${ACCEPTED_IMAGE_EXTENSIONS_LABEL}.`
+        )
+      );
       return;
     }
     cb(null, true);
@@ -155,7 +164,7 @@ export function createColoringRouter(
         }
         if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
           res.status(400).json({
-            error: 'La foto supera il limite massimo di 12 MB.',
+            error: `La foto supera il limite massimo di ${MAX_UPLOAD_FILE_SIZE_MB} MB.`,
           });
           return;
         }

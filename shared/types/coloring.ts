@@ -1,21 +1,18 @@
-export const ALLOWED_THEME_IDS = [
-  'pirati',
-  'unicorni',
-  'draghi',
-  'spazio',
-  'dinosauri',
-  'principessa',
-] as const;
+import {
+  ALLOWED_THEME_IDS,
+  SUPPORTED_PROVIDER_IDS,
+  isAllowedThemeId,
+  type ProviderId,
+  type ThemeId,
+} from '../config/limits.ts';
 
-export type ThemeId = (typeof ALLOWED_THEME_IDS)[number];
-
-export function isAllowedThemeId(value: string): value is ThemeId {
-  return (ALLOWED_THEME_IDS as readonly string[]).includes(value);
-}
-
-export const SUPPORTED_PROVIDER_IDS = ['gemini', 'openai'] as const;
-
-export type ProviderId = (typeof SUPPORTED_PROVIDER_IDS)[number];
+export {
+  ALLOWED_THEME_IDS,
+  SUPPORTED_PROVIDER_IDS,
+  isAllowedThemeId,
+  type ProviderId,
+  type ThemeId,
+};
 
 export type ColoringOutputFormat = 'svg' | 'raster';
 

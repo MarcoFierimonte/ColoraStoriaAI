@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ORDER_CONFIG } from '../config/orderConfig';
 import type { AdminTelemetry } from '../modules/coloring-api';
 
 /**
@@ -362,7 +363,7 @@ export function TempModelCostEstimatorPanel({
               <th className="py-2.5 px-3 font-medium">Tempo medio / SLA</th>
               <th className="py-2.5 px-3 font-medium">Stima 1 pagina</th>
               <th className="py-2.5 px-4 font-medium text-right">
-                Stima libro (16 pag.)
+                Stima libro ({ORDER_CONFIG.projectedBookPages} pag.)
               </th>
             </tr>
           </thead>
@@ -374,7 +375,7 @@ export function TempModelCostEstimatorPanel({
                 resolution,
                 mode: apiMode,
               });
-              const bookCost = estimate.costUsd * 16;
+              const bookCost = estimate.costUsd * ORDER_CONFIG.projectedBookPages;
               const turnaroundText =
                 apiMode === 'batch'
                   ? spec.batchLatencyLabel

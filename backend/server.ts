@@ -35,12 +35,8 @@ export async function startServer() {
           scriptSrc: config.isDevelopment
             ? ["'self'", "'unsafe-inline'", 'https://challenges.cloudflare.com']
             : ["'self'", 'https://challenges.cloudflare.com'],
-          styleSrc: [
-            "'self'",
-            "'unsafe-inline'",
-            'https://fonts.googleapis.com',
-          ],
-          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          fontSrc: ["'self'", 'data:'],
           imgSrc: [
             "'self'",
             'data:',
@@ -83,6 +79,7 @@ export async function startServer() {
     res.status(404).json({ error: 'Endpoint non trovato.' });
   });
 
+  let viteServer: { close: () => Promise<void> } | null = null;
   if (config.isDevelopment) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -94,6 +91,7 @@ export async function startServer() {
       },
       appType: 'spa',
     });
+    viteServer = vite;
     app.use(vite.middlewares);
   } else {
     app.use(express.static(DIST_DIR));
@@ -125,11 +123,47 @@ export async function startServer() {
     );
   }
 
-  app.listen(config.port, '0.0.0.0', () => {
+  const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(
       `ColoraStoria server listening on http://0.0.0.0:${config.port} (mode: ${config.isDevelopment ? 'development' : 'production'}, default provider: ${config.defaultProvider})`
     );
   });
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    console.error('[SERVER LISTEN ERROR]', error);
+    process.exit(1);
+  });
+
+  let isShuttingDown = false;
+  const shutdown = (signal: NodeJS.Signals) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log(`[SERVER] Received ${signal}, shutting down gracefully...`);
+
+    const forceTimer = setTimeout(() => {
+      console.error('[SERVER] Forced shutdown after 10s timeout.');
+      process.exit(1);
+    }, 10_000);
+    forceTimer.unref();
+
+    server.close(async (closeErr) => {
+      if (closeErr) {
+        console.error('[SERVER] Error closing HTTP server:', closeErr);
+        process.exit(1);
+      }
+      if (viteServer) {
+        await viteServer.close().catch(() => undefined);
+      }
+      clearTimeout(forceTimer);
+      console.log('[SERVER] Shutdown complete.');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  return server;
 }
 
 const isDirectExecution =

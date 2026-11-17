@@ -7,6 +7,7 @@ import {
   subscribeGenerationLogs,
   type GenerationLogRecord,
 } from '../modules/database';
+import { ORDER_CONFIG } from '../config/orderConfig';
 import { TempModelCostEstimatorPanel } from './TempModelCostEstimatorPanel';
 
 interface AdminTelemetryPanelProps {
@@ -111,7 +112,9 @@ export function AdminTelemetryPanel({
               </p>
             </div>
             <div className="rounded-xl border border-zinc-200 bg-[#FBFBF9] p-3">
-              <p className="text-xs text-zinc-500">Stima libro (16 pag.)</p>
+              <p className="text-xs text-zinc-500">
+                Stima libro ({ORDER_CONFIG.projectedBookPages} pag.)
+              </p>
               <p className="mt-1 text-lg font-semibold font-mono-num text-zinc-900">
                 {formatUsd(latestTelemetry.projectedBook16CostUsd, 4)}
               </p>
@@ -162,9 +165,9 @@ export function AdminTelemetryPanel({
                   <span className="font-mono-num font-medium text-zinc-900">
                     {formatUsd(avgCostUsd, 5)}
                   </span>{' '}
-                  · Proiezione 16 pagine:{' '}
+                  · Proiezione {ORDER_CONFIG.projectedBookPages} pagine:{' '}
                   <span className="font-mono-num font-medium text-zinc-900">
-                    {formatUsd(avgCostUsd * 16, 4)}
+                    {formatUsd(avgCostUsd * ORDER_CONFIG.projectedBookPages, 4)}
                   </span>
                 </>
               ) : (

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import type { ConfigService } from '../../config/config.interface.ts';
+import { getServerConfig, type ServerConfig } from '../../config/index.ts';
 import type {
   AdminAuthContext,
   AuthTokenVerifier,
@@ -18,15 +18,15 @@ const DEFAULT_FIREBASE_CONFIG_PATH = path.resolve(
 );
 
 export class FirebaseAdminTokenVerifier implements AuthTokenVerifier {
-  private readonly configService: ConfigService;
+  private readonly config: ServerConfig;
   private readonly firebaseConfigPath: string;
   private firebaseInitialized = false;
 
   constructor(
-    configService: ConfigService,
+    config: ServerConfig = getServerConfig(),
     firebaseConfigPath = DEFAULT_FIREBASE_CONFIG_PATH
   ) {
-    this.configService = configService;
+    this.config = config;
     this.firebaseConfigPath = firebaseConfigPath;
   }
 
@@ -72,24 +72,32 @@ export class FirebaseAdminTokenVerifier implements AuthTokenVerifier {
 
     try {
       const decoded = await getAuth().verifyIdToken(token);
-      const email = decoded.email?.toLowerCase();
-      const emailVerified = decoded.email_verified === true;
-      const { adminEmails } = this.configService.getConfig();
-      const hasAdminClaim = decoded.admin === true;
-      const hasAdminEmail = Boolean(
-        email && adminEmails.includes(email)
-      );
-
-      const isAdmin = Boolean(emailVerified && (hasAdminClaim || hasAdminEmail));
-
-      return {
-        authenticated: true,
-        isAdmin,
-        uid: decoded.uid,
-        email: decoded.email,
-      };
+      return this.evaluateDecodedToken(decoded);
     } catch {
       return { authenticated: false, isAdmin: false };
     }
+  }
+
+  evaluateDecodedToken(decoded: {
+    uid: string;
+    email?: string;
+    email_verified?: boolean;
+    admin?: unknown;
+  }): AdminAuthContext {
+    const email = decoded.email?.toLowerCase();
+    const emailVerified = decoded.email_verified === true;
+    const hasAdminClaim = decoded.admin === true;
+    const hasAdminEmail = Boolean(
+      email && this.config.adminEmails.includes(email)
+    );
+
+    const isAdmin = Boolean(emailVerified && (hasAdminClaim || hasAdminEmail));
+
+    return {
+      authenticated: true,
+      isAdmin,
+      uid: decoded.uid,
+      email: decoded.email,
+    };
   }
 }

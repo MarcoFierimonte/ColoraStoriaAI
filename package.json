@@ -1,26 +1,22 @@
 {
-  "name": "material-flask",
+  "name": "colorastoria",
   "private": true,
   "version": "1.0.0",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
-    "predev": "[ -d node_modules/.bin ] || bun install || npm install",
-    "dev": "NODE_ENV=development tsx server.ts",
+    "dev": "NODE_ENV=development PORT=3000 tsx server.ts",
     "start": "NODE_ENV=production node server.ts",
-    "prebuild": "[ -d node_modules/.bin ] || bun install || npm install",
     "build": "vite build --config web-app/vite.config.ts",
-    "prelint": "[ -d node_modules/.bin ] || bun install || npm install",
     "lint": "tsc --noEmit && eslint .",
+    "test": "node --test tests/*.test.ts",
     "prompts:sync": "node prompts/sync-manual.mjs"
   },
   "dependencies": {
-    "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^3.3.0",
-    "@tailwindcss/vite": "^4.3.5",
-    "@types/express": "^5.0.6",
-    "@types/multer": "^2.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "eslint": "^10.15.0",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.4",
     "firebase": "^13.3.0",
@@ -32,14 +28,23 @@
     "multer": "^2.5.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "tailwindcss": "^4.3.5",
-    "tsx": "^4.23.15",
-    "vite": "^8.3.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
+    "@fontsource/fraunces": "^5.3.0",
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "typescript": "^7.0.2"
+    "@vitejs/plugin-react": "^6.1.1",
+    "eslint": "^10.15.0",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
   }
 }

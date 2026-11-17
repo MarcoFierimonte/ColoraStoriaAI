@@ -1,5 +1,5 @@
-import type { ServerConfig } from '../../config/config.interface.ts';
-import type { CostEstimator } from '../../cost-estimation/costEstimation.interface.ts';
+import { type ServerConfig } from '../../config/index.ts';
+import { calculateGenerationCost } from '../../cost-estimation/index.ts';
 import type { PromptRepository } from '../../prompts/promptRepository.interface.ts';
 import {
   ProviderConfigurationError,
@@ -15,16 +15,13 @@ export class OpenAIColoringProvider implements ColoringProvider {
   readonly label = 'OpenAI';
   private readonly config: ServerConfig;
   private readonly promptRepository: PromptRepository;
-  private readonly costEstimator: CostEstimator;
 
   constructor(params: {
     config: ServerConfig;
     promptRepository: PromptRepository;
-    costEstimator: CostEstimator;
   }) {
     this.config = params.config;
     this.promptRepository = params.promptRepository;
-    this.costEstimator = params.costEstimator;
   }
 
   isConfigured(): boolean {
@@ -126,7 +123,7 @@ export class OpenAIColoringProvider implements ColoringProvider {
       payload.usage?.output_tokens_details?.text_tokens ??
       Math.max(0, (payload.usage?.output_tokens ?? 0) - imageOutputTokens);
 
-    const usage = this.costEstimator.calculate({
+    const usage = calculateGenerationCost({
       model: this.config.openaiModel,
       inputTokens,
       cachedInputTokens,

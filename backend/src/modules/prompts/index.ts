@@ -1,5 +1,5 @@
 import type { ThemeId } from '../ai-providers/aiProvider.interface.ts';
-import { configService } from '../config/index.ts';
+import { serverConfig } from '../config/index.ts';
 import { FilesystemPromptRepository } from './implementations/filesystemPromptRepository.ts';
 import type { BuiltPrompt, PromptRepository } from './promptRepository.interface.ts';
 
@@ -11,7 +11,7 @@ export type {
 export { FilesystemPromptRepository } from './implementations/filesystemPromptRepository.ts';
 
 export const promptRepository: PromptRepository = new FilesystemPromptRepository(
-  configService
+  serverConfig
 );
 
 export function listPromptVersions(): string[] {

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ThemeId } from '../../ai-providers/aiProvider.interface.ts';
-import type { ConfigService } from '../../config/config.interface.ts';
+import { getServerConfig, type ServerConfig } from '../../config/index.ts';
 import type {
   BuiltPrompt,
   PromptBundle,
@@ -24,11 +24,14 @@ function extractVersionNumber(version: string): number {
 }
 
 export class FilesystemPromptRepository implements PromptRepository {
-  private readonly configService: ConfigService;
+  private readonly config: ServerConfig;
   private readonly promptsRoot: string;
 
-  constructor(configService: ConfigService, promptsRoot = DEFAULT_PROMPTS_ROOT) {
-    this.configService = configService;
+  constructor(
+    config: ServerConfig = getServerConfig(),
+    promptsRoot = DEFAULT_PROMPTS_ROOT
+  ) {
+    this.config = config;
     this.promptsRoot = promptsRoot;
   }
 
@@ -63,7 +66,7 @@ export class FilesystemPromptRepository implements PromptRepository {
 
   getActiveVersion(): string {
     const { activeVersion, availableVersions } = this.readPromptsConfig();
-    const envOverride = this.configService.getConfig().promptVersion;
+    const envOverride = this.config.promptVersion;
     const requested = envOverride || activeVersion || 'latest';
 
     if (requested !== 'latest') {

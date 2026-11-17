@@ -1,5 +1,4 @@
-import { configService } from '../config/index.ts';
-import { costEstimator } from '../cost-estimation/index.ts';
+import { serverConfig } from '../config/index.ts';
 import { promptRepository } from '../prompts/index.ts';
 import type {
   AiProviderRegistry,
@@ -25,9 +24,8 @@ export { OpenAIColoringProvider } from './implementations/openaiColoringProvider
 
 export const aiProviderRegistry: AiProviderRegistry =
   new DefaultAiProviderRegistry({
-    configService,
+    config: serverConfig,
     promptRepository,
-    costEstimator,
   });
 
 export function getColoringProvider(requestedId?: string): ColoringProvider {

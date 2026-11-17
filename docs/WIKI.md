@@ -24,15 +24,19 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Moduli con Interfaccia vs Implementazione (`*.interface.ts` + `implementations/`)
 - **Cos’è:** Un pattern architetturale (simile a una "presa elettrica" e alla sua "spina") che separa **cosa** fa un modulo (l’interfaccia pura in TypeScript) da **come** lo fa tecnicamente con una specifica libreria esterna (l’implementazione).
-- **Come e dov’è usato:** Ogni dominio in `backend/src/modules/` e `web-app/src/modules/` ha `<nome>.interface.ts` (senza import di librerie esterne), `implementations/*.ts` (es. Gemini, Firebase, Cloudflare) e `index.ts` (punto unico di accesso). Se domani vuoi cambiare database o provider AI, sostituisci solo l’implementazione senza toccare la UI o le route Express.
+- **Come e dov’è usato:** Ogni dominio collegato a servizi esterni in `backend/src/modules/` e `web-app/src/modules/` ha `<nome>.interface.ts` (senza import di librerie esterne), `implementations/*.ts` (es. Gemini, Firebase, Cloudflare) e `index.ts` (punto unico di accesso). Se domani vuoi cambiare database o provider AI, sostituisci solo l’implementazione senza toccare la UI o le route Express.
 
 ### Dependency Injection (DI)
 - **Cos’è:** Invece di creare gli strumenti direttamente dentro una funzione o route, glieli "passi da fuori" come parametri.
-- **Come e dov’è usato:** `createColoringRouter(deps)` in `backend/src/routes/coloringRoutes.ts` e `AuthProvider` in `web-app/src/modules/auth/` ricevono interfacce (`providers`, `auth`, `botProtection`, `mediaValidator`, `prompts`), rendendo il codice modulare e riusabile come template.
+- **Come e dov’è usato:** `createColoringRouter(deps)` in `backend/src/routes/coloringRoutes.ts` e `AuthProvider` in `web-app/src/modules/auth/` ricevono interfacce (`providers`, `auth`, `botProtection`, `mediaValidator`, `prompts`), rendendo il codice modulare e facilmente testabile.
 
-### `shared/types/` (Contratti condivisi)
-- **Cos’è:** Un’unica cartella con i tipi TypeScript condivisi tra client e server (*Single Source of Truth*).
-- **Come e dov’è usato:** `shared/types/coloring.ts` definisce i temi validi (`ALLOWED_THEME_IDS`), i provider (`ProviderId`), le risposte di `/api/health`, `/api/admin/session`, `/api/coloring/generate` e la telemetria (`AdminTelemetry`). Evita di dover aggiornare i tipi in due posti diversi.
+### Regola "Interfaccia solo se serve" (`*.interface.ts` vs moduli diretti)
+- **Cos’è:** La regola pratica per non scrivere file superflui: usiamo il pattern completo **Interfaccia + Implementazione** solo dove serve davvero poter cambiare fornitore o servizio esterno (`ai-providers`, `auth`, `database`, `bot-protection`, `media-validation`, `prompts`, futuri `payments`/`email`). Moduli interni come `config` e `cost-estimation` restano funzioni/moduli diretti e leggeri.
+- **Come e dov’è usato:** Documentato in `AGENTS.md` e applicato in `backend/src/modules/` e `web-app/src/modules/`.
+
+### `shared/types/` e `shared/config/` (Fonte unica di verità)
+- **Cos’è:** Un’unica cartella condivisa tra client e server (*Single Source of Truth*) per evitare costanti duplicate o disallineate.
+- **Come e dov’è usato:** `shared/config/limits.ts` centralizza tipi MIME accettati, limite `12 MB`, risoluzione minima `400×400 px`, `10–15` foto libro, `16` pagine proiettate, lista dei 6 temi (`ALLOWED_THEME_IDS`) e provider (`SUPPORTED_PROVIDER_IDS`). `shared/types/coloring.ts` definisce invece tutti i DTO delle API. Sia `backend/` sia `web-app/` importano da qui.
 
 ### Prompt Versionati (`prompts/`)
 - **Cos’è:** Le istruzioni testuali inviate all’AI tenute in file separati dal codice sorgente, divise per versione (`v1`, `v2`, ecc.).
@@ -100,9 +104,13 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 - **Cos’è:** Adapter HTTP verso l’endpoint `/v1/images/edits` di OpenAI tramite `fetch` nativo di Node.
 - **Come e dov’è usato:** `backend/src/modules/ai-providers/implementations/openaiColoringProvider.ts`, attivabile tramite `AI_PROVIDER=openai` o selettore Admin se `OPENAI_API_KEY` è configurata.
 
-### Cost Estimation (`StaticRateCardCostEstimator`)
-- **Cos’è:** Modulo di calcolo che traduce i token consumati in input/output e cache in una stima economica in dollari (singola pagina e proiezione su 16 pagine).
-- **Come e dov’è usato:** `backend/src/modules/cost-estimation/` (sincronizzato con i prezzi documentati in `pricing/`). I risultati arrivano solo nella telemetria Admin.
+### Cost Estimation (`calculateGenerationCost`)
+- **Cos’è:** Modulo di calcolo che traduce i token consumati in input/output e cache in una stima economica in dollari (singola pagina e proiezione su `PROJECTED_BOOK_PAGES = 16` pagine). Se incontra un modello non presente nel listino, stampa un `console.warn` invece di ignorarlo in silenzio.
+- **Come e dov’è usato:** `backend/src/modules/cost-estimation/rateCardCostEstimator.ts` (sincronizzato con i prezzi documentati in `pricing/`). I risultati arrivano solo nella telemetria Admin.
+
+### Validazione configurazione all’avvio (`zod`) & Graceful Shutdown
+- **Cos’è:** `zod` è una libreria di validazione rigorosa degli schemi dati. Qui controlla tutte le variabili d’ambiente all’avvio del server: se `PORT` non è un numero valido, `AI_PROVIDER` è sbagliato o `ADMIN_EMAILS` contiene un’email non valida, il server rifiuta di partire subito con un errore chiaro. Il **Graceful Shutdown** (`SIGTERM`/`SIGINT`) fa sì che Cloud Run chiuda le connessioni HTTP in corso prima di spegnere il container.
+- **Come e dov’è usato:** `backend/src/modules/config/envConfig.ts` (`parseServerConfig`) e `backend/server.ts`.
 
 ---
 
@@ -123,6 +131,14 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 ### Lucide React (`lucide-react`)
 - **Cos’è:** Raccolta di icone SVG pulite e leggere importabili come normali componenti React (solo le icone usate entrano nel bundle finale).
 - **Come e dov’è usato:** Pulsanti, step visivi, anteprime e pannello Admin in `web-app/src/App.tsx` e `web-app/src/components/`.
+
+### Font Self-Hosted (`@fontsource/fraunces` & `@fontsource/plus-jakarta-sans`)
+- **Cos’è:** Pacchetti npm che includono i file `.woff2` dei font direttamente dentro il bundle dell’applicazione, eliminando ogni chiamata ai server di Google Fonts (migliorando la privacy **GDPR**, perché l’IP del visitatore non viene inviato a terzi, e rendendo più stretta la CSP).
+- **Come e dov’è usato:** Importati in `web-app/src/main.tsx` per tutti i pesi usati (`Fraunces` + `Plus Jakarta Sans`), insieme al font monospace locale `DMMono-Regular.ttf`.
+
+### Pagine Legali con URL Reali & SEO Meta
+- **Cos’è:** Invece di aprire finestre modali difficili da raggiungere con tastiera o link diretti, le pagine informative hanno veri indirizzi web navigabili e linkabili (`/contatti`, `/privacy`, `/condizioni`, `/recesso`) con gestione automatica del focus sul titolo `<h1>`.
+- **Come e dov’è usato:** `web-app/src/components/LegalPage.tsx` e routing client-side in `web-app/src/App.tsx`, accompagnati da `og:image`, `canonical` e `theme-color` in `web-app/index.html`.
 
 ### Esportazione SVG → PNG (`Canvas` browser) & Validazione Foto client
 - **Cos’è:** Uso delle API native del browser (`FileReader`/`Image` + `<canvas>`) per controllare formato/risoluzione prima dell’invio e convertire il disegno vettoriale SVG in file `.png` ad alta risoluzione pronto per la stampa.
@@ -159,3 +175,11 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 ### ESLint 10 (`eslint`) & `@firebase/eslint-plugin-security-rules`
 - **Cos’è:** Uno strumento di analisi automatica del codice (*linter*). Qui fa due lavori chiave: controlla la sicurezza di `firestore.rules` e applica regole architetturali sui confini tra moduli (`no-restricted-imports`).
 - **Come e dov’è usato:** Configurato in `eslint.config.mjs` (con parser compatibile con TypeScript 7) ed eseguito automaticamente insieme a `tsc --noEmit` tramite `npm run lint`.
+
+### Test Automatici (`node --test`), CI (`GitHub Actions`) & `Dependabot`
+- **Cos’è:** Il runner di test integrato in Node.js (`node:test`) verifica senza librerie extra che validazione upload (magic bytes e dimensioni), configurazione Zod, auth admin, provider registry e coerenza dei temi tra `shared/config`, `prompts/` e `firestore.rules` restino sempre validi. **GitHub Actions** e **Dependabot** automatizzano questi controlli e gli aggiornamenti di sicurezza su ogni modifica.
+- **Come e dov’è usato:** `tests/*.test.ts` (eseguiti con `npm test`), `.github/workflows/ci.yml` e `.github/dependabot.yml`.
+
+### Docker Multi-Stage (`Dockerfile`) & `npm` con `package-lock.json`
+- **Cos’è:** Il `Dockerfile` crea un’immagine di produzione leggera e isolata (`node:24-slim`) compilando prima il frontend e installando poi solo le dipendenze necessarie a runtime (`npm ci --omit=dev`), eseguendo l’app con utente non privilegiato (`USER node`). Tutto il progetto usa `npm` e `package-lock.json` come unico package manager.
+- **Come e dov’è usato:** Nella root (`Dockerfile`, `.dockerignore`, `package.json`, `package-lock.json`), pronto per il deploy su Cloud Run Free Tier documentato in `README.md`.

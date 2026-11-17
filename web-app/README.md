@@ -3,10 +3,11 @@
 React + TypeScript + Tailwind CSS frontend organized with modular interfaces and vendor implementations under `src/modules/`.
 
 ## Structure
-- `index.html` — HTML entry point (`lang="it"`).
+- `index.html` — HTML entry point (`lang="it"`, `theme-color`, `og:image`, `canonical`, no external font CDNs).
 - `vite.config.ts` — Vite + Tailwind v4 configuration outputting to `../dist`.
-- `src/App.tsx` — Single-page layout (Hero comparison, Come funziona, live generator, privacy note, footer, Admin panels).
-- `src/components/` — Presentational and interactive UI components (`PhotoGeneratorSection`, `AdminTelemetryPanel`, `TempModelCostEstimatorPanel`, etc.).
+- `src/main.tsx` — Entry point loading self-hosted `@fontsource/fraunces` & `@fontsource/plus-jakarta-sans` woff2 fonts.
+- `src/App.tsx` — SPA layout with real-URL legal routes (`/contatti`, `/privacy`, `/condizioni`, `/recesso`), Hero comparison, Come funziona, live generator, privacy note, footer, and Admin panels.
+- `src/components/` — Presentational and interactive UI components (`PhotoGeneratorSection`, `LegalPage`, `AdminTelemetryPanel`, `TempModelCostEstimatorPanel`, etc.).
 - `src/modules/auth/` — `AuthProviderGateway` interface + `FirebaseAuthGateway`, DI `AuthProvider`, and `useAuth()`.
 - `src/modules/database/` — `GenerationLogRepository` interface + `firebaseAppInstance` and `FirestoreGenerationLogRepository`.
 - `src/modules/coloring-api/` — `ColoringApiClient` interface + `FetchColoringApiClient` (`/api/*` HTTP client + proxy cookie-check handling).

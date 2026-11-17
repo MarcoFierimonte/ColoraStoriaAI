@@ -1,15 +1,17 @@
-import type { ConfigService, ServerConfig } from './config.interface.ts';
-import { EnvConfigService } from './implementations/envConfigService.ts';
+import {
+  parseServerConfig,
+  type ServerConfig,
+  type SupportedProviderId,
+} from './envConfig.ts';
 
-export type {
-  ConfigService,
-  ServerConfig,
-  SupportedProviderId,
-} from './config.interface.ts';
-export { EnvConfigService } from './implementations/envConfigService.ts';
+export {
+  parseServerConfig,
+  type ServerConfig,
+  type SupportedProviderId,
+};
 
-export const configService: ConfigService = new EnvConfigService();
+export const serverConfig: ServerConfig = parseServerConfig();
 
 export function getServerConfig(): ServerConfig {
-  return configService.getConfig();
+  return serverConfig;
 }

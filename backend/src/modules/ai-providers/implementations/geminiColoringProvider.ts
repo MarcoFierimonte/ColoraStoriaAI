@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type { ServerConfig } from '../../config/config.interface.ts';
-import type { CostEstimator } from '../../cost-estimation/costEstimation.interface.ts';
+import { type ServerConfig } from '../../config/index.ts';
+import { calculateGenerationCost } from '../../cost-estimation/index.ts';
 import type { PromptRepository } from '../../prompts/promptRepository.interface.ts';
 import {
   ProviderConfigurationError,
@@ -175,16 +175,13 @@ export class GeminiColoringProvider implements ColoringProvider {
   readonly label = 'Google Gemini';
   private readonly config: ServerConfig;
   private readonly promptRepository: PromptRepository;
-  private readonly costEstimator: CostEstimator;
 
   constructor(params: {
     config: ServerConfig;
     promptRepository: PromptRepository;
-    costEstimator: CostEstimator;
   }) {
     this.config = params.config;
     this.promptRepository = params.promptRepository;
-    this.costEstimator = params.costEstimator;
   }
 
   isConfigured(): boolean {
@@ -274,7 +271,7 @@ export class GeminiColoringProvider implements ColoringProvider {
         response.usageMetadata as RawGeminiUsageMetadata | undefined,
         'raster'
       );
-      const usage = this.costEstimator.calculate({
+      const usage = calculateGenerationCost({
         model,
         ...counts,
       });
@@ -368,7 +365,7 @@ export class GeminiColoringProvider implements ColoringProvider {
         response.usageMetadata as RawGeminiUsageMetadata | undefined,
         'svg'
       );
-      const usage = this.costEstimator.calculate({
+      const usage = calculateGenerationCost({
         model,
         ...counts,
       });
