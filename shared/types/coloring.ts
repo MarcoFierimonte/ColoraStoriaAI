@@ -1,15 +1,21 @@
 import {
   ALLOWED_THEME_IDS,
+  PRINT_PDF_LAYOUTS,
   SUPPORTED_PROVIDER_IDS,
   isAllowedThemeId,
+  isPrintPdfLayout,
+  type PrintPdfLayout,
   type ProviderId,
   type ThemeId,
 } from '../config/limits.ts';
 
 export {
   ALLOWED_THEME_IDS,
+  PRINT_PDF_LAYOUTS,
   SUPPORTED_PROVIDER_IDS,
   isAllowedThemeId,
+  isPrintPdfLayout,
+  type PrintPdfLayout,
   type ProviderId,
   type ThemeId,
 };
@@ -76,6 +82,11 @@ export interface ColoringGenerationResponse {
 export interface ColoringErrorResponse {
   error: string;
   adminErrorDetails?: AdminErrorDetails;
+}
+
+export interface ExportPrintPdfRequest {
+  imageDataUrl: string;
+  layout: PrintPdfLayout;
 }
 
 export interface HealthResponse {

@@ -3,6 +3,7 @@ import type { ServerMediaValidator } from './mediaValidation.interface.ts';
 
 export {
   ImageValidationError,
+  type PreparedAiImage,
   type ServerMediaValidator,
   type ValidatedImageResult,
   type VerifiedImageMime,

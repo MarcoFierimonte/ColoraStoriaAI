@@ -41,13 +41,14 @@ modules/<module-name>/
 | `config` *(simple)* | `envConfig.ts` (`ServerConfig`, `parseServerConfig`) | *(direct Zod module)* | Validates & normalizes server env vars at startup (fails fast) |
 | `auth` | `auth.interface.ts` (`AuthTokenVerifier`, `AdminAuthContext`) | `firebaseAdminTokenVerifier.ts` | Verifies optional Bearer ID tokens (`admin` custom claim or `ADMIN_EMAILS`) |
 | `bot-protection` | `botProtection.interface.ts` (`BotProtectionVerifier`) | `defaultBotProtectionVerifier.ts` | Anti-bot verification (Cloudflare Turnstile / Firebase App Check) |
-| `media-validation` | `mediaValidation.interface.ts` (`ServerMediaValidator`) | `bufferImageValidator.ts` | Server-side JPEG/PNG/WebP magic-bytes & dimension verification |
+| `media-validation` | `mediaValidation.interface.ts` (`ServerMediaValidator`) | `bufferImageValidator.ts` | Server-side JPG/PNG/WebP/AVIF magic-bytes verification & EXIF-strip/resize (`<=1280px`) |
+| `print-pdf` | `printPdf.interface.ts` (`PrintPdfGenerator`) | `sharpPdfLibGenerator.ts` | Sharp B&W print mastering (300 DPI grayscale) & A4 PDF layout (`1-up`, `2-up`, `4-up`) |
 | `ai-providers` | `aiProvider.interface.ts` (`ColoringProvider`, `AiProviderRegistry`, errors) | `geminiColoringProvider.ts`, `openaiColoringProvider.ts`, `defaultAiProviderRegistry.ts` | Multi-provider AI generation & provider registry |
 | `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts from `prompts/` & `prompts/config.json` |
 | `cost-estimation` *(simple)* | `rateCardCostEstimator.ts` (`calculateGenerationCost`) | *(direct typed module)* | Computes token & image generation costs per model (warns on unknown model) |
 
 Delivery layer (`backend/src/routes/coloringRoutes.ts`):
-- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts, botProtection, mediaValidator }` interfaces.
+- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts, botProtection, mediaValidator, printPdf }` interfaces.
 - `backend/server.ts` configures `helmet` CSP (`crossOriginOpenerPolicy: same-origin-allow-popups`), `trust proxy`, global JSON error handler, listen error handling & `SIGTERM`/`SIGINT` graceful shutdown, `/api`, serves Vite middleware only when `NODE_ENV === 'development'`, and uses `app.use(...)` (Express 5-safe) for production SPA fallback.
 
 ### Frontend (`web-app/src/modules/`)

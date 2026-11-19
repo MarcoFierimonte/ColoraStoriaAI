@@ -90,8 +90,8 @@ flowchart LR
 ```
 
 ### Status Summary
-- **Implemented:** Single-page landing UI, 6 fixed themes, single-photo validation & upload, PNG export, Express backend (`backend/`), versioned prompt library (`prompts/v1`), optional Firebase Google Login (`signInWithPopup`) + server-side `firebase-admin` verification, Admin cost/token telemetry & full error diagnostics, Firestore `generation_logs` persistence with deployed security rules, and active `gemini-4-hydrogen` adapter (`OpenAIColoringProvider` & Gemini raster mode pre-wired via env).
-- **Pending for Final MVP:** Multi-photo upload (`10–15` photos with reorder), custom cover title, email input & 3 mandatory legal checkboxes, Stripe Checkout + webhook verification, billing-enabled raster image model (`gemini-nano-banana-2.1`) for high facial likeness, A4 PDF generation, automated email delivery, and order confirmation screen.
+- **Implemented:** Single-page landing UI, 6 fixed themes, single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize optimization (`<=1280px`), print-ready A4 PDF export (`1-up`, `2-up` landscape, `4-up` grid via `sharp` 300 DPI grayscale + `pdf-lib`) & PNG download, Express backend (`backend/`), versioned prompt library (`prompts/v1`), optional Firebase Google Login (`signInWithPopup`) + server-side `firebase-admin` verification, Admin cost/token telemetry & full error diagnostics, Firestore `generation_logs` persistence with deployed security rules, and active `gemini-nano-banana-2.1` / `gemini-4-hydrogen` adapters (`OpenAIColoringProvider` pre-wired via env).
+- **Pending for Final MVP:** Multi-photo upload (`10–15` photos with reorder), custom cover title, email input & 3 mandatory legal checkboxes, Stripe Checkout + webhook verification, full multi-page A4 PDF book composition, automated email delivery, and order confirmation screen.
 
 ## Scripts
 - `npm run dev` — Starts Express + Vite dev server (`NODE_ENV=development`) on port `3000`.

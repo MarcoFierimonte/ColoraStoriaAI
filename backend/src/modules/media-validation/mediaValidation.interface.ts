@@ -1,7 +1,18 @@
-export type VerifiedImageMime = 'image/jpeg' | 'image/png' | 'image/webp';
+export type VerifiedImageMime =
+  | 'image/jpeg'
+  | 'image/png'
+  | 'image/webp'
+  | 'image/avif';
 
 export interface ValidatedImageResult {
   mimeType: VerifiedImageMime;
+  width: number;
+  height: number;
+}
+
+export interface PreparedAiImage {
+  buffer: Buffer;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   width: number;
   height: number;
 }
@@ -20,4 +31,8 @@ export class ImageValidationError extends Error {
 
 export interface ServerMediaValidator {
   validate(buffer: Buffer, declaredMimeType?: string): ValidatedImageResult;
+  prepareForAi(
+    buffer: Buffer,
+    mimeType: VerifiedImageMime
+  ): Promise<PreparedAiImage>;
 }

@@ -9,6 +9,7 @@ import {
   ORDER_ESTIMATED_DELIVERY,
   ORDER_PRICE_EUR,
   PROJECTED_BOOK_PAGES,
+  RECOMMENDED_PHOTO_MIN_DIMENSION_PX,
   SUPPORT_EMAIL,
 } from '../../../shared/config/index.ts';
 import heroOriginalImg from '../assets/images/hero_foto_originale_1794739093633.jpg';
@@ -22,6 +23,7 @@ export interface OrderConfiguration {
   maxFileSizeMb: number;
   minWidthPx: number;
   minHeightPx: number;
+  recommendedMinDimensionPx: number;
   acceptedMimeTypes: readonly string[];
   acceptedExtensionsLabel: string;
   coverTitleMaxLength: number;
@@ -37,6 +39,7 @@ export const ORDER_CONFIG: OrderConfiguration = {
   maxFileSizeMb: MAX_UPLOAD_FILE_SIZE_MB,
   minWidthPx: MIN_PHOTO_DIMENSION_PX,
   minHeightPx: MIN_PHOTO_DIMENSION_PX,
+  recommendedMinDimensionPx: RECOMMENDED_PHOTO_MIN_DIMENSION_PX,
   acceptedMimeTypes: ACCEPTED_IMAGE_MIME_TYPES,
   acceptedExtensionsLabel: ACCEPTED_IMAGE_EXTENSIONS_LABEL,
   coverTitleMaxLength: COVER_TITLE_MAX_LENGTH,

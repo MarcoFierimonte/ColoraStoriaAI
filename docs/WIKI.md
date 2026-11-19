@@ -108,6 +108,16 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 - **Cos’è:** Modulo di calcolo che traduce i token consumati in input/output e cache in una stima economica in dollari (singola pagina e proiezione su `PROJECTED_BOOK_PAGES = 16` pagine). Se incontra un modello non presente nel listino, stampa un `console.warn` invece di ignorarlo in silenzio.
 - **Come e dov’è usato:** `backend/src/modules/cost-estimation/rateCardCostEstimator.ts` (sincronizzato con i prezzi documentati in `pricing/`). I risultati arrivano solo nella telemetria Admin.
 
+### Elaborazione Immagini & Print Mastering (`sharp`)
+- **Cos’è:** Libreria Node.js ad alte prestazioni per manipolare immagini in memoria RAM.
+- **Come e dov’è usato:** Usata in due punti chiave:
+  1. **Ottimizzazione Input (`BufferImageValidator.prepareForAi`)**: prima di inviare la foto a Gemini/OpenAI, raddrizza automaticamente l’orientamento EXIF, elimina i dati GPS/privacy e ridimensiona il lato lungo a max `1280 px` (meno banda e meno token).
+  2. **Pre-stampa (`SharpPdfLibGenerator`)**: converte l’illustrazione in scala di grigi pura (zero spreco di inchiostro CMYK), forza lo sfondo a bianco assoluto (`#FFFFFF`) e porta la risoluzione a `300 DPI` reali per la cella A4 scelta.
+
+### Generazione PDF da Stampa (`pdf-lib`)
+- **Cos’è:** Libreria JavaScript pura per creare e impaginare file PDF standard lato server senza browser headless pesanti.
+- **Come e dov’è usato:** Modulo `backend/src/modules/print-pdf/` esposto su `POST /api/coloring/export-pdf`. Impagina il disegno in A4 con margini sicuri da `12 mm`: **1 copia** (A4 verticale), **2 copie** (A4 orizzontale affiancate) o **4 copie** (griglia 2×2 con linee di taglio tratteggiate).
+
 ### Validazione configurazione all’avvio (`zod`) & Graceful Shutdown
 - **Cos’è:** `zod` è una libreria di validazione rigorosa degli schemi dati. Qui controlla tutte le variabili d’ambiente all’avvio del server: se `PORT` non è un numero valido, `AI_PROVIDER` è sbagliato o `ADMIN_EMAILS` contiene un’email non valida, il server rifiuta di partire subito con un errore chiaro. Il **Graceful Shutdown** (`SIGTERM`/`SIGINT`) fa sì che Cloud Run chiuda le connessioni HTTP in corso prima di spegnere il container.
 - **Come e dov’è usato:** `backend/src/modules/config/envConfig.ts` (`parseServerConfig`) e `backend/server.ts`.

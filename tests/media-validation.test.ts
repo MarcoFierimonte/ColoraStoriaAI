@@ -110,3 +110,40 @@ test('rejects images larger than MAX_PHOTO_DIMENSION_PX', () => {
     (err: unknown) => err instanceof ImageValidationError && err.statusCode === 400
   );
 });
+
+test('accepts valid AVIF ISOBMFF buffer and prepareForAi normalizes oversized input to <=1280px JPEG without EXIF', async () => {
+  // Minimal ISOBMFF ftypavif + ispe box
+  const avifBuf = Buffer.alloc(40);
+  avifBuf.writeUInt32BE(20, 0);
+  avifBuf.write('ftypavif', 4, 'ascii');
+  avifBuf.writeUInt32BE(20, 20);
+  avifBuf.write('ispe', 24, 'ascii');
+  avifBuf.writeUInt32BE(0, 28);
+  avifBuf.writeUInt32BE(900, 32);
+  avifBuf.writeUInt32BE(1200, 36);
+
+  const avifRes = validator.validate(avifBuf, 'image/avif');
+  assert.equal(avifRes.mimeType, 'image/avif');
+  assert.equal(avifRes.width, 900);
+  assert.equal(avifRes.height, 1200);
+
+  // Create real 2000x1500 PNG with sharp and normalize it for AI
+  const { default: sharp } = await import('sharp');
+  const bigPng = await sharp({
+    create: {
+      width: 2000,
+      height: 1500,
+      channels: 3,
+      background: { r: 220, g: 180, b: 140 },
+    },
+  })
+    .png()
+    .toBuffer();
+
+  const prepared = await validator.prepareForAi(bigPng, 'image/png');
+  assert.equal(prepared.mimeType, 'image/jpeg');
+  assert.equal(prepared.width, 1280);
+  assert.equal(prepared.height, 960);
+  const meta = await sharp(prepared.buffer).metadata();
+  assert.equal(meta.exif, undefined);
+});

@@ -5,6 +5,7 @@ import {
   type AdminSessionResponse,
   type ColoringApiClient,
   type ColoringGenerationResponse,
+  type ExportPrintPdfRequest,
   type GenerateColoringPageRequest,
 } from '../coloringApi.interface';
 
@@ -241,5 +242,52 @@ export class FetchColoringApiClient implements ColoringApiClient {
     }
 
     return payload;
+  }
+
+  async exportPrintPdf(params: ExportPrintPdfRequest): Promise<Blob> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/coloring/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        redirect: 'manual',
+        body: JSON.stringify(params),
+      });
+    } catch {
+      throw new ColoringApiError(
+        'Impossibile contattare il server per preparare il PDF da stampa. Riprova.'
+      );
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    if (
+      response.type === 'opaqueredirect' ||
+      contentType.toLowerCase().includes('text/html')
+    ) {
+      throw new ColoringApiError(
+        'Sessione di anteprima scaduta. Ricarica la pagina e riprova.'
+      );
+    }
+
+    if (!response.ok) {
+      const errJson = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new ColoringApiError(
+        errJson?.error ??
+          `Errore durante la generazione del PDF (HTTP ${response.status}). Riprova.`
+      );
+    }
+
+    if (!contentType.toLowerCase().includes('application/pdf')) {
+      throw new ColoringApiError(
+        'Il server non ha restituito un file PDF valido. Riprova.'
+      );
+    }
+
+    return response.blob();
   }
 }

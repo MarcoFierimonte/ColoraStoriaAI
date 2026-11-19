@@ -9,6 +9,7 @@ import {
 } from '../../../shared/config/index.ts';
 import {
   isAllowedThemeId,
+  isPrintPdfLayout,
   type AdminSessionResponse,
   type ColoringGenerationResponse,
   type HealthResponse,
@@ -34,6 +35,11 @@ import {
   serverMediaValidator,
   type ServerMediaValidator,
 } from '../modules/media-validation/index.ts';
+import {
+  PrintPdfError,
+  printPdfGenerator,
+  type PrintPdfGenerator,
+} from '../modules/print-pdf/index.ts';
 import {
   promptRepository,
   type PromptRepository,
@@ -73,12 +79,26 @@ const generateRateLimiter = rateLimit({
   },
 });
 
+const exportPdfRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      error:
+        'Hai raggiunto il limite temporaneo di esportazioni PDF. Attendi qualche minuto e riprova.',
+    });
+  },
+});
+
 export interface ColoringRouterDeps {
   providers: AiProviderRegistry;
   auth: AuthTokenVerifier;
   prompts: PromptRepository;
   botProtection: BotProtectionVerifier;
   mediaValidator: ServerMediaValidator;
+  printPdf?: PrintPdfGenerator;
 }
 
 interface RequestWithAdmin extends Request {
@@ -92,6 +112,7 @@ export function createColoringRouter(
     prompts: promptRepository,
     botProtection: botProtectionVerifier,
     mediaValidator: serverMediaValidator,
+    printPdf: printPdfGenerator,
   }
 ): Router {
   const router = Router();
@@ -232,6 +253,10 @@ export function createColoringRouter(
           file.buffer,
           file.mimetype
         );
+        const preparedImage = await deps.mediaValidator.prepareForAi(
+          file.buffer,
+          verifiedImage.mimeType
+        );
 
         const requestedProvider =
           adminCtx.isAdmin && typeof req.body?.provider === 'string'
@@ -246,14 +271,14 @@ export function createColoringRouter(
         const provider = deps.providers.getProvider(requestedProvider);
 
         const result = await provider.generateColoringPage({
-          imageBuffer: file.buffer,
-          mimeType: verifiedImage.mimeType,
+          imageBuffer: preparedImage.buffer,
+          mimeType: preparedImage.mimeType,
           themeId: rawTheme,
           promptVersionOverride: requestedPromptVersion || undefined,
         });
 
         console.info(
-          `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} theme=${rawTheme} format=${result.outputFormat} dims=${verifiedImage.width}x${verifiedImage.height} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
+          `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} theme=${rawTheme} format=${result.outputFormat} orig=${verifiedImage.width}x${verifiedImage.height} aiIn=${preparedImage.width}x${preparedImage.height} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
         );
 
         const responsePayload: ColoringGenerationResponse = {
@@ -334,6 +359,61 @@ export function createColoringRouter(
                 },
               }
             : {}),
+        });
+      }
+    }
+  );
+
+  router.post(
+    '/coloring/export-pdf',
+    exportPdfRateLimiter,
+    async (req: Request, res: Response) => {
+      try {
+        const rawDataUrl =
+          typeof req.body?.imageDataUrl === 'string' ? req.body.imageDataUrl : '';
+        const rawLayout =
+          typeof req.body?.layout === 'string' ? req.body.layout.trim() : '';
+
+        if (!rawDataUrl) {
+          res.status(400).json({
+            error: 'Immagine mancante per la generazione del PDF.',
+          });
+          return;
+        }
+
+        if (!isPrintPdfLayout(rawLayout)) {
+          res.status(400).json({
+            error: 'Formato di impaginazione PDF non valido.',
+          });
+          return;
+        }
+
+        const pdfService = deps.printPdf ?? printPdfGenerator;
+        const pdfResult = await pdfService.generatePdf({
+          imageDataUrl: rawDataUrl,
+          layout: rawLayout,
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${pdfResult.filename}"`
+        );
+        res.setHeader('Cache-Control', 'no-store');
+        res.send(pdfResult.pdfBuffer);
+      } catch (error) {
+        if (error instanceof PrintPdfError) {
+          console.error(
+            `[PrintPdfError] status=${error.statusCode} message="${error.message}" raw="${error.rawDetails ?? ''}"`
+          );
+          res.status(error.statusCode).json({ error: error.message });
+          return;
+        }
+
+        console.error('Unexpected print PDF error:', error);
+        res.status(500).json({
+          error:
+            'Errore durante la creazione del PDF da stampa. Riprova tra poco.',
         });
       }
     }

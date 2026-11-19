@@ -1,9 +1,13 @@
+import sharp from 'sharp';
 import {
+  ACCEPTED_IMAGE_EXTENSIONS_LABEL,
+  AI_INPUT_MAX_DIMENSION_PX,
   MAX_PHOTO_DIMENSION_PX,
   MIN_PHOTO_DIMENSION_PX,
 } from '../../../../../shared/config/index.ts';
 import {
   ImageValidationError,
+  type PreparedAiImage,
   type ServerMediaValidator,
   type ValidatedImageResult,
   type VerifiedImageMime,
@@ -45,6 +49,15 @@ function detectMagicMime(buffer: Buffer): VerifiedImageMime | null {
     buffer.subarray(8, 12).toString('ascii') === 'WEBP'
   ) {
     return 'image/webp';
+  }
+
+  // AVIF: ISOBMFF ftyp box containing avif or avis brand
+  if (buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const ftypSize = Math.min(buffer.length, buffer.readUInt32BE(0));
+    const ftypHeader = buffer.subarray(8, Math.max(12, Math.min(ftypSize, 64))).toString('ascii');
+    if (ftypHeader.includes('avif') || ftypHeader.includes('avis')) {
+      return 'image/avif';
+    }
   }
 
   return null;
@@ -128,6 +141,18 @@ function parseWebpDimensions(
   return null;
 }
 
+function parseAvifDimensions(
+  buffer: Buffer
+): { width: number; height: number } | null {
+  const ispeIdx = buffer.indexOf('ispe');
+  if (ispeIdx === -1 || ispeIdx + 16 > buffer.length) {
+    return null;
+  }
+  const width = buffer.readUInt32BE(ispeIdx + 8);
+  const height = buffer.readUInt32BE(ispeIdx + 12);
+  return { width, height };
+}
+
 function parseDimensions(
   buffer: Buffer,
   mimeType: VerifiedImageMime
@@ -139,6 +164,8 @@ function parseDimensions(
       return parseJpegDimensions(buffer);
     case 'image/webp':
       return parseWebpDimensions(buffer);
+    case 'image/avif':
+      return parseAvifDimensions(buffer);
   }
 }
 
@@ -146,22 +173,25 @@ export class BufferImageValidator implements ServerMediaValidator {
   private readonly minWidth: number;
   private readonly minHeight: number;
   private readonly maxDimension: number;
+  private readonly aiMaxDimension: number;
 
   constructor(options?: {
     minWidth?: number;
     minHeight?: number;
     maxDimension?: number;
+    aiMaxDimension?: number;
   }) {
     this.minWidth = options?.minWidth ?? MIN_WIDTH_PX;
     this.minHeight = options?.minHeight ?? MIN_HEIGHT_PX;
     this.maxDimension = options?.maxDimension ?? MAX_DIMENSION_PX;
+    this.aiMaxDimension = options?.aiMaxDimension ?? AI_INPUT_MAX_DIMENSION_PX;
   }
 
   validate(buffer: Buffer, declaredMimeType?: string): ValidatedImageResult {
     const detectedMime = detectMagicMime(buffer);
     if (!detectedMime) {
       throw new ImageValidationError(
-        'Il file caricato non è un’immagine JPG, PNG o WebP valida.',
+        `Il file caricato non è un’immagine ${ACCEPTED_IMAGE_EXTENSIONS_LABEL} valida.`,
         400,
         `Magic bytes mismatch (declaredMime=${declaredMimeType ?? 'unknown'}, bytes=${buffer.subarray(0, 12).toString('hex')})`
       );
@@ -211,5 +241,41 @@ export class BufferImageValidator implements ServerMediaValidator {
       width: dimensions.width,
       height: dimensions.height,
     };
+  }
+
+  async prepareForAi(
+    buffer: Buffer,
+    _mimeType: VerifiedImageMime
+  ): Promise<PreparedAiImage> {
+    try {
+      // .rotate() physically applies EXIF orientation and strips GPS/EXIF metadata (since .withMetadata() is omitted).
+      const { data, info } = await sharp(buffer, {
+        limitInputPixels: this.maxDimension * this.maxDimension,
+      })
+        .rotate()
+        .flatten({ background: '#ffffff' })
+        .resize({
+          width: this.aiMaxDimension,
+          height: this.aiMaxDimension,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: 90, mozjpeg: true })
+        .toBuffer({ resolveWithObject: true });
+
+      return {
+        buffer: data,
+        mimeType: 'image/jpeg',
+        width: info.width,
+        height: info.height,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ImageValidationError(
+        'Impossibile elaborare la foto caricata. Prova con un altro file JPG o PNG.',
+        400,
+        `sharp prepareForAi failed: ${msg}`
+      );
+    }
   }
 }

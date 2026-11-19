@@ -6,6 +6,7 @@ export interface ValidatedPhoto {
   width: number;
   height: number;
   previewUrl: string;
+  qualityWarning?: string;
 }
 
 export interface RejectedPhoto {

@@ -4,8 +4,10 @@ import {
   Check,
   Copy,
   Download,
+  FileDown,
   ImagePlus,
   Loader2,
+  Printer,
   RotateCcw,
   SlidersHorizontal,
   Sun,
@@ -17,9 +19,11 @@ import { BOOK_THEMES, type ThemeId } from '../data/themes';
 import { useAuth } from '../modules/auth';
 import {
   ColoringApiError,
+  exportPrintPdfApi,
   generateColoringPageApi,
   type AdminDebugInfo,
   type ColoringGenerationResponse,
+  type PrintPdfLayout,
   type ProviderId,
 } from '../modules/coloring-api';
 import { saveGenerationLog } from '../modules/database';
@@ -101,6 +105,9 @@ export function PhotoGeneratorSection({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileResetCounter, setTurnstileResetCounter] = useState(0);
   const [result, setResult] = useState<ColoringGenerationResponse | null>(null);
+  const [pdfLayout, setPdfLayout] = useState<PrintPdfLayout>('1-up');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
@@ -174,6 +181,33 @@ export function PhotoGeneratorSection({
     setApiError(null);
     setApiErrorDetails(null);
     setCopiedError(false);
+    setPdfError(null);
+  };
+
+  const handleDownloadPrintPdf = async () => {
+    if (!result || isExportingPdf) return;
+    setIsExportingPdf(true);
+    setPdfError(null);
+    try {
+      const pdfBlob = await exportPrintPdfApi({
+        imageDataUrl: result.imageDataUrl,
+        layout: pdfLayout,
+      });
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `colorastoria-stampa-${pdfLayout}.pdf`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch (err) {
+      setPdfError(
+        err instanceof Error
+          ? err.message
+          : 'Impossibile generare il PDF per la stampa. Riprova.'
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const handleCopyAdminError = async () => {
@@ -460,6 +494,11 @@ export function PhotoGeneratorSection({
                   {photo.width} × {photo.height} px ·{' '}
                   {(photo.sizeBytes / (1024 * 1024)).toFixed(2)} MB
                 </p>
+                {photo.qualityWarning && (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                    {photo.qualityWarning}
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <label
                     htmlFor="replace-photo-input"
@@ -690,24 +729,120 @@ export function PhotoGeneratorSection({
               <p className="text-sm text-zinc-600">{result.sceneSummary}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => void downloadColoringResultAsPng(result)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#B83B1F] hover:bg-[#9E3119] text-white text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-800 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <Download className="w-4 h-4" aria-hidden="true" />
-                Scarica PNG da stampare
+                PNG
               </button>
               <button
                 type="button"
                 onClick={handleRemovePhoto}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-800 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-800 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <RotateCcw className="w-4 h-4" aria-hidden="true" />
-                Prova un’altra foto
+                Altra foto
               </button>
             </div>
+          </div>
+
+          {/* Impaginazione PDF ottimizzata per la stampa A4 */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                <Printer className="w-4 h-4 text-[#B83B1F]" aria-hidden="true" />
+                <span>PDF ottimizzato per la stampa (A4 · 300 DPI)</span>
+              </div>
+              <span className="text-xs text-zinc-500">
+                Bianco puro, nero pieno e margini sicuri da 12 mm
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div
+                role="radiogroup"
+                aria-label="Numero di copie sul foglio A4"
+                className="grid grid-cols-3 gap-2 flex-1"
+              >
+                {(
+                  [
+                    {
+                      id: '1-up',
+                      title: '1 copia',
+                      subtitle: 'A4 tutto foglio',
+                    },
+                    {
+                      id: '2-up',
+                      title: '2 copie',
+                      subtitle: 'A4 orizzontale',
+                    },
+                    {
+                      id: '4-up',
+                      title: '4 copie',
+                      subtitle: 'Griglia 2×2',
+                    },
+                  ] as const
+                ).map((option) => {
+                  const selected = pdfLayout === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => {
+                        setPdfLayout(option.id);
+                        setPdfError(null);
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B83B1F] ${
+                        selected
+                          ? 'border-[#B83B1F] bg-[#FDF1ED]/70 ring-1 ring-[#B83B1F]'
+                          : 'border-zinc-200 bg-[#FBFBF9] hover:border-zinc-300'
+                      }`}
+                    >
+                      <span className="block text-xs sm:text-sm font-semibold text-zinc-900">
+                        {option.title}
+                      </span>
+                      <span className="block text-[11px] text-zinc-600">
+                        {option.subtitle}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => void handleDownloadPrintPdf()}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#B83B1F] hover:bg-[#9E3119] disabled:bg-zinc-400 text-white text-sm font-semibold transition-colors cursor-pointer disabled:cursor-wait whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B83B1F]"
+              >
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    <span>Preparazione PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-4 h-4" aria-hidden="true" />
+                    <span>Scarica PDF da stampa</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {pdfError && (
+              <p
+                role="alert"
+                className="flex items-center gap-2 text-xs text-red-700 font-medium"
+              >
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span>{pdfError}</span>
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

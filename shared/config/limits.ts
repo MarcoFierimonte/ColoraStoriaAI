@@ -2,17 +2,20 @@ export const ACCEPTED_IMAGE_MIME_TYPES = [
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/avif',
 ] as const;
 
 export type AcceptedImageMimeType = (typeof ACCEPTED_IMAGE_MIME_TYPES)[number];
 
-export const ACCEPTED_IMAGE_EXTENSIONS_LABEL = 'JPG, PNG o WebP';
+export const ACCEPTED_IMAGE_EXTENSIONS_LABEL = 'JPG, PNG, WebP o AVIF';
 
 export const MAX_UPLOAD_FILE_SIZE_MB = 12;
 export const MAX_UPLOAD_FILE_BYTES = MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
 
 export const MIN_PHOTO_DIMENSION_PX = 400;
+export const RECOMMENDED_PHOTO_MIN_DIMENSION_PX = 700;
 export const MAX_PHOTO_DIMENSION_PX = 16000;
+export const AI_INPUT_MAX_DIMENSION_PX = 1280;
 
 export const MIN_BOOK_PHOTOS = 10;
 export const MAX_BOOK_PHOTOS = 15;
@@ -42,3 +45,11 @@ export function isAllowedThemeId(value: string): value is ThemeId {
 export const SUPPORTED_PROVIDER_IDS = ['gemini', 'openai'] as const;
 
 export type ProviderId = (typeof SUPPORTED_PROVIDER_IDS)[number];
+
+export const PRINT_PDF_LAYOUTS = ['1-up', '2-up', '4-up'] as const;
+
+export type PrintPdfLayout = (typeof PRINT_PDF_LAYOUTS)[number];
+
+export function isPrintPdfLayout(value: string): value is PrintPdfLayout {
+  return (PRINT_PDF_LAYOUTS as readonly string[]).includes(value);
+}

@@ -3,6 +3,8 @@ import type {
   AdminSessionResponse,
   AdminTelemetry,
   ColoringGenerationResponse,
+  ExportPrintPdfRequest,
+  PrintPdfLayout,
   ProviderId,
   ProviderStatus,
   ThemeId,
@@ -13,6 +15,8 @@ export type {
   AdminSessionResponse,
   AdminTelemetry,
   ColoringGenerationResponse,
+  ExportPrintPdfRequest,
+  PrintPdfLayout,
   ProviderId,
   ProviderStatus,
   ThemeId,
@@ -52,4 +56,5 @@ export interface ColoringApiClient {
   generateColoringPage(
     params: GenerateColoringPageRequest
   ): Promise<ColoringGenerationResponse>;
+  exportPrintPdf(params: ExportPrintPdfRequest): Promise<Blob>;
 }

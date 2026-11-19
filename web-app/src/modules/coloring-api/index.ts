@@ -2,6 +2,7 @@ import type {
   AdminSessionResponse,
   ColoringApiClient,
   ColoringGenerationResponse,
+  ExportPrintPdfRequest,
   GenerateColoringPageRequest,
 } from './coloringApi.interface';
 import { FetchColoringApiClient } from './implementations/fetchColoringApiClient';
@@ -14,7 +15,9 @@ export {
   type AdminTelemetry,
   type ColoringApiClient,
   type ColoringGenerationResponse,
+  type ExportPrintPdfRequest,
   type GenerateColoringPageRequest,
+  type PrintPdfLayout,
   type ProviderId,
   type ProviderStatus,
 } from './coloringApi.interface';
@@ -33,4 +36,10 @@ export function generateColoringPageApi(
   params: GenerateColoringPageRequest
 ): Promise<ColoringGenerationResponse> {
   return coloringApiClient.generateColoringPage(params);
+}
+
+export function exportPrintPdfApi(
+  params: ExportPrintPdfRequest
+): Promise<Blob> {
+  return coloringApiClient.exportPrintPdf(params);
 }

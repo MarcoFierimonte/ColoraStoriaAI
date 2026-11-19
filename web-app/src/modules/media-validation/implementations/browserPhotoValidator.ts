@@ -57,6 +57,12 @@ export class BrowserPhotoValidator implements MediaValidator {
         };
       }
 
+      const minSide = Math.min(width, height);
+      const qualityWarning =
+        minSide < ORDER_CONFIG.recommendedMinDimensionPx
+          ? `Risoluzione moderata (${width} × ${height} px): per tratti e volti ancora più nitidi consigliamo almeno ${ORDER_CONFIG.recommendedMinDimensionPx} px.`
+          : undefined;
+
       return {
         accepted: {
           id: `${file.name}-${file.size}-${Date.now()}`,
@@ -66,6 +72,7 @@ export class BrowserPhotoValidator implements MediaValidator {
           width,
           height,
           previewUrl,
+          qualityWarning,
         },
       };
     } catch {
