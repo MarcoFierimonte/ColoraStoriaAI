@@ -105,18 +105,36 @@ export async function startServer() {
 
   let viteServer: { close: () => Promise<void> } | null = null;
   if (config.isDevelopment) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      configFile: path.resolve(WEB_APP_DIR, 'vite.config.ts'),
-      root: WEB_APP_DIR,
-      server: {
-        middlewareMode: true,
-        hmr: false,
-      },
-      appType: 'spa',
+    const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
+      createViteServer({
+        configFile: path.resolve(WEB_APP_DIR, 'vite.config.ts'),
+        root: WEB_APP_DIR,
+        server: {
+          middlewareMode: true,
+          hmr: false,
+          ws: false,
+        },
+        appType: 'spa',
+      })
+    );
+
+    vitePromise
+      .then((vite) => {
+        viteServer = vite;
+      })
+      .catch((err) => {
+        console.error('[VITE INIT ERROR]', err);
+        process.exit(1);
+      });
+
+    app.use(async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const vite = await vitePromise;
+        vite.middlewares(req, res, next);
+      } catch (err) {
+        next(err);
+      }
     });
-    viteServer = vite;
-    app.use(vite.middlewares);
   } else {
     app.use(express.static(DIST_DIR));
     app.use((_req: Request, res: Response) => {
