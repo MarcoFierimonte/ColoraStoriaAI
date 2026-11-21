@@ -2,7 +2,9 @@ import type {
   AdminErrorDetails,
   AdminSessionResponse,
   AdminTelemetry,
+  ColoringAgeGroup,
   ColoringGenerationResponse,
+  ColoringStyleMode,
   ExportPrintPdfRequest,
   PrintPdfLayout,
   ProviderId,
@@ -14,7 +16,9 @@ export type {
   AdminErrorDetails,
   AdminSessionResponse,
   AdminTelemetry,
+  ColoringAgeGroup,
   ColoringGenerationResponse,
+  ColoringStyleMode,
   ExportPrintPdfRequest,
   PrintPdfLayout,
   ProviderId,
@@ -44,6 +48,8 @@ export class ColoringApiError extends Error {
 export interface GenerateColoringPageRequest {
   file: File;
   themeId: ThemeId;
+  mode?: ColoringStyleMode;
+  ageGroup?: ColoringAgeGroup;
   providerId?: ProviderId;
   promptVersion?: string;
   idToken?: string | null;

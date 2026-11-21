@@ -1,0 +1,44 @@
+:root {
+  color-scheme: light;
+
+  /* Brand & surface palette */
+  --cs-bg: #fff8d9;
+  --cs-sky: #e4f3ff;
+  --cs-surface: #ffffff;
+  --cs-ink: #24284f;
+  --cs-ink-muted: #4b5075;
+  --cs-border: #24284f;
+
+  /* Accent colors */
+  --cs-pink: #ffa3c4;
+  --cs-pink-strong: #ff6fa3;
+  --cs-blue: #9acfff;
+  --cs-mint: #b4f0cb;
+  --cs-yellow: #ffe680;
+  --cs-lavender: #d9ccff;
+
+  /* State colors */
+  --cs-disabled-bg: #e6e6ee;
+  --cs-disabled-ink: #7a7e9e;
+  --cs-disabled-border: #9aa0be;
+  --cs-danger-bg: #ffe4e8;
+  --cs-danger-ink: #8f1d2c;
+  --cs-warn-bg: #fff1b8;
+
+  /* Neo-brutalist geometry & hard offset shadows */
+  --cs-border-width: 3px;
+  --cs-radius-sm: 8px;
+  --cs-radius-btn: 10px;
+  --cs-radius-card: 14px;
+  --cs-radius-dialog: 16px;
+  --cs-shadow-sm: 3px 3px 0 var(--cs-border);
+  --cs-shadow-btn: 4px 4px 0 var(--cs-border);
+  --cs-shadow-card: 5px 5px 0 var(--cs-border);
+  --cs-shadow-dialog: 6px 6px 0 var(--cs-border);
+
+  /* Layout & self-hosted typography */
+  --cs-container-max: 980px;
+  --cs-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cs-font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cs-font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}

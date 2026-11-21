@@ -10,6 +10,8 @@ export {
   type ColoringErrorResponse,
   type ColoringGenerationResponse,
   type ColoringOutputFormat,
+  type ColoringStyleMode,
+  type ColoringAgeGroup,
   type ExportPrintPdfRequest,
   type HealthResponse,
   type PrintPdfLayout,

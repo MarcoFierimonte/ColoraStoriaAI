@@ -9,6 +9,7 @@ import {
 } from '../modules/database';
 import { ORDER_CONFIG } from '../config/orderConfig';
 import { TempModelCostEstimatorPanel } from './TempModelCostEstimatorPanel';
+import { UiBadge, UiButton, UiCard } from './ui';
 
 interface AdminTelemetryPanelProps {
   latestTelemetry: AdminTelemetry | null;
@@ -74,14 +75,14 @@ export function AdminTelemetryPanel({
       {latestTelemetry && (
         <section
           aria-label="Telemetria costi generazione admin"
-          className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 space-y-4"
+          className="cs-card space-y-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--cs-ink-muted)]">
                 Telemetria Admin · Singola generazione
               </p>
-              <h4 className="text-base font-semibold text-zinc-900">
+              <h4 className="text-base font-bold text-[var(--cs-ink)]">
                 {latestTelemetry.provider} ·{' '}
                 <span className="font-mono-num text-sm">
                   {latestTelemetry.model}
@@ -95,45 +96,43 @@ export function AdminTelemetryPanel({
 
             <div className="flex items-center gap-2">
               {latestTelemetry.isFreeTier && (
-                <span className="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-800">
-                  Free tier
-                </span>
+                <UiBadge tone="mint">Free tier</UiBadge>
               )}
-              <span className="px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-xs font-mono-num text-zinc-700">
+              <UiBadge tone="white" className="font-mono-num">
                 {latestTelemetry.outputFormat.toUpperCase()} ·{' '}
                 {latestTelemetry.latencyMs} ms
-              </span>
+              </UiBadge>
             </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-            <div className="rounded-xl border border-zinc-200 bg-[#FBFBF9] p-3">
-              <p className="text-xs text-zinc-500">Costo pagina</p>
-              <p className="mt-1 text-lg font-semibold font-mono-num text-zinc-900">
+            <div className="rounded-[10px] border-2 border-[var(--cs-border)] bg-[var(--cs-bg)] p-3">
+              <p className="text-xs font-bold text-[var(--cs-ink-muted)]">Costo pagina</p>
+              <p className="mt-1 text-lg font-bold font-mono-num text-[var(--cs-ink)]">
                 {formatUsd(latestTelemetry.estimatedCostUsd, 5)}
               </p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-[#FBFBF9] p-3">
-              <p className="text-xs text-zinc-500">
+            <div className="rounded-[10px] border-2 border-[var(--cs-border)] bg-[var(--cs-bg)] p-3">
+              <p className="text-xs font-bold text-[var(--cs-ink-muted)]">
                 Stima libro ({ORDER_CONFIG.projectedBookPages} pag.)
               </p>
-              <p className="mt-1 text-lg font-semibold font-mono-num text-zinc-900">
+              <p className="mt-1 text-lg font-bold font-mono-num text-[var(--cs-ink)]">
                 {formatUsd(latestTelemetry.projectedBook16CostUsd, 4)}
               </p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-[#FBFBF9] p-3">
-              <p className="text-xs text-zinc-500">Token input (cache)</p>
-              <p className="mt-1 text-lg font-semibold font-mono-num text-zinc-900">
+            <div className="rounded-[10px] border-2 border-[var(--cs-border)] bg-[var(--cs-bg)] p-3">
+              <p className="text-xs font-bold text-[var(--cs-ink-muted)]">Token input (cache)</p>
+              <p className="mt-1 text-lg font-bold font-mono-num text-[var(--cs-ink)]">
                 {latestTelemetry.inputTokens}
-                <span className="text-xs font-normal text-zinc-500">
+                <span className="text-xs font-normal text-[var(--cs-ink-muted)]">
                   {' '}
                   ({latestTelemetry.cachedInputTokens})
                 </span>
               </p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-[#FBFBF9] p-3">
-              <p className="text-xs text-zinc-500">Output (testo / img)</p>
-              <p className="mt-1 text-lg font-semibold font-mono-num text-zinc-900">
+            <div className="rounded-[10px] border-2 border-[var(--cs-border)] bg-[var(--cs-bg)] p-3">
+              <p className="text-xs font-bold text-[var(--cs-ink-muted)]">Output (testo / img)</p>
+              <p className="mt-1 text-lg font-bold font-mono-num text-[var(--cs-ink)]">
                 {latestTelemetry.textOutputTokens} /{' '}
                 {latestTelemetry.imageOutputTokens}
               </p>
@@ -148,29 +147,29 @@ export function AdminTelemetryPanel({
 
       <section
         aria-label="Storico generazioni salvate su Firestore"
-        className="rounded-2xl border border-zinc-200 bg-white overflow-hidden"
+        className="cs-card !p-0 overflow-hidden"
       >
         <button
           type="button"
           onClick={() => setHistoryOpen((prev) => !prev)}
           aria-expanded={historyOpen}
-          className="w-full px-5 py-4 flex items-center justify-between gap-4 text-left hover:bg-[#FBFBF9] transition-colors cursor-pointer"
+          className="w-full px-5 py-4 flex items-center justify-between gap-4 text-left hover:bg-[var(--cs-bg)]/50 transition-colors cursor-pointer"
         >
           <div className="space-y-0.5">
-            <h4 className="text-sm font-semibold text-zinc-900">
+            <h4 className="text-sm font-bold text-[var(--cs-ink)]">
               Storico test Admin su Firestore ({logs.length})
             </h4>
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-[var(--cs-ink-muted)]">
               {!hasAdminClaim ? (
                 'Storico Firestore disattivato in questa sessione (richiede custom claim Firebase { admin: true }). Telemetria live e controlli Admin attivi.'
               ) : logs.length > 0 ? (
                 <>
                   Media costo/pagina:{' '}
-                  <span className="font-mono-num font-medium text-zinc-900">
+                  <span className="font-mono-num font-bold text-[var(--cs-ink)]">
                     {formatUsd(avgCostUsd, 5)}
                   </span>{' '}
                   · Proiezione {ORDER_CONFIG.projectedBookPages} pagine:{' '}
-                  <span className="font-mono-num font-medium text-zinc-900">
+                  <span className="font-mono-num font-bold text-[var(--cs-ink)]">
                     {formatUsd(avgCostUsd * ORDER_CONFIG.projectedBookPages, 4)}
                   </span>
                 </>
@@ -180,96 +179,95 @@ export function AdminTelemetryPanel({
             </p>
           </div>
           {historyOpen ? (
-            <ChevronUp className="w-4 h-4 text-zinc-600 shrink-0" aria-hidden="true" />
+            <ChevronUp className="w-4 h-4 text-[var(--cs-ink)] shrink-0" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-600 shrink-0" aria-hidden="true" />
+            <ChevronDown className="w-4 h-4 text-[var(--cs-ink)] shrink-0" aria-hidden="true" />
           )}
         </button>
 
         {historyOpen && (
-          <div className="border-t border-zinc-200">
+          <div className="border-t-[3px] border-[var(--cs-border)]">
             {logsError && (
-              <p className="px-5 py-3 text-xs text-red-700 bg-red-50">
+              <p className="px-5 py-3 text-xs font-bold text-[var(--cs-danger-ink)] bg-[var(--cs-danger-bg)]">
                 {logsError}
               </p>
             )}
 
             {!hasAdminClaim ? (
-              <div className="px-5 py-5 text-sm text-zinc-700 space-y-2">
+              <div className="px-5 py-5 text-sm text-[var(--cs-ink)] space-y-2">
                 <p>
                   Sei autenticato come Admin tramite{' '}
-                  <code className="font-mono-num text-xs bg-zinc-100 px-1.5 py-0.5 rounded">
+                  <code className="font-mono-num text-xs bg-[var(--cs-yellow)] border border-[var(--cs-border)] px-1.5 py-0.5 rounded">
                     ADMIN_EMAILS
                   </code>
                   : i controlli prompt/provider e la telemetria della singola generazione qui sopra funzionano normalmente.
                 </p>
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-[var(--cs-ink-muted)]">
                   Per sicurezza, le regole di Firestore richiedono il custom claim firmato{' '}
-                  <code className="font-mono-num bg-zinc-100 px-1.5 py-0.5 rounded">
+                  <code className="font-mono-num bg-[var(--cs-bg)] border border-[var(--cs-border)] px-1.5 py-0.5 rounded">
                     {'{ admin: true }'}
                   </code>{' '}
                   per leggere o salvare lo storico persistente su{' '}
-                  <code className="font-mono-num bg-zinc-100 px-1.5 py-0.5 rounded">
+                  <code className="font-mono-num bg-[var(--cs-bg)] border border-[var(--cs-border)] px-1.5 py-0.5 rounded">
                     generation_logs
                   </code>
                   . Per abilitarlo esegui{' '}
-                  <code className="font-mono-num bg-zinc-100 px-1.5 py-0.5 rounded">
+                  <code className="font-mono-num bg-[var(--cs-bg)] border border-[var(--cs-border)] px-1.5 py-0.5 rounded">
                     npx tsx scripts/set-admin-claim.ts {user?.email ?? '<email>'}
                   </code>{' '}
                   e poi effettua di nuovo l’accesso.
                 </p>
                 <div className="pt-2">
-                  <button
-                    type="button"
+                  <UiButton
+                    size="compact"
                     onClick={() => void refreshAdminSession()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold cursor-pointer transition-colors"
                   >
                     Verifica claim adesso
-                  </button>
+                  </UiButton>
                 </div>
               </div>
             ) : logs.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-zinc-600">
+              <UiCard tone="surface" className="!border-0 !shadow-none px-5 py-6 text-sm text-[var(--cs-ink-muted)]">
                 Nessun log salvato al momento. Avvia una generazione per registrare costi e token.
-              </p>
+              </UiCard>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-[#FBFBF9] text-zinc-600 border-b border-zinc-200">
+                  <thead className="bg-[var(--cs-sky)] text-[var(--cs-ink)] border-b-2 border-[var(--cs-border)]">
                     <tr>
-                      <th className="py-2.5 px-4 font-medium">Data</th>
-                      <th className="py-2.5 px-3 font-medium">Tema</th>
-                      <th className="py-2.5 px-3 font-medium">Modello</th>
-                      <th className="py-2.5 px-3 font-medium">Prompt</th>
-                      <th className="py-2.5 px-3 font-medium">Token (in/out)</th>
-                      <th className="py-2.5 px-3 font-medium">Latenza</th>
-                      <th className="py-2.5 px-3 font-medium">Costo</th>
-                      <th className="py-2.5 px-4 font-medium text-right">Azioni</th>
+                      <th className="py-2.5 px-4 font-bold">Data</th>
+                      <th className="py-2.5 px-3 font-bold">Tema</th>
+                      <th className="py-2.5 px-3 font-bold">Modello</th>
+                      <th className="py-2.5 px-3 font-bold">Prompt</th>
+                      <th className="py-2.5 px-3 font-bold">Token (in/out)</th>
+                      <th className="py-2.5 px-3 font-bold">Latenza</th>
+                      <th className="py-2.5 px-3 font-bold">Costo</th>
+                      <th className="py-2.5 px-4 font-bold text-right">Azioni</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-200">
+                  <tbody className="divide-y-2 divide-[var(--cs-border)]/20">
                     {logs.map((item) => (
-                      <tr key={item.id} className="hover:bg-[#FBFBF9]/70">
-                        <td className="py-2.5 px-4 font-mono-num text-zinc-600 whitespace-nowrap">
+                      <tr key={item.id} className="hover:bg-[var(--cs-bg)]/50">
+                        <td className="py-2.5 px-4 font-mono-num text-[var(--cs-ink-muted)] whitespace-nowrap">
                           {formatDateTime(item.createdAtMs)}
                         </td>
-                        <td className="py-2.5 px-3 text-zinc-900 capitalize whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-bold text-[var(--cs-ink)] capitalize whitespace-nowrap">
                           {item.themeId}
                         </td>
-                        <td className="py-2.5 px-3 font-mono-num text-zinc-800 whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-mono-num text-[var(--cs-ink)] whitespace-nowrap">
                           {item.model}
                         </td>
-                        <td className="py-2.5 px-3 font-mono-num text-zinc-700 whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-mono-num text-[var(--cs-ink-muted)] whitespace-nowrap">
                           {item.promptVersion}
                         </td>
-                        <td className="py-2.5 px-3 font-mono-num text-zinc-700 whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-mono-num text-[var(--cs-ink-muted)] whitespace-nowrap">
                           {item.inputTokens} /{' '}
                           {item.textOutputTokens + item.imageOutputTokens}
                         </td>
-                        <td className="py-2.5 px-3 font-mono-num text-zinc-700 whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-mono-num text-[var(--cs-ink-muted)] whitespace-nowrap">
                           {item.latencyMs} ms
                         </td>
-                        <td className="py-2.5 px-3 font-mono-num font-medium text-zinc-900 whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-mono-num font-bold text-[var(--cs-ink)] whitespace-nowrap">
                           {formatUsd(item.estimatedCostUsd, 5)}
                         </td>
                         <td className="py-2.5 px-4 text-right whitespace-nowrap">
@@ -277,7 +275,7 @@ export function AdminTelemetryPanel({
                             type="button"
                             onClick={() => void deleteGenerationLog(item.id)}
                             aria-label={`Elimina log del ${formatDateTime(item.createdAtMs)}`}
-                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-zinc-500 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                            className="inline-flex items-center justify-center p-1.5 rounded-[8px] border-2 border-transparent text-[var(--cs-ink-muted)] hover:text-[var(--cs-danger-ink)] hover:bg-[var(--cs-danger-bg)] hover:border-[var(--cs-border)] transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>

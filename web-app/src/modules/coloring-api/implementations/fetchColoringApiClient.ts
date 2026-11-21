@@ -58,6 +58,12 @@ export class FetchColoringApiClient implements ColoringApiClient {
     const formData = new FormData();
     formData.append('photo', params.file);
     formData.append('theme', params.themeId);
+    if (params.mode) {
+      formData.append('mode', params.mode);
+    }
+    if (params.ageGroup) {
+      formData.append('ageGroup', params.ageGroup);
+    }
     if (params.providerId) {
       formData.append('provider', params.providerId);
     }

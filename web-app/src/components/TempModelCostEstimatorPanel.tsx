@@ -276,17 +276,17 @@ export function TempModelCostEstimatorPanel({
   return (
     <section
       aria-label="Stima comparativa temporanea su altri modelli"
-      className="rounded-2xl border border-dashed border-zinc-300 bg-[#FBFBF9] p-5 sm:p-6 space-y-4"
+      className="cs-card !border-dashed !bg-[var(--cs-surface)] space-y-4"
     >
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+            <span className="cs-badge uppercase tracking-wide">
               Stima temporanea
             </span>
-            <p className="text-xs font-medium text-zinc-600">
+            <p className="text-xs font-bold text-[var(--cs-ink-muted)]">
               Proiezione sui{' '}
-              <span className="font-mono-num text-zinc-900">
+              <span className="font-mono-num text-[var(--cs-ink)]">
                 {telemetry.inputTokens}
               </span>{' '}
               token input reali di questa richiesta
@@ -295,7 +295,7 @@ export function TempModelCostEstimatorPanel({
                 : ''}
             </p>
           </div>
-          <h4 className="text-base font-semibold text-zinc-900">
+          <h4 className="text-base font-bold text-[var(--cs-ink)]">
             Confronto costi e tempi stimati sui modelli immagine a pagamento
           </h4>
         </div>
@@ -304,15 +304,15 @@ export function TempModelCostEstimatorPanel({
           <div
             role="group"
             aria-label="Modalità API Standard o Batch"
-            className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5"
+            className="inline-flex rounded-[10px] border-2 border-[var(--cs-border)] bg-white p-0.5 gap-0.5"
           >
             <button
               type="button"
               onClick={() => setApiMode('standard')}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              className={`px-3 py-1 rounded-[7px] text-xs font-bold transition-colors cursor-pointer ${
                 apiMode === 'standard'
-                  ? 'bg-zinc-900 text-white'
-                  : 'text-zinc-600 hover:text-zinc-900'
+                  ? 'bg-[var(--cs-mint)] text-[var(--cs-ink)]'
+                  : 'text-[var(--cs-ink-muted)] hover:text-[var(--cs-ink)]'
               }`}
             >
               Standard API
@@ -320,10 +320,10 @@ export function TempModelCostEstimatorPanel({
             <button
               type="button"
               onClick={() => setApiMode('batch')}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              className={`px-3 py-1 rounded-[7px] text-xs font-bold transition-colors cursor-pointer ${
                 apiMode === 'batch'
-                  ? 'bg-zinc-900 text-white'
-                  : 'text-zinc-600 hover:text-zinc-900'
+                  ? 'bg-[var(--cs-mint)] text-[var(--cs-ink)]'
+                  : 'text-[var(--cs-ink-muted)] hover:text-[var(--cs-ink)]'
               }`}
             >
               Batch API (-50%)
@@ -333,17 +333,17 @@ export function TempModelCostEstimatorPanel({
           <div
             role="group"
             aria-label="Risoluzione target Gemini"
-            className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5"
+            className="inline-flex rounded-[10px] border-2 border-[var(--cs-border)] bg-white p-0.5 gap-0.5"
           >
             {(['1K', '2K'] as const).map((res) => (
               <button
                 key={res}
                 type="button"
                 onClick={() => setResolution(res)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1 rounded-[7px] text-xs font-bold transition-colors cursor-pointer ${
                   resolution === res
-                    ? 'bg-zinc-900 text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
+                    ? 'bg-[var(--cs-blue)] text-[var(--cs-ink)]'
+                    : 'text-[var(--cs-ink-muted)] hover:text-[var(--cs-ink)]'
                 }`}
               >
                 Gemini {res}
@@ -353,21 +353,21 @@ export function TempModelCostEstimatorPanel({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+      <div className="overflow-x-auto rounded-[10px] border-2 border-[var(--cs-border)] bg-white">
         <table className="w-full text-left text-xs">
-          <thead className="bg-[#FBFBF9] text-zinc-600 border-b border-zinc-200">
+          <thead className="bg-[var(--cs-sky)] text-[var(--cs-ink)] border-b-2 border-[var(--cs-border)]">
             <tr>
-              <th className="py-2.5 px-4 font-medium">Modello</th>
-              <th className="py-2.5 px-3 font-medium">Fascia</th>
-              <th className="py-2.5 px-3 font-medium">Taglio / Output</th>
-              <th className="py-2.5 px-3 font-medium">Tempo medio / SLA</th>
-              <th className="py-2.5 px-3 font-medium">Stima 1 pagina</th>
-              <th className="py-2.5 px-4 font-medium text-right">
+              <th className="py-2.5 px-4 font-bold">Modello</th>
+              <th className="py-2.5 px-3 font-bold">Fascia</th>
+              <th className="py-2.5 px-3 font-bold">Taglio / Output</th>
+              <th className="py-2.5 px-3 font-bold">Tempo medio / SLA</th>
+              <th className="py-2.5 px-3 font-bold">Stima 1 pagina</th>
+              <th className="py-2.5 px-4 font-bold text-right">
                 Stima libro ({ORDER_CONFIG.projectedBookPages} pag.)
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y-2 divide-[var(--cs-border)]/20">
             {SIMULATED_MODELS.map((spec) => {
               const estimate = spec.estimateCostUsd({
                 inputTokens: telemetry.inputTokens,
@@ -383,37 +383,39 @@ export function TempModelCostEstimatorPanel({
               const batchUnavailable = apiMode === 'batch' && !spec.supportsBatch;
 
               return (
-                <tr key={spec.id} className="hover:bg-[#FBFBF9]/70">
+                <tr key={spec.id} className="hover:bg-[var(--cs-bg)]/50">
                   <td className="py-2.5 px-4">
-                    <div className="font-mono-num font-medium text-zinc-900">
+                    <div className="font-mono-num font-bold text-[var(--cs-ink)]">
                       {spec.label}
                     </div>
-                    <div className="text-[11px] text-zinc-500">
+                    <div className="text-[11px] text-[var(--cs-ink-muted)]">
                       {spec.provider} · {spec.note}
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 text-zinc-700 whitespace-nowrap">
+                  <td className="py-2.5 px-3 text-[var(--cs-ink)] whitespace-nowrap">
                     {spec.tier}
                   </td>
-                  <td className="py-2.5 px-3 font-mono-num text-zinc-600 whitespace-nowrap">
+                  <td className="py-2.5 px-3 font-mono-num text-[var(--cs-ink-muted)] whitespace-nowrap">
                     {estimate.resolutionLabel} · {estimate.assumedOutputTokens} tok
                   </td>
                   <td
                     className={`py-2.5 px-3 whitespace-nowrap ${
-                      batchUnavailable ? 'text-amber-800 font-medium' : 'text-zinc-700'
+                      batchUnavailable
+                        ? 'text-[var(--cs-danger-ink)] font-bold'
+                        : 'text-[var(--cs-ink)]'
                     }`}
                   >
                     {turnaroundText}
                   </td>
-                  <td className="py-2.5 px-3 font-mono-num font-semibold text-zinc-900 whitespace-nowrap">
+                  <td className="py-2.5 px-3 font-mono-num font-bold text-[var(--cs-ink)] whitespace-nowrap">
                     ${estimate.costUsd.toFixed(4)}
                     {estimate.appliedBatchDiscount && (
-                      <span className="ml-1.5 text-[10px] font-medium text-emerald-700">
+                      <span className="ml-1.5 text-[10px] font-bold text-[var(--cs-ink)] bg-[var(--cs-mint)] px-1 rounded">
                         (-50%)
                       </span>
                     )}
                   </td>
-                  <td className="py-2.5 px-4 font-mono-num font-semibold text-zinc-900 text-right whitespace-nowrap">
+                  <td className="py-2.5 px-4 font-mono-num font-bold text-[var(--cs-ink)] text-right whitespace-nowrap">
                     ${bookCost.toFixed(2)}
                   </td>
                 </tr>
@@ -423,7 +425,7 @@ export function TempModelCostEstimatorPanel({
         </table>
       </div>
 
-      <p className="text-[11px] text-zinc-500 leading-relaxed">
+      <p className="text-[11px] text-[var(--cs-ink-muted)] leading-relaxed">
         Nota: i token SVG di output ({telemetry.textOutputTokens}) di{' '}
         <span className="font-mono-num">gemini-4-hydrogen</span> non sono sommati perché i modelli raster fatturano token immagine fissi per risoluzione. La Batch API ufficiale Google/OpenAI applica uno sconto del 50% con completamento asincrono entro 24 ore (non supportata su{' '}
         <span className="font-mono-num">gpt-image-2.6</span>; per la consegna MVP in 15–30 min serve la modalità Standard).

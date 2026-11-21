@@ -22,6 +22,10 @@ export {
 
 export type ColoringOutputFormat = 'svg' | 'raster';
 
+export type ColoringStyleMode = 'fedele' | 'creativa';
+
+export type ColoringAgeGroup = '1-2' | '3-4' | '5-7' | '8+';
+
 export interface ProviderStatus {
   id: ProviderId;
   label: string;

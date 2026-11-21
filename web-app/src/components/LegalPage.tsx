@@ -88,9 +88,9 @@ export function LegalPage({
   return (
     <section
       aria-labelledby="legal-page-title"
-      className="py-12 sm:py-20"
+      className="py-10 sm:py-14"
     >
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+      <div className="cs-wrap max-w-3xl space-y-6">
         <div>
           <a
             href="/"
@@ -98,24 +98,24 @@ export function LegalPage({
               e.preventDefault();
               onNavigateHome();
             }}
-            className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B83B1F]"
+            className="cs-btn cs-btn-secondary cs-btn-compact inline-flex"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Torna alla pagina principale
+            <span>Torna alla pagina principale</span>
           </a>
         </div>
 
-        <article className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-10 space-y-6">
+        <article className="cs-card p-6 sm:p-8 space-y-6">
           <h1
             id="legal-page-title"
             ref={headingRef}
             tabIndex={-1}
-            className="text-3xl sm:text-4xl font-semibold tracking-tight text-zinc-900 focus:outline-none"
+            className="text-3xl sm:text-4xl font-bold tracking-[-0.02em] text-[var(--cs-ink)] focus:outline-none"
           >
             {content.title}
           </h1>
 
-          <div className="space-y-4 text-base text-zinc-700 leading-relaxed">
+          <div className="space-y-4 text-base text-[var(--cs-ink)] leading-relaxed">
             {content.paragraphs.map((text, idx) => (
               <p key={idx}>{text}</p>
             ))}
@@ -124,7 +124,7 @@ export function LegalPage({
 
         <nav
           aria-label="Altre pagine informative"
-          className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-zinc-600"
+          className="flex flex-wrap items-center gap-3 text-sm font-bold"
         >
           {(Object.keys(LEGAL_ROUTES) as LegalRouteSlug[]).map((itemSlug) => {
             const route = LEGAL_ROUTES[itemSlug];
@@ -138,10 +138,8 @@ export function LegalPage({
                   e.preventDefault();
                   onNavigateLegal(itemSlug);
                 }}
-                className={`underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B83B1F] ${
-                  isCurrent
-                    ? 'font-semibold text-zinc-900 underline'
-                    : 'hover:text-zinc-900'
+                className={`cs-badge px-3 py-1 transition-transform hover:-translate-y-0.5 ${
+                  isCurrent ? 'cs-badge-mint' : 'cs-badge-white'
                 }`}
               >
                 {route.label}

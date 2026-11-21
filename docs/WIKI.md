@@ -142,17 +142,25 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 - **Cos’è:** Raccolta di icone SVG pulite e leggere importabili come normali componenti React (solo le icone usate entrano nel bundle finale).
 - **Come e dov’è usato:** Pulsanti, step visivi, anteprime e pannello Admin in `web-app/src/App.tsx` e `web-app/src/components/`.
 
-### Font Self-Hosted (`@fontsource/fraunces` & `@fontsource/plus-jakarta-sans`)
-- **Cos’è:** Pacchetti npm che includono i file `.woff2` dei font direttamente dentro il bundle dell’applicazione, eliminando ogni chiamata ai server di Google Fonts (migliorando la privacy **GDPR**, perché l’IP del visitatore non viene inviato a terzi, e rendendo più stretta la CSP).
-- **Come e dov’è usato:** Importati in `web-app/src/main.tsx` per tutti i pesi usati (`Fraunces` + `Plus Jakarta Sans`), insieme al font monospace locale `DMMono-Regular.ttf`.
+### Design System Templetizzabile (`theme.css` + `siteTemplate.ts` + `components/ui/` & `sections/`)
+- **Cos’è:** Separazione tra token visivi CSS (colori, bordi spessi `3px`, ombre nette neo-brutalist, font e raggio), configurazione dati dei testi/esempi (`siteTemplate.ts` e `sampleScenes.ts`), primitive UI riutilizzabili (`UiButton`, `UiCard`, `UiChip`, `UiBadge`, `ModalDialog`, `UiToast`) e sezioni componibili della landing.
+- **Come e dov’è usato:** `web-app/src/styles/theme.css`, `web-app/src/config/siteTemplate.ts`, `web-app/src/config/sampleScenes.ts`, `web-app/src/components/ui/` e `web-app/src/components/sections/`. Permette di modificare palette, testi, scene di esempio o interi blocchi visivi senza toccare la logica API o le validazioni.
+
+### Finestre Modali Native (`<dialog>` in `CreatorDialog` ed `ExamplesDialog`)
+- **Cos’è:** Wrapper accessibile sopra l’elemento HTML nativo `<dialog>` (`.showModal()`, focus trap automatico, backdrop scuro, chiusura con `Esc` e passaggio automatico a schermo intero su smartphone `<= 600px`) dotato di anteprima A4 e conferma anti-smarrimento se ci sono modifiche non salvate.
+- **Come e dov’è usato:** `web-app/src/components/ui/ModalDialog.tsx`, `web-app/src/components/CreatorDialog.tsx` (flusso foto/esempi, stile Fedele/Creativa, temi, età, esportazione PDF A4 `1-up`/`2-up`/`4-up` e PNG) e `web-app/src/components/ExamplesDialog.tsx`.
+
+### Font Self-Hosted (`@fontsource/plus-jakarta-sans` & `DM Mono`)
+- **Cos’è:** Pacchetto npm e font locale che includono i file `.woff2`/`.ttf` direttamente dentro il bundle dell’applicazione, eliminando ogni chiamata ai server di Google Fonts (migliorando la privacy **GDPR**, perché l’IP del visitatore non viene inviato a terzi, e rendendo più stretta la CSP).
+- **Come e dov’è usato:** `Plus Jakarta Sans` importato in `web-app/src/main.tsx` per tutti i pesi usati e associato ai token `--cs-font-sans` / `--cs-font-display` in `web-app/src/styles/theme.css`, insieme al font monospace locale `DMMono-Regular.ttf`.
 
 ### Pagine Legali con URL Reali & SEO Meta
 - **Cos’è:** Invece di aprire finestre modali difficili da raggiungere con tastiera o link diretti, le pagine informative hanno veri indirizzi web navigabili e linkabili (`/contatti`, `/privacy`, `/condizioni`, `/recesso`) con gestione automatica del focus sul titolo `<h1>`.
 - **Come e dov’è usato:** `web-app/src/components/LegalPage.tsx` e routing client-side in `web-app/src/App.tsx`, accompagnati da `og:image`, `canonical` e `theme-color` in `web-app/index.html`.
 
 ### Esportazione SVG → PNG (`Canvas` browser) & Validazione Foto client
-- **Cos’è:** Uso delle API native del browser (`FileReader`/`Image` + `<canvas>`) per controllare formato/risoluzione prima dell’invio e convertire il disegno vettoriale SVG in file `.png` ad alta risoluzione pronto per la stampa.
-- **Come e dov’è usato:** Modulo `web-app/src/modules/media-validation/` (`BrowserPhotoValidator`) per i controlli rapidi sul browser, e `PhotoGeneratorSection.tsx` per il download PNG.
+- **Cos’è:** Uso delle API native del browser (`FileReader`/`Image` + `<canvas>`) per controllare formato/risoluzione prima dell’invio, disegnare proceduralmente a risoluzione 2× (`1120×1584 px`) gli esempi dimostrativi (`Gatto`, `Orsetto`, `Paesaggio`, `Ritratto`) e convertire l’eventuale disegno SVG in `.png`.
+- **Come e dov’è usato:** Modulo `web-app/src/modules/media-validation/` (`BrowserPhotoValidator`) per i controlli rapidi sul browser, `web-app/src/config/sampleScenes.ts` per gli esempi pronti, e `web-app/src/components/CreatorDialog.tsx` per il download PNG.
 
 ---
 
