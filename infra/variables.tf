@@ -75,3 +75,40 @@ variable "container_image" {
   type        = string
   default     = ""
 }
+
+variable "google_oauth_client_id" {
+  description = "Optional Google OAuth 2.0 Web Client ID for Firebase Google Sign-In. Leave empty to enable Google Sign-In directly from Firebase Console."
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_secret" {
+  description = "Optional Google OAuth 2.0 Web Client Secret for Firebase Google Sign-In."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "extra_authorized_domains" {
+  description = "Optional extra domains to keep authorized in Firebase Auth (e.g. existing AI Studio preview hosts)."
+  type        = list(string)
+  default     = []
+}
+
+variable "allow_unauthenticated" {
+  description = "If true, exposes Cloud Run publicly (allUsers). If false (default), restricts access via Cloud Run IAP + IAM to allowed_users / admin_emails."
+  type        = bool
+  default     = false
+}
+
+variable "allowed_users" {
+  description = "Optional list of Google email addresses allowed to access the private Cloud Run service. Defaults to parsed admin_emails when empty."
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_iap" {
+  description = "Optional: enable Cloud Run direct IAP browser sign-in (requires Google Workspace Organization or custom IAP OAuth client). Only used when allow_unauthenticated = false."
+  type        = bool
+  default     = false
+}

@@ -8,8 +8,8 @@
     "node": ">=22.18.0"
   },
   "scripts": {
-    "dev": "NODE_ENV=development PORT=3000 tsx server.ts",
-    "start": "NODE_ENV=production node server.ts",
+    "dev": "NODE_ENV=development PORT=3000 tsx --env-file-if-exists=.env server.ts",
+    "start": "NODE_ENV=production node --env-file-if-exists=.env server.ts",
     "build": "vite build --config web-app/vite.config.ts",
     "lint": "tsc --noEmit && eslint .",
     "test": "node --test tests/*.test.ts",

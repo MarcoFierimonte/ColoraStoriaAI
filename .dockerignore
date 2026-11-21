@@ -7,3 +7,5 @@ dist
 bun.lock
 *.log
 .DS_Store
+infra/
+*.tfvars

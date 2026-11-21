@@ -9,11 +9,13 @@ locals {
     "firebase.googleapis.com",           # Firebase Management API
     "firebaserules.googleapis.com",      # Firestore Security Rules deployment
     "generativelanguage.googleapis.com", # Gemini Generative Language API
+    "iap.googleapis.com",                # Cloud Identity-Aware Proxy (private Cloud Run access)
+    "billingbudgets.googleapis.com",     # Cloud Billing Budgets API
   ]
 }
 
 resource "google_project_service" "apis" {
-  for_each                   = toset(locals.required_services)
+  for_each                   = toset(local.required_services)
   project                    = var.project_id
   service                    = each.key
   disable_on_destroy         = false

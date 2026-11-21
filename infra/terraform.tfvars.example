@@ -34,3 +34,12 @@ firestore_database_id = "(default)"
 
 # Dominio personalizzato opzionale (es. "colorastoria.com") per i domini autorizzati Auth
 custom_domain = ""
+
+# Credenziali OAuth 2.0 Web Client opzionali per Google Sign-In via Terraform.
+# Lascia vuote se preferisci abilitare Google Sign-In in 1 clic da Firebase Console.
+google_oauth_client_id     = ""
+google_oauth_client_secret = ""
+
+# Se false (consigliato in fase privata), l'URL Cloud Run è accessibile solo a te via IAP.
+# Imposta true solo quando vuoi aprire la web app al pubblico.
+allow_unauthenticated = false

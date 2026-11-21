@@ -1,21 +1,39 @@
 locals {
   default_image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.repo.repository_id}/${var.app_name}:latest"
   image_to_deploy = var.container_image != "" ? var.container_image : local.default_image
+  effective_allowed_users = toset(
+    length(var.allowed_users) > 0
+      ? var.allowed_users
+      : [for e in split(",", var.admin_emails) : trimspace(e) if trimspace(e) != ""]
+  )
+  use_iap = !var.allow_unauthenticated && var.enable_iap
+}
+
+resource "google_project_service_identity" "iap_sa" {
+  count      = local.use_iap ? 1 : 0
+  provider   = google-beta
+  project    = var.project_id
+  service    = "iap.googleapis.com"
+  depends_on = [google_project_service.apis["iap.googleapis.com"]]
 }
 
 resource "google_cloud_run_v2_service" "app" {
+  provider = google-beta
+
   depends_on = [
     google_project_service.apis["run.googleapis.com"],
+    google_project_service.apis["iap.googleapis.com"],
     google_secret_manager_secret_version.gemini_api_key_version,
     google_secret_manager_secret_version.turnstile_secret_key_version,
     google_secret_manager_secret_iam_member.gemini_secret_access,
     google_secret_manager_secret_iam_member.turnstile_secret_access,
   ]
 
-  project  = var.project_id
-  location = var.region
-  name     = var.app_name
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  project     = var.project_id
+  location    = var.region
+  name        = var.app_name
+  ingress     = "INGRESS_TRAFFIC_ALL"
+  iap_enabled = local.use_iap
 
   labels = {
     managed-by = "terraform"
@@ -51,11 +69,6 @@ resource "google_cloud_run_v2_service" "app" {
       env {
         name  = "NODE_ENV"
         value = "production"
-      }
-
-      env {
-        name  = "PORT"
-        value = "8080"
       }
 
       env {
@@ -107,11 +120,44 @@ resource "google_cloud_run_v2_service" "app" {
   }
 }
 
-# Allow public unauthenticated access to the web application
+# Optional public access (disabled by default via allow_unauthenticated = false)
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
+  count    = var.allow_unauthenticated ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.app.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# Allow Google IAP service agent to invoke the private Cloud Run service
+resource "google_cloud_run_v2_service_iam_member" "iap_invoker" {
+  count      = local.use_iap ? 1 : 0
+  depends_on = [google_project_service_identity.iap_sa]
+  project    = var.project_id
+  location   = var.region
+  name       = google_cloud_run_v2_service.app.name
+  role       = "roles/run.invoker"
+  member     = "serviceAccount:${google_project_service_identity.iap_sa[0].email}"
+}
+
+# Allow authorized personal accounts to invoke via gcloud run services proxy / IAM token
+resource "google_cloud_run_v2_service_iam_member" "private_invokers" {
+  for_each = var.allow_unauthenticated ? toset([]) : local.effective_allowed_users
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.app.name
+  role     = "roles/run.invoker"
+  member   = "user:${each.value}"
+}
+
+# Allow ONLY authorized Google accounts through IAP browser sign-in
+resource "google_iap_web_cloud_run_service_iam_member" "iap_accessors" {
+  for_each               = local.use_iap ? local.effective_allowed_users : toset([])
+  depends_on             = [google_project_service.apis["iap.googleapis.com"]]
+  project                = var.project_id
+  location               = var.region
+  cloud_run_service_name = google_cloud_run_v2_service.app.name
+  role                   = "roles/iap.httpsResourceAccessor"
+  member                 = "user:${each.value}"
 }

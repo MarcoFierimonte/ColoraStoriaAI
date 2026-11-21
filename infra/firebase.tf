@@ -70,19 +70,24 @@ resource "google_identity_platform_config" "auth_config" {
   ]
   project = var.project_id
 
-  authorized_domains = compact([
+  authorized_domains = distinct(compact(concat([
     "localhost",
     "127.0.0.1",
     "${var.project_id}.firebaseapp.com",
     "${var.project_id}.web.app",
+    trimprefix(google_cloud_run_v2_service.app.uri, "https://"),
     var.custom_domain != "" ? var.custom_domain : null,
-  ])
+  ], var.extra_authorized_domains)))
 }
 
-# Enable Google Identity Provider for popup login
+# Enable Google Identity Provider for popup login (optional via Terraform;
+# if left empty, enable Google Sign-In in 1 click from Firebase Console)
 resource "google_identity_platform_default_supported_idp_config" "google_idp" {
-  depends_on = [google_identity_platform_config.auth_config]
-  project    = var.project_id
-  idp_id     = "google.com"
-  enabled    = true
+  count         = var.google_oauth_client_id != "" && var.google_oauth_client_secret != "" ? 1 : 0
+  depends_on    = [google_identity_platform_config.auth_config]
+  project       = var.project_id
+  idp_id        = "google.com"
+  enabled       = true
+  client_id     = var.google_oauth_client_id
+  client_secret = var.google_oauth_client_secret
 }

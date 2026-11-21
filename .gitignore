@@ -1,15 +1,43 @@
 node_modules
 dist
-.env
-.env.local
 .DS_Store
 *.log
 
+# Environment files & local secrets
+.env
+.env.*
+!.env.example
+
+# GCP / Firebase credentials & private keys
+*service-account*.json
+*serviceaccount*.json
+*firebase-adminsdk*.json
+application_default_credentials.json
+*.pem
+*.key
+*.p12
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # Terraform
+**/.terraform/
 **/.terraform/*
 *.tfstate
 *.tfstate.*
+*.tfplan
+tfplan
 crash.log
+crash.*.log
 [._]terraform*
 *.tfvars
+*.tfvars.json
 !*.tfvars.example
+!*.tfvars.json.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
