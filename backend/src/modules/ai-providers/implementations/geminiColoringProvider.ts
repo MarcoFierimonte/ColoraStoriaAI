@@ -237,10 +237,12 @@ export class GeminiColoringProvider implements ColoringProvider {
     input: ColoringGenerationInput
   ): Promise<ColoringGenerationOutput> {
     const { prompt, version: promptVersion } =
-      this.promptRepository.buildRasterPrompt(
-        input.themeId,
-        input.promptVersionOverride
-      );
+      this.promptRepository.buildRasterPrompt({
+        mode: input.mode,
+        themeId: input.themeId,
+        ageGroup: input.ageGroup,
+        versionOverride: input.promptVersionOverride,
+      });
     const startedAt = Date.now();
     try {
       const response = await withRetry(() =>
@@ -285,7 +287,10 @@ export class GeminiColoringProvider implements ColoringProvider {
             promptVersion,
             outputFormat: 'raster',
             imageDataUrl: `data:${mime};base64,${part.inlineData.data}`,
-            sceneSummary: 'Pagina da colorare generata direttamente dalla tua foto.',
+            sceneSummary:
+              input.mode === 'fedele'
+                ? 'Pagina da colorare fedele alla tua foto.'
+                : 'Pagina da colorare creativa generata direttamente dalla tua foto.',
             latencyMs,
             usage,
           };
@@ -317,10 +322,12 @@ export class GeminiColoringProvider implements ColoringProvider {
     input: ColoringGenerationInput
   ): Promise<ColoringGenerationOutput> {
     const { prompt, version: promptVersion } =
-      this.promptRepository.buildSvgPrompt(
-        input.themeId,
-        input.promptVersionOverride
-      );
+      this.promptRepository.buildSvgPrompt({
+        mode: input.mode,
+        themeId: input.themeId,
+        ageGroup: input.ageGroup,
+        versionOverride: input.promptVersionOverride,
+      });
     const startedAt = Date.now();
     try {
       const response = await withRetry(() =>

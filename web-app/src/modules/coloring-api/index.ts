@@ -4,8 +4,8 @@ import type {
   ColoringGenerationResponse,
   ExportPrintPdfRequest,
   GenerateColoringPageRequest,
-} from './coloringApi.interface';
-import { FetchColoringApiClient } from './implementations/fetchColoringApiClient';
+} from './coloringApi.interface.ts';
+import { FetchColoringApiClient } from './implementations/fetchColoringApiClient.ts';
 
 export {
   ColoringApiError,
@@ -22,8 +22,8 @@ export {
   type PrintPdfLayout,
   type ProviderId,
   type ProviderStatus,
-} from './coloringApi.interface';
-export { FetchColoringApiClient } from './implementations/fetchColoringApiClient';
+} from './coloringApi.interface.ts';
+export { FetchColoringApiClient } from './implementations/fetchColoringApiClient.ts';
 
 export const coloringApiClient: ColoringApiClient =
   new FetchColoringApiClient('/api');

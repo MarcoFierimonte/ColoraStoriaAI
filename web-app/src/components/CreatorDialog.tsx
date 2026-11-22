@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Check, Copy, SlidersHorizontal } from 'lucide-react';
+import {
+  buildGenerateColoringRequest,
+  getGenerationLogThemeId,
+} from '../config/generationPayload';
 import { ORDER_CONFIG } from '../config/orderConfig';
 import { renderSampleSceneToFile, SAMPLE_SCENES } from '../config/sampleScenes';
 import { SITE_TEMPLATE } from '../config/siteTemplate';
@@ -298,17 +302,19 @@ export function CreatorDialog({
 
     try {
       const freshToken = isAdmin && user ? await refreshIdToken() : idToken;
-      const generated = await generateColoringPageApi({
-        file: photo.file,
-        themeId,
-        mode,
-        ageGroup: mode === 'creativa' ? ageGroup : undefined,
-        providerId: isAdmin && selectedProviderId ? selectedProviderId : undefined,
-        promptVersion:
-          isAdmin && selectedPromptVersion ? selectedPromptVersion : undefined,
-        idToken: freshToken,
-        turnstileToken,
-      });
+      const generated = await generateColoringPageApi(
+        buildGenerateColoringRequest({
+          file: photo.file,
+          mode,
+          themeId,
+          ageGroup,
+          isAdmin,
+          selectedProviderId,
+          selectedPromptVersion,
+          idToken: freshToken,
+          turnstileToken,
+        })
+      );
 
       if (runCounterRef.current !== currentRun) return;
 
@@ -321,7 +327,7 @@ export function CreatorDialog({
       if (isAdmin && hasAdminClaim && user && generated.adminTelemetry) {
         void saveGenerationLog({
           adminUid: user.uid,
-          themeId,
+          themeId: getGenerationLogThemeId(mode, themeId),
           telemetry: generated.adminTelemetry,
         }).catch((err) => {
           console.warn('Firestore generation log save failed:', err);
@@ -564,7 +570,11 @@ export function CreatorDialog({
             {result ? (
               <img
                 src={result.imageDataUrl}
-                alt={`Pagina da colorare (${selectedTheme?.name ?? themeId})`}
+                alt={
+                  mode === 'creativa'
+                    ? `Pagina da colorare (${selectedTheme?.name ?? themeId})`
+                    : 'Pagina da colorare (Fedele alla foto)'
+                }
                 referrerPolicy="no-referrer"
                 className="cs-sheet-media block h-full w-full bg-white object-contain"
               />

@@ -1,9 +1,17 @@
 import {
+  ALLOWED_AGE_GROUPS,
+  ALLOWED_COLORING_MODES,
   ALLOWED_THEME_IDS,
+  DEFAULT_AGE_GROUP,
+  DEFAULT_COLORING_MODE,
   PRINT_PDF_LAYOUTS,
   SUPPORTED_PROVIDER_IDS,
   isAllowedThemeId,
+  isColoringAgeGroup,
+  isColoringStyleMode,
   isPrintPdfLayout,
+  type ColoringAgeGroup,
+  type ColoringStyleMode,
   type PrintPdfLayout,
   type ProviderId,
   type ThemeId,
@@ -11,11 +19,19 @@ import {
 import type { BetaInviteQuota } from './access.ts';
 
 export {
+  ALLOWED_AGE_GROUPS,
+  ALLOWED_COLORING_MODES,
   ALLOWED_THEME_IDS,
+  DEFAULT_AGE_GROUP,
+  DEFAULT_COLORING_MODE,
   PRINT_PDF_LAYOUTS,
   SUPPORTED_PROVIDER_IDS,
   isAllowedThemeId,
+  isColoringAgeGroup,
+  isColoringStyleMode,
   isPrintPdfLayout,
+  type ColoringAgeGroup,
+  type ColoringStyleMode,
   type PrintPdfLayout,
   type ProviderId,
   type ThemeId,
@@ -23,9 +39,7 @@ export {
 
 export type ColoringOutputFormat = 'svg' | 'raster';
 
-export type ColoringStyleMode = 'fedele' | 'creativa';
-
-export type ColoringAgeGroup = '1-2' | '3-4' | '5-7' | '8+';
+export type GenerationLogThemeId = ThemeId | 'fedele';
 
 export interface ProviderStatus {
   id: ProviderId;

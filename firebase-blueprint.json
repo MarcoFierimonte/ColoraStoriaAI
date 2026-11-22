@@ -64,7 +64,7 @@
         },
         "themeId": {
           "type": "string",
-          "enum": ["pirati", "unicorni", "draghi", "spazio", "dinosauri", "principessa"],
+          "enum": ["fedele", "pirati", "unicorni", "draghi", "spazio", "dinosauri", "principessa"],
           "description": "Selected coloring book theme"
         },
         "outputFormat": {

@@ -184,7 +184,11 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Firestore Security Rules (`firestore.rules`) & `firebase-blueprint.json`
 - **Cos’è:** Le regole di sicurezza (`firestore.rules`) agiscono come un firewall direttamente sul database Firestore: decidono chi può leggere/scrivere cosa e verificano tipo, lunghezza e timestamp di ogni campo. `firebase-blueprint.json` è lo schema di riferimento della struttura dati.
-- **Come e dov’è usato:** Nella root del progetto. Blocca tutto di default (`deny-all`), permette lettura/creazione/cancellazione su `generation_logs` **solo** ad account verificati con custom claim `admin == true` e valida tutti i 13 campi più `createdAt == request.time`.
+- **Come e dov’è usato:** Nella root del progetto. Blocca tutto di default (`deny-all`), permette lettura/creazione/cancellazione su `generation_logs` **solo** ad account verificati con custom claim `admin == true` (includendo sia i 6 temi fantasy sia `'fedele'` per la modalità fedele alla foto) e vieta l’accesso diretto client a `beta_invites`.
+
+### Prompt Versionati Multi-Modalità (`prompts/v2/`)
+- **Cos’è:** Raccolta versionata delle istruzioni inviate all’AI, separata per istruzioni base di fedeltà (`base.txt`), modalità (`modes.json`: `fedele` senza temi fantasy vs `creativa`), i 6 temi (`themes.json`) e le 4 fasce d’età (`ages.json`).
+- **Come e dov’è usato:** `prompts/config.json` seleziona la versione attiva (`latest` → `v2`), caricata da `FilesystemPromptRepository` in `backend/src/modules/prompts/`. In modalità `fedele` il backend scarta qualsiasi tema residuo così i temi fantasy non possono mai filtrare nello sfondo.
 
 ---
 

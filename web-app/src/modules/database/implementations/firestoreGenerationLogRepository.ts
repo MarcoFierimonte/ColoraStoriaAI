@@ -12,7 +12,7 @@ import {
   Timestamp,
   where,
 } from 'firebase/firestore';
-import type { ThemeId } from '../../../../../shared/types/index.ts';
+import type { GenerationLogThemeId } from '../../../../../shared/types/index.ts';
 import {
   OperationType,
   type AdminProfileInput,
@@ -137,7 +137,7 @@ export class FirestoreGenerationLogRepository
             provider: data.provider === 'openai' ? 'openai' : 'gemini',
             model: String(data.model ?? ''),
             promptVersion: String(data.promptVersion ?? 'v1'),
-            themeId: (data.themeId as ThemeId) ?? 'pirati',
+            themeId: (data.themeId as GenerationLogThemeId) ?? 'fedele',
             outputFormat: data.outputFormat === 'raster' ? 'raster' : 'svg',
             inputTokens: Number(data.inputTokens ?? 0),
             cachedInputTokens: Number(data.cachedInputTokens ?? 0),

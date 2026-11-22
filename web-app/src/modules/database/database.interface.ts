@@ -1,8 +1,8 @@
 import type {
   AdminTelemetry,
   ColoringOutputFormat,
+  GenerationLogThemeId,
   ProviderId,
-  ThemeId,
 } from '../../../../shared/types/index.ts';
 
 export enum OperationType {
@@ -37,7 +37,7 @@ export interface GenerationLogRecord {
   provider: ProviderId;
   model: string;
   promptVersion: string;
-  themeId: ThemeId;
+  themeId: GenerationLogThemeId;
   outputFormat: ColoringOutputFormat;
   inputTokens: number;
   cachedInputTokens: number;
@@ -50,7 +50,7 @@ export interface GenerationLogRecord {
 
 export interface SaveGenerationLogInput {
   adminUid: string;
-  themeId: ThemeId;
+  themeId: GenerationLogThemeId;
   telemetry: AdminTelemetry;
 }
 

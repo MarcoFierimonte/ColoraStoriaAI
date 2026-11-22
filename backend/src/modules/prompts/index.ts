@@ -1,10 +1,14 @@
-import type { ThemeId } from '../ai-providers/aiProvider.interface.ts';
 import { serverConfig } from '../config/index.ts';
 import { FilesystemPromptRepository } from './implementations/filesystemPromptRepository.ts';
-import type { BuiltPrompt, PromptRepository } from './promptRepository.interface.ts';
+import type {
+  BuiltPrompt,
+  PromptBuildOptions,
+  PromptRepository,
+} from './promptRepository.interface.ts';
 
 export type {
   BuiltPrompt,
+  PromptBuildOptions,
   PromptBundle,
   PromptRepository,
 } from './promptRepository.interface.ts';
@@ -23,15 +27,13 @@ export function getActivePromptVersion(): string {
 }
 
 export function buildRasterColoringPrompt(
-  themeId: ThemeId,
-  versionOverride?: string
+  options: PromptBuildOptions
 ): BuiltPrompt {
-  return promptRepository.buildRasterPrompt(themeId, versionOverride);
+  return promptRepository.buildRasterPrompt(options);
 }
 
 export function buildSvgColoringPrompt(
-  themeId: ThemeId,
-  versionOverride?: string
+  options: PromptBuildOptions
 ): BuiltPrompt {
-  return promptRepository.buildSvgPrompt(themeId, versionOverride);
+  return promptRepository.buildSvgPrompt(options);
 }

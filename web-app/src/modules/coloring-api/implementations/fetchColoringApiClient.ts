@@ -7,7 +7,7 @@ import {
   type ColoringGenerationResponse,
   type ExportPrintPdfRequest,
   type GenerateColoringPageRequest,
-} from '../coloringApi.interface';
+} from '../coloringApi.interface.ts';
 
 export class FetchColoringApiClient implements ColoringApiClient {
   private readonly baseUrl: string;
@@ -55,13 +55,14 @@ export class FetchColoringApiClient implements ColoringApiClient {
   async generateColoringPage(
     params: GenerateColoringPageRequest
   ): Promise<ColoringGenerationResponse> {
+    const effectiveMode = params.mode ?? 'fedele';
     const formData = new FormData();
     formData.append('photo', params.file);
-    formData.append('theme', params.themeId);
-    if (params.mode) {
-      formData.append('mode', params.mode);
+    formData.append('mode', effectiveMode);
+    if (effectiveMode === 'creativa' && params.themeId) {
+      formData.append('theme', params.themeId);
     }
-    if (params.ageGroup) {
+    if (effectiveMode === 'creativa' && params.ageGroup) {
       formData.append('ageGroup', params.ageGroup);
     }
     if (params.providerId) {

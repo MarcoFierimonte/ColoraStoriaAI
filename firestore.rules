@@ -65,7 +65,7 @@ service cloud.firestore {
         data.model is string && data.model.size() >= 1 && data.model.size() <= 80 &&
         data.promptVersion is string && data.promptVersion.size() >= 2 && data.promptVersion.size() <= 20 &&
         data.promptVersion.matches('^v[0-9]+$') &&
-        data.themeId in ['pirati', 'unicorni', 'draghi', 'spazio', 'dinosauri', 'principessa'] &&
+        data.themeId in ['fedele', 'pirati', 'unicorni', 'draghi', 'spazio', 'dinosauri', 'principessa'] &&
         data.outputFormat in ['svg', 'raster'] &&
         data.inputTokens is int && data.inputTokens >= 0 && data.inputTokens <= 1000000 &&
         data.cachedInputTokens is int && data.cachedInputTokens >= 0 && data.cachedInputTokens <= 1000000 &&

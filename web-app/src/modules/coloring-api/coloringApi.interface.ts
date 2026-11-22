@@ -47,8 +47,8 @@ export class ColoringApiError extends Error {
 
 export interface GenerateColoringPageRequest {
   file: File;
-  themeId: ThemeId;
   mode?: ColoringStyleMode;
+  themeId?: ThemeId;
   ageGroup?: ColoringAgeGroup;
   providerId?: ProviderId;
   promptVersion?: string;

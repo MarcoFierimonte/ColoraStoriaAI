@@ -1,6 +1,8 @@
 import {
   ALLOWED_THEME_IDS,
+  type ColoringAgeGroup,
   type ColoringOutputFormat,
+  type ColoringStyleMode,
   type ProviderId,
   type ProviderStatus,
   type ThemeId,
@@ -11,7 +13,9 @@ export type SupportedProviderId = ProviderId;
 
 export {
   ALLOWED_THEME_IDS,
+  type ColoringAgeGroup,
   type ColoringOutputFormat,
+  type ColoringStyleMode,
   type ProviderId,
   type ProviderStatus,
   type ThemeId,
@@ -21,7 +25,9 @@ export {
 export interface ColoringGenerationInput {
   imageBuffer: Buffer;
   mimeType: string;
-  themeId: ThemeId;
+  mode: ColoringStyleMode;
+  themeId?: ThemeId;
+  ageGroup?: ColoringAgeGroup;
   promptVersionOverride?: string;
 }
 

@@ -1,10 +1,23 @@
-import type { ThemeId } from '../ai-providers/aiProvider.interface.ts';
+import type {
+  ColoringAgeGroup,
+  ColoringStyleMode,
+  ThemeId,
+} from '../ai-providers/aiProvider.interface.ts';
 
 export interface PromptBundle {
   version: string;
   basePrompt: string;
   themes: Record<ThemeId, string>;
+  modes?: Record<ColoringStyleMode, string>;
+  ages?: Record<ColoringAgeGroup, string>;
   svgAdapter: string;
+}
+
+export interface PromptBuildOptions {
+  mode: ColoringStyleMode;
+  themeId?: ThemeId;
+  ageGroup?: ColoringAgeGroup;
+  versionOverride?: string;
 }
 
 export interface BuiltPrompt {
@@ -15,6 +28,6 @@ export interface BuiltPrompt {
 export interface PromptRepository {
   listVersions(): string[];
   getActiveVersion(): string;
-  buildRasterPrompt(themeId: ThemeId, versionOverride?: string): BuiltPrompt;
-  buildSvgPrompt(themeId: ThemeId, versionOverride?: string): BuiltPrompt;
+  buildRasterPrompt(options: PromptBuildOptions): BuiltPrompt;
+  buildSvgPrompt(options: PromptBuildOptions): BuiltPrompt;
 }

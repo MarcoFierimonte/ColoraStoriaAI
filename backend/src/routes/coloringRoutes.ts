@@ -8,15 +8,21 @@ import {
   MAX_UPLOAD_FILE_SIZE_MB,
 } from '../../../shared/config/index.ts';
 import {
+  DEFAULT_AGE_GROUP,
   isAllowedThemeId,
+  isColoringAgeGroup,
+  isColoringStyleMode,
   isPrintPdfLayout,
   type AccessSessionResponse,
   type AdminInviteMutationResponse,
   type AdminInvitesListResponse,
   type AdminSessionResponse,
+  type ColoringAgeGroup,
   type ColoringGenerationResponse,
+  type ColoringStyleMode,
   type CreateInviteRequest,
   type HealthResponse,
+  type ThemeId,
   type UpdateInviteRequest,
 } from '../../../shared/types/index.ts';
 import {
@@ -408,23 +414,82 @@ export function createColoringRouter(
           return;
         }
 
+        const rawMode =
+          typeof req.body?.mode === 'string' ? req.body.mode.trim() : '';
         const rawTheme =
           typeof req.body?.theme === 'string' ? req.body.theme.trim() : '';
-        if (!isAllowedThemeId(rawTheme)) {
-          res.status(400).json({
-            error: 'Seleziona uno dei sei mondi illustrati disponibili.',
-            ...(isAdminUser
-              ? {
-                  adminErrorDetails: {
-                    statusCode: 400,
-                    errorName: 'ValidationError',
-                    rawMessage: `Invalid themeId received: "${rawTheme}"`,
-                    timestamp: new Date().toISOString(),
-                  },
-                }
-              : {}),
-          });
-          return;
+        const rawAgeGroup =
+          typeof req.body?.ageGroup === 'string' ? req.body.ageGroup.trim() : '';
+
+        let mode: ColoringStyleMode;
+        if (rawMode !== '') {
+          if (!isColoringStyleMode(rawMode)) {
+            res.status(400).json({
+              error: 'Modalità di stile non valida.',
+              ...(isAdminUser
+                ? {
+                    adminErrorDetails: {
+                      statusCode: 400,
+                      errorName: 'ValidationError',
+                      rawMessage: `Invalid mode received: "${rawMode}"`,
+                      timestamp: new Date().toISOString(),
+                    },
+                  }
+                : {}),
+            });
+            return;
+          }
+          mode = rawMode;
+        } else {
+          mode = rawTheme !== '' ? 'creativa' : 'fedele';
+        }
+
+        let themeId: ThemeId | undefined;
+        let ageGroup: ColoringAgeGroup | undefined;
+        if (mode === 'creativa') {
+          if (!isAllowedThemeId(rawTheme)) {
+            res.status(400).json({
+              error: 'Seleziona uno dei sei mondi illustrati disponibili.',
+              ...(isAdminUser
+                ? {
+                    adminErrorDetails: {
+                      statusCode: 400,
+                      errorName: 'ValidationError',
+                      rawMessage: `Invalid themeId received: "${rawTheme}"`,
+                      timestamp: new Date().toISOString(),
+                    },
+                  }
+                : {}),
+            });
+            return;
+          }
+          themeId = rawTheme;
+
+          if (rawAgeGroup !== '') {
+            if (!isColoringAgeGroup(rawAgeGroup)) {
+              res.status(400).json({
+                error: 'Fascia d’età selezionata non valida.',
+                ...(isAdminUser
+                  ? {
+                      adminErrorDetails: {
+                        statusCode: 400,
+                        errorName: 'ValidationError',
+                        rawMessage: `Invalid ageGroup received: "${rawAgeGroup}"`,
+                        timestamp: new Date().toISOString(),
+                      },
+                    }
+                  : {}),
+              });
+              return;
+            }
+            ageGroup = rawAgeGroup;
+          } else {
+            ageGroup = DEFAULT_AGE_GROUP;
+          }
+        } else {
+          // Faithful mode never forwards any theme or creative-only fields to providers.
+          themeId = undefined;
+          ageGroup = undefined;
         }
 
         const verifiedImage = deps.mediaValidator.validate(
@@ -452,12 +517,14 @@ export function createColoringRouter(
         const result = await provider.generateColoringPage({
           imageBuffer: preparedImage.buffer,
           mimeType: preparedImage.mimeType,
-          themeId: rawTheme,
+          mode,
+          themeId,
+          ageGroup,
           promptVersionOverride: requestedPromptVersion || undefined,
         });
 
         console.info(
-          `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} theme=${rawTheme} format=${result.outputFormat} orig=${verifiedImage.width}x${verifiedImage.height} aiIn=${preparedImage.width}x${preparedImage.height} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
+          `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} mode=${mode} theme=${themeId ?? 'none'} age=${ageGroup ?? 'none'} format=${result.outputFormat} orig=${verifiedImage.width}x${verifiedImage.height} aiIn=${preparedImage.width}x${preparedImage.height} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
         );
 
         const responsePayload: ColoringGenerationResponse = {

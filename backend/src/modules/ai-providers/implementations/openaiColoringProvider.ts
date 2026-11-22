@@ -51,10 +51,12 @@ export class OpenAIColoringProvider implements ColoringProvider {
     }
 
     const { prompt, version: promptVersion } =
-      this.promptRepository.buildRasterPrompt(
-        input.themeId,
-        input.promptVersionOverride
-      );
+      this.promptRepository.buildRasterPrompt({
+        mode: input.mode,
+        themeId: input.themeId,
+        ageGroup: input.ageGroup,
+        versionOverride: input.promptVersionOverride,
+      });
     const formData = new FormData();
     const ext =
       input.mimeType === 'image/png'
@@ -139,7 +141,10 @@ export class OpenAIColoringProvider implements ColoringProvider {
         promptVersion,
         outputFormat: 'raster',
         imageDataUrl: `data:image/png;base64,${first.b64_json}`,
-        sceneSummary: 'Pagina da colorare generata con OpenAI a partire dalla tua foto.',
+        sceneSummary:
+          input.mode === 'fedele'
+            ? 'Pagina da colorare fedele alla tua foto.'
+            : 'Pagina da colorare creativa generata con OpenAI.',
         latencyMs,
         usage,
       };
@@ -151,7 +156,10 @@ export class OpenAIColoringProvider implements ColoringProvider {
         promptVersion,
         outputFormat: 'raster',
         imageDataUrl: first.url,
-        sceneSummary: 'Pagina da colorare generata con OpenAI a partire dalla tua foto.',
+        sceneSummary:
+          input.mode === 'fedele'
+            ? 'Pagina da colorare fedele alla tua foto.'
+            : 'Pagina da colorare creativa generata con OpenAI.',
         latencyMs,
         usage,
       };

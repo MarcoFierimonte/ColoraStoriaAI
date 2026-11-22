@@ -1,10 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ThemeId } from '../../ai-providers/aiProvider.interface.ts';
+import type {
+  ColoringAgeGroup,
+  ColoringStyleMode,
+  ThemeId,
+} from '../../ai-providers/aiProvider.interface.ts';
 import { getServerConfig, type ServerConfig } from '../../config/index.ts';
 import type {
   BuiltPrompt,
+  PromptBuildOptions,
   PromptBundle,
   PromptRepository,
 } from '../promptRepository.interface.ts';
@@ -12,6 +17,9 @@ import type {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_PROMPTS_ROOT = path.resolve(__dirname, '../../../../../prompts');
+
+const LEGACY_FAITHFUL_INSTRUCTION =
+  'FAITHFUL PHOTO MODE (NO FANTASY THEME): Strictly reproduce ONLY the real subject(s), clothing and real setting/background actually visible in the attached photo as crisp black outlines on white. Do NOT add or invent any fantasy theme, costumes, crowns, hats or imaginary props.';
 
 interface PromptsConfigFile {
   activeVersion?: string;
@@ -103,6 +111,23 @@ export class FilesystemPromptRepository implements PromptRepository {
     const themes = JSON.parse(
       fs.readFileSync(path.join(versionDir, 'themes.json'), 'utf8')
     ) as Record<ThemeId, string>;
+
+    const modesPath = path.join(versionDir, 'modes.json');
+    const modes = fs.existsSync(modesPath)
+      ? (JSON.parse(fs.readFileSync(modesPath, 'utf8')) as Record<
+          ColoringStyleMode,
+          string
+        >)
+      : undefined;
+
+    const agesPath = path.join(versionDir, 'ages.json');
+    const ages = fs.existsSync(agesPath)
+      ? (JSON.parse(fs.readFileSync(agesPath, 'utf8')) as Record<
+          ColoringAgeGroup,
+          string
+        >)
+      : undefined;
+
     const svgAdapterPath = path.join(versionDir, 'svg-adapter.txt');
     const svgAdapter = fs.existsSync(svgAdapterPath)
       ? fs.readFileSync(svgAdapterPath, 'utf8').trim()
@@ -112,26 +137,57 @@ export class FilesystemPromptRepository implements PromptRepository {
       version,
       basePrompt,
       themes,
+      modes,
+      ages,
       svgAdapter,
     };
   }
 
-  buildRasterPrompt(themeId: ThemeId, versionOverride?: string): BuiltPrompt {
-    const bundle = this.loadBundle(versionOverride);
-    const themeBlock = bundle.themes[themeId];
-    if (!themeBlock) {
-      throw new Error(
-        `Blocco tema "${themeId}" mancante nella versione prompt ${bundle.version}`
-      );
+  buildRasterPrompt(options: PromptBuildOptions): BuiltPrompt {
+    const bundle = this.loadBundle(options.versionOverride);
+    const parts: string[] = [];
+
+    if (options.mode === 'fedele') {
+      if (bundle.modes?.fedele) {
+        parts.push(bundle.basePrompt, bundle.modes.fedele.trim());
+      } else {
+        const sanitizedLegacyBase = bundle.basePrompt
+          .replace(/^Apply the theme ONLY[^\n]*$/im, '')
+          .trim();
+        parts.push(sanitizedLegacyBase, LEGACY_FAITHFUL_INSTRUCTION);
+      }
+    } else {
+      if (!options.themeId) {
+        throw new Error('Tema mancante per la modalità creativa.');
+      }
+      const themeBlock = bundle.themes[options.themeId];
+      if (!themeBlock) {
+        throw new Error(
+          `Blocco tema "${options.themeId}" mancante nella versione prompt ${bundle.version}`
+        );
+      }
+
+      if (bundle.modes?.creativa) {
+        parts.push(
+          bundle.basePrompt,
+          `${bundle.modes.creativa.trim()} ${themeBlock.trim()}`
+        );
+      } else {
+        parts.push(`${bundle.basePrompt}\n${themeBlock.trim()}`);
+      }
+      if (options.ageGroup && bundle.ages?.[options.ageGroup]) {
+        parts.push(bundle.ages[options.ageGroup].trim());
+      }
     }
+
     return {
       version: bundle.version,
-      prompt: `${bundle.basePrompt}\n${themeBlock}`,
+      prompt: parts.join('\n\n'),
     };
   }
 
-  buildSvgPrompt(themeId: ThemeId, versionOverride?: string): BuiltPrompt {
-    const { prompt, version } = this.buildRasterPrompt(themeId, versionOverride);
+  buildSvgPrompt(options: PromptBuildOptions): BuiltPrompt {
+    const { prompt, version } = this.buildRasterPrompt(options);
     const bundle = this.loadBundle(version);
     const combined = bundle.svgAdapter
       ? `${prompt}\n\n${bundle.svgAdapter}`

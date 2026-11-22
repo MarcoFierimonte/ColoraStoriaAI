@@ -46,6 +46,26 @@ export const SUPPORTED_PROVIDER_IDS = ['gemini', 'openai'] as const;
 
 export type ProviderId = (typeof SUPPORTED_PROVIDER_IDS)[number];
 
+export const ALLOWED_COLORING_MODES = ['fedele', 'creativa'] as const;
+
+export type ColoringStyleMode = (typeof ALLOWED_COLORING_MODES)[number];
+
+export const DEFAULT_COLORING_MODE: ColoringStyleMode = 'fedele';
+
+export function isColoringStyleMode(value: string): value is ColoringStyleMode {
+  return (ALLOWED_COLORING_MODES as readonly string[]).includes(value);
+}
+
+export const ALLOWED_AGE_GROUPS = ['1-2', '3-4', '5-7', '8+'] as const;
+
+export type ColoringAgeGroup = (typeof ALLOWED_AGE_GROUPS)[number];
+
+export const DEFAULT_AGE_GROUP: ColoringAgeGroup = '3-4';
+
+export function isColoringAgeGroup(value: string): value is ColoringAgeGroup {
+  return (ALLOWED_AGE_GROUPS as readonly string[]).includes(value);
+}
+
 export const PRINT_PDF_LAYOUTS = ['1-up', '2-up', '4-up'] as const;
 
 export type PrintPdfLayout = (typeof PRINT_PDF_LAYOUTS)[number];
