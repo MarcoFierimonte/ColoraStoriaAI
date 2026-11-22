@@ -3,9 +3,9 @@
 Compact cost reference for converting uploaded photos into black-and-white coloring pages (`1 photo + theme prompt -> 1 coloring page`), comparing **Standard (real-time)** vs **Batch API (async)**.
 
 > **App Baseline:**
-> - **Input per page:** 1 resized photo (`~560–1,120` image tokens) + ~`300` text prompt tokens (`prompts/v1`).
-> - **Output per page:** 1 portrait coloring page (`1K` ≈ 1 MP is crisp for A4 crayon printing; `2K` ≈ 4 MP is max needed).
-> - **Full book (MVP):** 15 photo pages + 1 cover = **16 images per order**.
+> - **Input per page:** 1 resized photo (`~560–1,120` image tokens, `<=1280 px` longest side) + ~`300–400` text prompt tokens (`prompts/v2`: faithful `fedele` mode or `creativa` mode + theme + age group).
+> - **Output per page (Phase 1 Active Beta):** 1 portrait coloring page (`1K` ≈ 1 MP is crisp for A4 crayon printing; `2K` ≈ 4 MP is max needed).
+> - **Full book projection (Phase 2 Roadmap):** 15 photo pages + 1 cover = **16 images per book**.
 
 ---
 

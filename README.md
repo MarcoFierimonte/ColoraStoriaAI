@@ -2,22 +2,26 @@
 
 Web app that turns personal photos into printable coloring-book pages using a server-side, multi-provider AI backend.
 
+Currently operating in **Phase 1 (Private Beta)** for instant single-page generation and print-ready A4 PDF export, gated by personal invite codes and per-user quotas. See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for the versioned product specification and Phase 2 roadmap.
+
 ## Repository Layout
-- `AGENTS.md` — Template engineering guidelines enforcing strict Interface vs. Implementation module separation and wiki maintenance.
+- `AGENTS.md` — Engineering guidelines enforcing Interface vs. Implementation module separation and mandatory Wiki/Requirements maintenance.
+- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.0.0`: Phase 1 active specs, non-functional security/cost rules, Phase 2 roadmap, and changelog).
 - `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
-- `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/themes (`shared/config/`) shared by `backend/` and `web-app/`.
-- `web-app/` — React + TypeScript + Tailwind CSS frontend with domain modules under `web-app/src/modules/`, self-hosted `@fontsource` fonts, and real-URL legal routes (`web-app/README.md`).
-- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` and Zod startup env validation (`backend/README.md`).
-- `tests/` — Native Node test runner suite (`node --test`) verifying upload validation, auth/providers, and config/rules consistency.
+- `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/modes/themes/ages (`shared/config/`) shared by `backend/` and `web-app/`.
+- `web-app/` — React + TypeScript + Tailwind CSS frontend with a neo-brutalist themeable UI (`theme.css`, `siteTemplate.ts`, `CreatorDialog`, `AdminInvitesPanel`), domain modules under `web-app/src/modules/`, self-hosted `@fontsource` fonts, and real-URL legal routes (`web-app/README.md`).
+- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` (including `beta-access` invite quotas and `print-pdf` A4 mastering) and Zod startup env validation (`backend/README.md`).
+- `tests/` — Native Node test runner suite (`node --test`) verifying upload validation, auth/providers, beta-access quotas/revocation, prompt mode/theme/age combinations, PDF export, and config/rules consistency.
 - `Dockerfile` & `.dockerignore` — Multi-stage non-root production container (`node:24-slim`).
-- `.github/workflows/ci.yml` — Automated CI running `lint`, `test`, `build`, and `npm audit`.
+- `.github/workflows/ci.yml` — Automated CI running `lint`, `test`, `build`, and `npm audit --audit-level=high`.
 - `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
-- `prompts/` — Versioned prompt library and `config.json` version selector (`prompts/README.md`).
+- `prompts/` — Versioned prompt library (`v2` multi-mode/age + `v1` fallback) and `config.json` version selector (`prompts/README.md`).
 - `pricing/` — AI model cost estimates for Standard and Batch APIs (`pricing/ai/image-generation-costs.md`).
 - `infra/` — Infrastructure as Code (Terraform) to automatically provision Cloud Run, Artifact Registry, Secret Manager, Firestore, and Firebase Auth (`infra/README.md`).
+- `scripts/` — One-time admin utilities (`set-admin-claim.ts`, `manage-invites.ts`).
 - `firebase-blueprint.json` & `firestore.rules` — Firestore schema blueprint and hardened security rules.
 - `server.ts` — Root entry point delegating to `backend/server.ts`.
-- `.env.example` — Required server-side environment variables.
+- `.env.example` — Required and optional server-side environment variables.
 
 ## Quick Start
 ```bash
@@ -26,114 +30,96 @@ npm run dev
 ```
 
 ## Environment Variables
-Copy `.env.example` or set secrets in your hosting environment:
+Copy `.env.example` or set secrets in Secret Manager / hosting environment:
 - `AI_PROVIDER=gemini` (`gemini` or `openai`)
-- `PROMPT_VERSION` — Optional override (defaults to `prompts/config.json` `activeVersion: "latest"`)
+- `PROMPT_VERSION` — Optional override (defaults to `prompts/config.json` `activeVersion: "latest"` -> `v2`)
 - `GEMINI_API_KEY` — Required for the default Gemini provider
-- `GEMINI_MODEL=gemini-nano-banana-2.1` — Default high-quality raster image model (supports face likeness)
+- `GEMINI_MODEL=gemini-nano-banana-2.1` — Default high-quality raster image model (supports likeness across people, pets, toys, and landscapes)
 - `OPENAI_API_KEY` / `OPENAI_MODEL=gpt-image-1` — Optional OpenAI configuration
-- `ADMIN_EMAILS` — Optional comma-separated verified Google emails allowed to view Admin telemetry (empty = none; prefer setting Firebase custom claim `{ admin: true }` via `scripts/set-admin-claim.ts`)
-- `TURNSTILE_SECRET_KEY` / `VITE_TURNSTILE_SITE_KEY` — Optional free Cloudflare Turnstile anti-bot keys (recommended before public deploy)
-- `APP_CHECK_ENABLED` — Set to `true` if using Firebase App Check instead of Turnstile
+- `ADMIN_EMAILS` — Optional comma-separated verified Google emails allowed Admin diagnostics & invite management (empty = none; prefer also setting Firebase custom claim `{ admin: true }` via `scripts/set-admin-claim.ts`)
+- `BETA_INVITE_REQUIRED=false` — Set `true` to gate generation and PDF export behind personal Firestore invite codes (`beta_invites`) while keeping the landing page public
+- `BETA_SESSION_SECRET` — HMAC-SHA256 signing secret (>= 16 chars required in production when `BETA_INVITE_REQUIRED=true`) for `HttpOnly` invite session cookies (`cs_invite`)
+- `TURNSTILE_SECRET_KEY` / `VITE_TURNSTILE_SITE_KEY` — Optional free Cloudflare Turnstile anti-bot keys
+- `APP_CHECK_ENABLED` — Set `true` if using Firebase App Check instead of Turnstile
+- `BOT_PROTECTION_REQUIRED` — Set `true`/`false` to explicitly require or disable anti-bot verification
 
-## Architecture & MVP Roadmap
+## Architecture & Product Phases
 
-Solid boxes show what is **implemented and active** today; dashed grey boxes show what is **still pending for the full MVP**.
+Solid boxes show **Phase 1 (Implemented & Active in Private Beta)**; dashed grey boxes show **Phase 2 (Future Roadmap)**.
 
 ```mermaid
 flowchart LR
   subgraph Client["Frontend (web-app/)"]
-    UI["Landing Page + 6 Fixed Themes<br/>Single Photo Upload & PNG Download<br/>(Implemented)"]:::done
-    AdminUI["Optional Google Login + Admin Panel<br/>Cost Telemetry, Error Debug & Prompt Controls<br/>(Implemented)"]:::done
-    MultiUI["10–15 Photo Upload, Reordering,<br/>Cover Title & 3 Legal Checkboxes<br/>(Pending MVP)"]:::pending
+    Landing["Public Neo-Brutalist Landing<br/>theme.css + siteTemplate.ts + Legal Routes<br/>(Implemented)"]:::done
+    Creator["CreatorDialog & ExamplesDialog<br/>Invite Gate, Fedele vs Creativa (6 Themes, 4 Ages)<br/>A4 PDF (1/2/4-up) & PNG Download<br/>(Implemented)"]:::done
+    AdminUI["Google Admin Panels<br/>Invites Manager, Prompt/Provider Overrides<br/>& Cost Telemetry<br/>(Implemented)"]:::done
+    BookUI["Multi-Page Book UI (10–15 Photos)<br/>Cover Title & Order Flow<br/>(Phase 2 Roadmap)"]:::pending
   end
 
-  subgraph Firebase["Firebase (Auth & Database)"]
-    FirebaseAuth["Firebase Auth (Google Popup)<br/>Optional Admin Login<br/>(Implemented)"]:::done
-    Firestore["Cloud Firestore + Security Rules<br/>admins & generation_logs<br/>(Implemented)"]:::done
+  subgraph Firebase["Firebase (Auth & Firestore)"]
+    FirebaseAuth["Firebase Auth (Google Popup)<br/>Admin Sign-In<br/>(Implemented)"]:::done
+    Firestore["Cloud Firestore + Hardened Rules<br/>beta_invites (server-only) & generation_logs<br/>(Implemented)"]:::done
   end
 
   subgraph Server["Backend (backend/)"]
-    API["Express API (/api/coloring/generate)<br/>In-Memory Multer Upload<br/>(Implemented)"]:::done
-    AdminAuth["Firebase Admin Auth + Cost Calc<br/>(/api/admin/session & Token Usage)<br/>(Implemented)"]:::done
-    Prompts["Versioned Prompts (prompts/v1)<br/>config.json: latest / pinned<br/>(Implemented)"]:::done
-    JobQueue["Async Book Job Queue &<br/>Auto Photo Cleanup<br/>(Pending MVP)"]:::pending
-    PDF["A4 PDF Book Composer<br/>Cover + 10–15 Pages<br/>(Pending MVP)"]:::pending
+    BetaGate["beta-access Module<br/>HMAC Cookie + Atomic Quotas & Refunds<br/>(Implemented)"]:::done
+    API["Express API (/api/coloring/generate & export-pdf)<br/>In-Memory Multer + Sharp Mastering<br/>(Implemented)"]:::done
+    Prompts["Versioned Prompts (prompts/v2)<br/>Fedele Isolation + Creativa Themes & Ages<br/>(Implemented)"]:::done
+    JobQueue["Async Book Job Queue &<br/>Post-Beta Monetization / Email<br/>(Phase 2 Roadmap)"]:::pending
   end
 
-  subgraph External["External Services & AI Providers"]
-    GeminiFree["Google Gemini (gemini-4-hydrogen)<br/>Free Tier SVG Line-Art<br/>(Active)"]:::done
-    RasterAI["Raster Image Model<br/>(gemini-nano-banana-2.1 / gpt-image-1)<br/>(Adapter Ready · Needs Billing Key)"]:::pending
-    Stripe["Stripe Checkout + Webhook<br/>Order Payment<br/>(Pending MVP)"]:::pending
-    Email["Email Delivery (Resend / SMTP)<br/>Send PDF to Customer<br/>(Pending MVP)"]:::pending
+  subgraph External["AI Providers & Future Services"]
+    Gemini["Google Gemini (gemini-nano-banana-2.1)<br/>Raster / SVG Line-Art Generation<br/>(Active)"]:::done
+    OpenAI["OpenAI Image Adapter (gpt-image-1)<br/>(Pre-wired via Env)"]:::done
+    Monetization["Post-Beta Payments (Stripe TBD)<br/>& Email Delivery<br/>(Phase 2 Roadmap)"]:::pending
   end
 
-  UI -->|"POST 1 photo + theme"| API
+  Landing --> Creator
+  Creator -->|"POST photo + mode (+ theme/age)"| API
   AdminUI -->|"signInWithPopup"| FirebaseAuth
-  AdminUI -->|"Bearer ID Token + overrides"| API
+  AdminUI -->|"Bearer ID Token + Invite CRUD"| API
   AdminUI -->|"Save & query cost logs"| Firestore
-  MultiUI -.->|"POST 10–15 photos + metadata"| Stripe
+  BookUI -.->|"10–15 photos + book order"| Monetization
 
-  API --> AdminAuth
-  AdminAuth -->|"verifyIdToken"| FirebaseAuth
+  API --> BetaGate
+  BetaGate -->|"Atomic tx / revoke check"| Firestore
   API --> Prompts
-  API --> GeminiFree
-  API -.->|"Switch via env"| RasterAI
-
-  Stripe -.->|"Payment confirmed"| JobQueue
-  JobQueue -.-> RasterAI
-  JobQueue -.-> PDF
-  PDF -.-> Email
+  API --> Gemini
+  API -.->|"Switch via env / admin"| OpenAI
+  Monetization -.-> JobQueue
 
   classDef done fill:#ecfdf5,stroke:#15803d,stroke-width:2px,color:#14532d
   classDef pending fill:#f4f4f5,stroke:#a1a1aa,stroke-width:1.5px,stroke-dasharray:5 5,color:#71717a
 ```
 
 ### Status Summary
-- **Implemented:** Single-page landing UI, 6 fixed themes, single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize optimization (`<=1280px`), print-ready A4 PDF export (`1-up`, `2-up` landscape, `4-up` grid via `sharp` 300 DPI grayscale + `pdf-lib`) & PNG download, Express backend (`backend/`), versioned prompt library (`prompts/v1`), optional Firebase Google Login (`signInWithPopup`) + server-side `firebase-admin` verification, Admin cost/token telemetry & full error diagnostics, Firestore `generation_logs` persistence with deployed security rules, and active `gemini-nano-banana-2.1` / `gemini-4-hydrogen` adapters (`OpenAIColoringProvider` pre-wired via env).
-- **Pending for Final MVP:** Multi-photo upload (`10–15` photos with reorder), custom cover title, email input & 3 mandatory legal checkboxes, Stripe Checkout + webhook verification, full multi-page A4 PDF book composition, automated email delivery, and order confirmation screen.
+- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, `ExamplesDialog`, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), Google Admin panel (`AdminInvitesPanel`, cost telemetry, prompt/provider overrides, `generation_logs`), `prompts/v2`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
+- **Planned for Phase 2 (Future Roadmap):** Multi-page coloring book composition (`10–15` photos + cover), post-beta monetization model to be validated after beta feedback (credit packs / pay-per-page / subscription), async job queue & automated email delivery, and final commercial/legal copy alignment.
 
 ## Scripts
 - `npm run dev` — Starts Express + Vite dev server (`NODE_ENV=development`) on port `3000`.
 - `npm run build` — Builds `web-app/` into `dist/`.
 - `npm run start` — Runs the production server (`NODE_ENV=production`) on port `3000`.
 - `npm run lint` — Runs TypeScript checks (`tsc --noEmit`) and ESLint architectural & Firestore rules checks (`eslint .`).
-- `npm test` — Runs unit and theme/rules consistency tests (`node --test tests/*.test.ts`).
+- `npm test` — Runs all unit, beta-access, PDF, image validation, prompt combination, and consistency tests (`node --test tests/*.test.ts`).
 - `npm run prompts:sync` — Regenerates `manual-test.json` inside every `prompts/v*` folder.
 
-## Deploy su Cloud Run (Free Tier & Container)
+## Deploy on Cloud Run (Terraform Free Tier & Container)
 
-The repository includes a multi-stage `Dockerfile` (`node:24-slim`, production-only `npm ci --omit=dev`, non-root `USER node`, `PORT=8080`).
+The repository includes full Terraform IaC (`infra/`) and a multi-stage `Dockerfile` (`node:24-slim`, production-only `npm ci --omit=dev`, non-root `USER node`, `PORT=8080`):
 
-1. **Secrets in Secret Manager (never plain env vars)**:
-   Store `GEMINI_API_KEY` (and optionally `TURNSTILE_SECRET_KEY` / `OPENAI_API_KEY`) in **Google Cloud Secret Manager** and grant the Cloud Run runtime service account `roles/secretmanager.secretAccessor`.
-2. **Build & Deploy staying within Cloud Run Free Tier**:
+1. **Provision with Terraform (`infra/`)**:
+   Configures Cloud Run v2 (`min_instances = 0`, `max_instances = 2`, `concurrency = 10`, `512Mi`), Secret Manager (`GEMINI_API_KEY`, `BETA_SESSION_SECRET`, optional `TURNSTILE_SECRET_KEY`), Firestore Native DB, hardened `firestore.rules`, Firebase Web App, Identity Platform, and least-privilege Service Account. See [infra/README.md](infra/README.md).
+2. **Build & Roll Out Updates**:
    ```bash
-   gcloud run deploy colorastoria \
-     --source . \
-     --region europe-west1 \
-     --allow-unauthenticated \
-     --min-instances 0 \
-     --max-instances 2 \
-     --concurrency 10 \
-     --cpu 1 \
-     --memory 512Mi \
-     --set-env-vars "NODE_ENV=production,AI_PROVIDER=gemini,GEMINI_MODEL=gemini-nano-banana-2.1" \
-     --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,TURNSTILE_SECRET_KEY=TURNSTILE_SECRET_KEY:latest"
+   IMAGE="europe-west1-docker.pkg.dev/<PROJECT_ID>/colorastoria-repo/colorastoria:latest"
+   gcloud builds submit --project="<PROJECT_ID>" --region=europe-west1 --tag="$IMAGE" .
+   gcloud run services update colorastoria --project="<PROJECT_ID>" --region=europe-west1 --image="$IMAGE"
    ```
-   - `--min-instances 0` keeps idle costs at `$0` (Cloud Run Free Tier includes 2M requests, 360k GB-seconds, and 180k vCPU-seconds/month).
-   - `--max-instances 2 --concurrency 10` caps memory usage (`multer.memoryStorage()` buffers) and prevents surprise scaling bills.
-   - If using Cloudflare Turnstile, bake `VITE_TURNSTILE_SITE_KEY` at build time (via `--build-env-vars` or Docker `--build-arg VITE_TURNSTILE_SITE_KEY=...`).
-2. **GCP Billing Budget Alerts**:
-   In **GCP Billing > Budgets & alerts**, create a monthly budget (e.g. `€10`) with email notifications at `50%`, `90%`, and `100%` of spend.
-3. **Restrict API Keys in Google Cloud Console (`APIs & Services > Credentials`)**:
-   - **Firebase Web API Key** (present in public `firebase-applet-config.json`): restrict **Application restrictions** to **HTTP referrers** matching your production/preview domains (`https://your-domain/*`) and restrict **API restrictions** strictly to **Identity Toolkit API**, **Token Service API**, and **Cloud Firestore API**.
-   - **Gemini API Key (`GEMINI_API_KEY`)**: restrict **API restrictions** strictly to **Generative Language API** (do not reuse keys across unrelated GCP services).
-4. **Anti-Bot Protection on `POST /api/coloring/generate`**:
-   Server IP rate-limiting (`express-rate-limit` with `app.set('trust proxy', 1)`) is active by default. Before opening the app publicly with billing enabled, enable **Cloudflare Turnstile** (`TURNSTILE_SECRET_KEY` + `VITE_TURNSTILE_SITE_KEY` at build time) or **Firebase App Check** (`APP_CHECK_ENABLED=true`).
-5. **Granting Admin Access (`custom claim`)**:
-   Run the one-time Firebase Admin SDK script instead of hardcoding admin emails:
+3. **Seed Invites & Admin Claim**:
    ```bash
+   npx tsx scripts/manage-invites.ts create --label "Marco" --code MARCO-BETA --max 50
    npx tsx scripts/set-admin-claim.ts admin@yourdomain.com
    ```
-   Then sign out and sign in again to refresh the ID token (`firestore.rules` checks `request.auth.token.admin == true && request.auth.token.email_verified == true`).
+4. **GCP Console Safety Defaults**:
+   Keep billing budget alerts configured, restrict `GEMINI_API_KEY` solely to *Generative Language API*, and restrict the public Firebase Web API key to your Cloud Run / custom domains.

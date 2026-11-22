@@ -2,7 +2,7 @@
 
 Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa serve** e **dov’è usato** ogni scelta architetturale, controllo di sicurezza, libreria e strumento presente in questo progetto.
 
-> **Nota per chi sviluppa (e per gli AI Agent):** questo file va tenuto sempre aggiornato (vedi `AGENTS.md`) ogni volta che si aggiunge una libreria, un modulo o una nuova misura di sicurezza.
+> **Nota per chi sviluppa (e per gli AI Agent):** questo file spiega *come* è costruito il progetto (architettura e librerie); i requisiti funzionali, non-funzionali e la roadmap sono invece versionati in [`docs/REQUIREMENTS.md`](REQUIREMENTS.md). Entrambi vanno tenuti aggiornati (vedi `AGENTS.md`).
 
 ---
 
@@ -212,4 +212,4 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Infrastructure as Code (`infra/`, Terraform)
 - **Cos’è:** Lo standard universale per definire e ricreare risorse cloud tramite codice dichiarativo e versionabile, senza dipendere da configurazioni manuali nella console web.
-- **Come e dov’è usato:** Cartella `infra/`. Automatizza in un unico comando (`terraform apply`) il provisioning completo di Cloud Run v2 (con limiti Free Tier: scale-to-zero e max 2 istanze, protetto di default tramite **IAM privato** `allow_unauthenticated = false` con ruolo `roles/run.invoker` riservato ai soli account Google autorizzati e supporto opzionale a Cloud Run IAP tramite `enable_iap = true`), Artifact Registry, Secret Manager (`GEMINI_API_KEY`, `TURNSTILE_SECRET_KEY`), database Cloud Firestore nativo, deploy automatico di `firestore.rules`, registrazione Web App Firebase, Identity Platform (Google Sign-In) e Service Account dedicato con privilegi minimi. Documentato in `infra/README.md`.
+- **Come e dov’è usato:** Cartella `infra/`. Automatizza in un unico comando (`terraform apply`) il provisioning completo di Cloud Run v2 (con limiti Free Tier: scale-to-zero e max 2 istanze, in Beta Privata con `allow_unauthenticated = true` + `beta_invite_required = true` affinché il blocco per utente venga gestito dall’app via cookie/Firestore, oppure chiuso anche a livello IAM con `allow_unauthenticated = false`), Artifact Registry, Secret Manager (`GEMINI_API_KEY`, `BETA_SESSION_SECRET` e `TURNSTILE_SECRET_KEY` opzionale), database Cloud Firestore nativo, deploy automatico di `firestore.rules`, registrazione Web App Firebase, Identity Platform (Google Sign-In) e Service Account dedicato con privilegi minimi. Documentato in `infra/README.md`.

@@ -38,26 +38,31 @@ modules/<module-name>/
 ### Backend (`backend/src/modules/`)
 | Module | Interface (`*.interface.ts`) | Implementation(s) (`implementations/`) | Responsibility |
 | :--- | :--- | :--- | :--- |
-| `config` *(simple)* | `envConfig.ts` (`ServerConfig`, `parseServerConfig`) | *(direct Zod module)* | Validates & normalizes server env vars at startup (fails fast) |
+| `config` *(simple)* | `envConfig.ts` (`ServerConfig`, `parseServerConfig`) | *(direct Zod module)* | Validates & normalizes server env vars at startup (fails fast, ignores Turnstile `"none"` placeholder) |
 | `auth` | `auth.interface.ts` (`AuthTokenVerifier`, `AdminAuthContext`) | `firebaseAdminTokenVerifier.ts` | Verifies optional Bearer ID tokens (`admin` custom claim or `ADMIN_EMAILS`) |
+| `beta-access` | `betaAccess.interface.ts` (`BetaAccessService`, `BetaInviteStore`) | `defaultBetaAccessService.ts`, `firestoreBetaInviteStore.ts`, `inMemoryBetaInviteStore.ts` | Invite-only beta access via signed `cs_invite` cookie, atomic Firestore quotas/refunds, expiration & admin CRUD |
 | `bot-protection` | `botProtection.interface.ts` (`BotProtectionVerifier`) | `defaultBotProtectionVerifier.ts` | Anti-bot verification (Cloudflare Turnstile / Firebase App Check) |
 | `media-validation` | `mediaValidation.interface.ts` (`ServerMediaValidator`) | `bufferImageValidator.ts` | Server-side JPG/PNG/WebP/AVIF magic-bytes verification & EXIF-strip/resize (`<=1280px`) |
 | `print-pdf` | `printPdf.interface.ts` (`PrintPdfGenerator`) | `sharpPdfLibGenerator.ts` | Sharp B&W print mastering (300 DPI grayscale) & A4 PDF layout (`1-up`, `2-up`, `4-up`) |
 | `ai-providers` | `aiProvider.interface.ts` (`ColoringProvider`, `AiProviderRegistry`, errors) | `geminiColoringProvider.ts`, `openaiColoringProvider.ts`, `defaultAiProviderRegistry.ts` | Multi-provider AI generation & provider registry |
-| `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts from `prompts/` & `prompts/config.json` |
+| `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts (`v2` multi-mode/age + `v1` fallback) from `prompts/` & `prompts/config.json` |
 | `cost-estimation` *(simple)* | `rateCardCostEstimator.ts` (`calculateGenerationCost`) | *(direct typed module)* | Computes token & image generation costs per model (warns on unknown model) |
 
 Delivery layer (`backend/src/routes/coloringRoutes.ts`):
-- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts, botProtection, mediaValidator, printPdf }` interfaces.
+- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts, botProtection, mediaValidator, printPdf, betaAccess }` interfaces.
 - `backend/server.ts` configures `helmet` CSP (`crossOriginOpenerPolicy: same-origin-allow-popups`), `trust proxy`, global JSON error handler, listen error handling & `SIGTERM`/`SIGINT` graceful shutdown, `/api`, serves Vite middleware only when `NODE_ENV === 'development'`, and uses `app.use(...)` (Express 5-safe) for production SPA fallback.
 
 ### Frontend (`web-app/src/modules/`)
 | Module | Interface (`*.interface.ts`) | Implementation(s) (`implementations/`) | Responsibility |
 | :--- | :--- | :--- | :--- |
 | `auth` | `auth.interface.ts` (`AuthProviderGateway`, `AuthContextValue`) | `firebaseAuthGateway.ts` + `AuthContext.tsx` | Google popup login, session sync, DI `AuthProvider` & `useAuth()` |
+| `beta-access` | `betaAccess.interface.ts` (`BetaAccessClient`, `AccessSessionResponse`) | `fetchBetaAccessClient.ts` | Typed `/api/access/*` and `/api/admin/invites*` client with cookie session credentials |
 | `database` | `database.interface.ts` (`GenerationLogRepository`, `GenerationLogRecord`) | `firebaseAppInstance.ts`, `firestoreGenerationLogRepository.ts` | Firestore persistence, schema validation, `handleFirestoreError` |
-| `coloring-api` | `coloringApi.interface.ts` (`ColoringApiClient`, `GenerateColoringResult`) | `fetchColoringApiClient.ts` | Typed `/api/*` client + proxy cookie-check detection |
+| `coloring-api` | `coloringApi.interface.ts` (`ColoringApiClient`, `GenerateColoringResult`) | `fetchColoringApiClient.ts` | Typed `/api/*` client + proxy cookie-check detection (`fedele`/`creativa` payload isolation) |
 | `media-validation` | `mediaValidation.interface.ts` (`MediaValidator`, `PhotoValidationResult`) | `browserPhotoValidator.ts` | Client-side MIME, file size, and dimension validation |
+
+UI template & configuration layer (`web-app/src/`):
+- `styles/theme.css` (`--cs-*` CSS tokens), `config/siteTemplate.ts` (editable landing/creator copy & example slots), `config/sampleScenes.ts` (2× procedural canvas examples), `config/generationPayload.ts` (pure UI-to-API request mapping), `components/ui/` (neo-brutalist primitives), `components/sections/` (composable landing blocks), and `components/` (`CreatorDialog`, `ExamplesDialog`, `AdminInvitesPanel`, `AdminTelemetryPanel`, `LegalPage`).
 
 ---
 
@@ -83,27 +88,28 @@ Delivery layer (`backend/src/routes/coloringRoutes.ts`):
 - **Firestore Config & Database ID**: Always initialize Firestore with `getFirestore(app, firebaseConfig.firestoreDatabaseId)` from `firebase-applet-config.json` (never assume `(default)`).
 - **Connection Test**: Keep `getDocFromServer(doc(db, 'test', 'connection'))` verification inside `firebaseAppInstance.ts`.
 - **Error Handling**: Keep structured JSON errors via `handleFirestoreError(err, OperationType, path)` and attach error callbacks to `onSnapshot`.
-- **Rules & Blueprint**: Any schema or access change MUST stay synchronized across `firebase-blueprint.json`, `firestore.rules`, and `firestoreGenerationLogRepository.ts`. Validate rules with `npx eslint firestore.rules`.
+- **Rules & Blueprint**: Any schema or access change MUST stay synchronized across `firebase-blueprint.json`, `firestore.rules`, `firestoreGenerationLogRepository.ts`, and `firestoreBetaInviteStore.ts`. `beta_invites` MUST remain server-only (`allow read, write: if false` in `firestore.rules`), and `generation_logs.themeId` accepts both `'fedele'` and the 6 creative `ThemeId` values. Validate rules with `npx eslint firestore.rules`.
 - **In-Memory Uploads**: Uploaded user photos MUST stay strictly in memory (`multer.memoryStorage()`), never persisted to local disk.
-- **Admin Diagnostics**: Detailed provider errors, token telemetry, and overrides MUST remain gated behind `authTokenVerifier.verifyOptionalRequest(req)` (`isAdmin === true`).
+- **Admin Diagnostics**: Detailed provider errors, token telemetry, invite CRUD, and overrides MUST remain gated behind `authTokenVerifier.verifyOptionalRequest(req)` (`isAdmin === true`).
 
 ---
 
-## 5. Prompts, Pricing & Language Conventions
+## 5. Prompts, Pricing, Requirements & Language Conventions
 
-- **Prompts (`prompts/`)**: Prompts are versioned under `prompts/v*` and selected via `prompts/config.json` (`activeVersion: "latest"` or pinned) or `PROMPT_VERSION`. After editing prompt files, run `npm run prompts:sync`.
+- **Prompts (`prompts/`)**: Prompts are versioned under `prompts/v*` (`v2` adds `modes.json` & `ages.json` alongside `base.txt` and `themes.json`) and selected via `prompts/config.json` (`activeVersion: "latest"` or pinned) or `PROMPT_VERSION`. After editing prompt files, run `npm run prompts:sync`.
 - **Pricing (`pricing/`)**: Document model pricing and cost assumptions in `pricing/` and keep rates synchronized with `rateCardCostEstimator.ts`.
+- **Requirements Wiki (`docs/REQUIREMENTS.md`)**: **MUST stay up to date and versioned (`MAJOR.MINOR.PATCH`).** Whenever product direction, functional scope, user flows, limits, invite/monetization rules, non-functional security/privacy targets, or roadmap items change, update `docs/REQUIREMENTS.md`, bump its semantic version, and record the change in its Changelog (written in Italian).
 - **Technical Wiki (`docs/WIKI.md`)**: **MUST stay up to date.** Whenever you add or remove a library, tool, security layer, module, or architectural pattern, add or update its brief plain-language entry ("Cos'è" + "Come e dov'è usato") in `docs/WIKI.md` (written in accessible Italian for the project owner).
 - **Language**:
-  - Source code, TypeScript symbols, comments, `AGENTS.md`, and `README.md` files: **English**.
-  - `docs/WIKI.md` and end-user UI strings in `web-app/`: **Italian** (unless localized for a new template target).
+  - Source code, TypeScript symbols, comments, `AGENTS.md`, and module/root `README.md` files (except Italian-facing `infra/README.md`): **English**.
+  - `docs/WIKI.md`, `docs/REQUIREMENTS.md`, and end-user UI strings in `web-app/`: **Italian** (unless localized for a new template target).
 
 ---
 
 ## 6. Verification Checklist Before Finishing Any Change
 
 1. Run `npm run lint` (`tsc --noEmit && eslint .`) — validates TypeScript types, module boundaries (`no-restricted-imports` in `eslint.config.mjs`), and `firestore.rules` security checks in one pass.
-2. Run `npm test` — verifies upload magic-bytes validation, Zod config/auth/provider selection, and theme/provider consistency across `shared/config/`, `prompts/`, and `firestore.rules`.
+2. Run `npm test` — verifies upload magic-bytes validation, Zod config/auth/provider selection, beta-access invites/quotas, prompt mode/theme/age combinations, and consistency across `shared/config/`, `prompts/`, and `firestore.rules`.
 3. Run production bundle check: `npm run build`.
-4. Confirm `docs/WIKI.md` is updated if any dependencies, modules, security controls, or architectural choices changed.
+4. Confirm `docs/REQUIREMENTS.md` (with bumped version & changelog entry) and `docs/WIKI.md` are updated if any product requirements, dependencies, modules, security controls, or architectural choices changed.
 5. Ensure the server boots cleanly on port `3000` and `GET /api/health` returns `{ "ok": true }`.
