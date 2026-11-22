@@ -62,5 +62,8 @@ export interface ColoringApiClient {
   generateColoringPage(
     params: GenerateColoringPageRequest
   ): Promise<ColoringGenerationResponse>;
-  exportPrintPdf(params: ExportPrintPdfRequest): Promise<Blob>;
+  exportPrintPdf(
+    params: ExportPrintPdfRequest,
+    idToken?: string | null
+  ): Promise<Blob>;
 }

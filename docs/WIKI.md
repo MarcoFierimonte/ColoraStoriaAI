@@ -60,7 +60,11 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Rate Limiting (`express-rate-limit`)
 - **Cos’è:** Un "contagiri" che limita quante richieste può fare lo stesso indirizzo IP in un certo intervallo di tempo.
-- **Come e dov’è usato:** In `backend/src/routes/coloringRoutes.ts` su `POST /api/coloring/generate`: massimo **15 generazioni ogni 15 minuti** per IP. Oltre quella soglia risponde `HTTP 429` evitando che qualcuno prosciughi quota o budget con script automatici.
+- **Come e dov’è usato:** In `backend/src/routes/coloringRoutes.ts` su `POST /api/coloring/generate`: massimo **15 generazioni ogni 15 minuti** per IP, **30** per `export-pdf` e **20** per `/api/access/redeem`. Oltre quella soglia risponde `HTTP 429` evitando che qualcuno prosciughi quota o budget con script automatici.
+
+### Accesso su Invito & Quote per Tester (`beta-access`)
+- **Cos’è:** Sistema ad inviti personali salvati su Firestore (`beta_invites`) con limite numerico di generazioni per utente, eventuale data di scadenza e revoca istantanea. La sessione dell’ospite usa un cookie `HttpOnly` firmato con HMAC-SHA256 (`BETA_SESSION_SECRET`), ma ogni richiesta di generazione o stampa PDF ricontrolla in tempo reale lo stato su Firestore tramite transazione atomica (e rimborsa automaticamente il credito se la chiamata AI fallisce).
+- **Come e dov’è usato:** Modulo `backend/src/modules/beta-access/` (`DefaultBetaAccessService` + `FirestoreBetaInviteStore`), client `web-app/src/modules/beta-access/`, blocco di sblocco in `CreatorDialog.tsx`, pannello di gestione `AdminInvitesPanel.tsx` visibile agli Admin e script CLI `scripts/manage-invites.ts`. L’amministratore autenticato con Google (`Area riservata`) salta automaticamente il blocco inviti.
 
 ### Protezione Anti-Bot (`Cloudflare Turnstile` / `Firebase App Check`)
 - **Cos’è:** Un controllo che verifica che a premere "Genera" sia un browser/utente reale e non uno script automatico (bot):

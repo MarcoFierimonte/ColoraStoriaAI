@@ -189,5 +189,17 @@ export const SITE_TEMPLATE = {
     closeConfirmBody: 'Perdi la foto e le scelte fatte.',
     closeConfirmStay: 'Resta',
     closeConfirmLeave: 'Chiudi',
+    inviteGateTitle: 'Accesso riservato agli invitati',
+    inviteGateHint:
+      'ColoraStoria è aperto in anteprima privata. Inserisci il tuo codice invito per caricare una foto e generare pagine.',
+    inviteExhaustedPrefix:
+      'Hai esaurito le generazioni disponibili per l’invito',
+    inviteExhaustedHint:
+      'Se hai ricevuto un nuovo codice invito puoi inserirlo qui sotto.',
+    inviteInputLabel: 'Codice invito',
+    inviteInputPlaceholder: 'es. MARCO-BETA',
+    inviteUnlockCta: 'Sblocca accesso',
+    inviteUnlockingCta: 'Verifica in corso…',
+    inviteLogoutCta: 'Cambia invito',
   },
 } as const;

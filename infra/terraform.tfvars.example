@@ -40,6 +40,12 @@ custom_domain = ""
 google_oauth_client_id     = ""
 google_oauth_client_secret = ""
 
-# Se false (consigliato in fase privata), l'URL Cloud Run è accessibile solo a te via IAP.
-# Imposta true solo quando vuoi aprire la web app al pubblico.
-allow_unauthenticated = false
+# Se false, l'URL Cloud Run è bloccata a livello IAM Google Cloud.
+# Con beta_invite_required = true è consigliato allow_unauthenticated = true
+# così la landing è visibile e solo gli utenti con invito possono generare.
+allow_unauthenticated = true
+beta_invite_required  = true
+
+# Segreto casuale (>= 16 caratteri) per firmare i cookie invito in Secret Manager:
+#   openssl rand -hex 32
+beta_session_secret = ""

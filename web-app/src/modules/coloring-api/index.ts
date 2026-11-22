@@ -41,7 +41,8 @@ export function generateColoringPageApi(
 }
 
 export function exportPrintPdfApi(
-  params: ExportPrintPdfRequest
+  params: ExportPrintPdfRequest,
+  idToken?: string | null
 ): Promise<Blob> {
-  return coloringApiClient.exportPrintPdf(params);
+  return coloringApiClient.exportPrintPdf(params, idToken);
 }

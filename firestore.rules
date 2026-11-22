@@ -90,5 +90,10 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isValidId(logId) && isAdmin();
     }
+
+    // Beta invite codes & quotas are strictly managed server-side via firebase-admin
+    match /beta_invites/{inviteCode} {
+      allow read, write: if false;
+    }
   }
 }

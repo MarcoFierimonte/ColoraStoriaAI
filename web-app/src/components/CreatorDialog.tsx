@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Check, Copy, SlidersHorizontal } from 'lucide-react';
 import { ORDER_CONFIG } from '../config/orderConfig';
 import { renderSampleSceneToFile, SAMPLE_SCENES } from '../config/sampleScenes';
 import { SITE_TEMPLATE } from '../config/siteTemplate';
 import { BOOK_THEMES, type ThemeId } from '../data/themes';
 import { useAuth } from '../modules/auth';
+import {
+  logoutInviteApi,
+  redeemInviteApi,
+  type AccessSessionResponse,
+  type BetaInviteQuota,
+} from '../modules/beta-access';
 import {
   ColoringApiError,
   exportPrintPdfApi,
@@ -25,6 +31,7 @@ import {
 import { TURNSTILE_SITE_KEY, TurnstileWidget } from './TurnstileWidget';
 import {
   ModalDialog,
+  UiBadge,
   UiButton,
   UiCard,
   UiChip,
@@ -35,6 +42,9 @@ import {
 export interface CreatorDialogProps {
   open: boolean;
   onClose: () => void;
+  accessSession?: AccessSessionResponse | null;
+  onAccessSessionChange?: (session: AccessSessionResponse) => void;
+  onInviteQuotaUpdate?: (quota: BetaInviteQuota) => void;
   onTelemetryGenerated?: (telemetry: AdminTelemetry | null) => void;
 }
 
@@ -74,6 +84,9 @@ async function downloadColoringResultAsPng(result: ColoringGenerationResponse) {
 export function CreatorDialog({
   open,
   onClose,
+  accessSession = null,
+  onAccessSessionChange,
+  onInviteQuotaUpdate,
   onTelemetryGenerated,
 }: CreatorDialogProps) {
   const { creator } = SITE_TEMPLATE;
@@ -115,6 +128,9 @@ export function CreatorDialog({
   const [turnstileResetCounter, setTurnstileResetCounter] = useState(0);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [inviteCodeInput, setInviteCodeInput] = useState('');
+  const [isRedeemingInvite, setIsRedeemingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const photoRef = useRef<ValidatedPhoto | null>(null);
   photoRef.current = photo;
@@ -298,6 +314,9 @@ export function CreatorDialog({
 
       setResult(generated);
       onTelemetryGenerated?.(generated.adminTelemetry ?? null);
+      if (generated.inviteQuota) {
+        onInviteQuotaUpdate?.(generated.inviteQuota);
+      }
 
       if (isAdmin && hasAdminClaim && user && generated.adminTelemetry) {
         void saveGenerationLog({
@@ -344,10 +363,14 @@ export function CreatorDialog({
     setPdfError(null);
 
     try {
-      const pdfBlob = await exportPrintPdfApi({
-        imageDataUrl: result.imageDataUrl,
-        layout: pdfLayout,
-      });
+      const freshToken = isAdmin && user ? await refreshIdToken() : idToken;
+      const pdfBlob = await exportPrintPdfApi(
+        {
+          imageDataUrl: result.imageDataUrl,
+          layout: pdfLayout,
+        },
+        freshToken
+      );
       const blobUrl = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -411,7 +434,54 @@ export function CreatorDialog({
     }
   };
 
+  const handleRedeemInvite = async (event: FormEvent) => {
+    event.preventDefault();
+    if (isRedeemingInvite) return;
+    const trimmed = inviteCodeInput.trim();
+    if (!trimmed) {
+      setInviteError('Inserisci il codice invito.');
+      return;
+    }
+
+    setIsRedeemingInvite(true);
+    setInviteError(null);
+    try {
+      const session = await redeemInviteApi(trimmed);
+      setInviteCodeInput('');
+      onAccessSessionChange?.(session);
+      if (session.invite) {
+        showToast(
+          `Invito attivo! Hai ${session.invite.remainingGenerations} generazioni disponibili.`
+        );
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Impossibile verificare il codice invito.';
+      setInviteError(message);
+    } finally {
+      setIsRedeemingInvite(false);
+    }
+  };
+
+  const handleLogoutInvite = async () => {
+    await logoutInviteApi().catch(() => {});
+    resetCreator();
+    onAccessSessionChange?.({
+      inviteRequired: accessSession?.inviteRequired ?? true,
+      hasAccess: false,
+      accessSource: 'none',
+      invite: null,
+    });
+  };
+
   const selectedTheme = BOOK_THEMES.find((item) => item.id === themeId);
+  const isInviteGated = Boolean(
+    accessSession?.inviteRequired && !isAdmin && !accessSession.hasAccess && !result
+  );
+  const activeInvite =
+    accessSession?.accessSource === 'invite' ? accessSession.invite : null;
   const sheetClassName = [
     'cs-sheet',
     result ? 'cs-sheet-big' : '',
@@ -423,10 +493,18 @@ export function CreatorDialog({
   return (
     <ModalDialog
       open={open}
-      title={result ? creator.titleReady : creator.titleCreate}
+      title={
+        isInviteGated
+          ? creator.inviteGateTitle
+          : result
+            ? creator.titleReady
+            : creator.titleCreate
+      }
       closeLabel={creator.closeLabel}
       titleAs="h1"
-      scrollTopKey={askConfirmClose ? 'ask' : result ? 'ready' : 'form'}
+      scrollTopKey={
+        askConfirmClose ? 'ask' : isInviteGated ? 'gate' : result ? 'ready' : 'form'
+      }
       onRequestClose={handleRequestClose}
     >
       {askConfirmClose ? (
@@ -448,34 +526,117 @@ export function CreatorDialog({
         </UiCard>
       ) : null}
 
-      <div
-        className={sheetClassName}
-        role="img"
-        aria-label={creator.sheetAriaLabel}
-      >
-        {result ? (
-          <img
-            src={result.imageDataUrl}
-            alt={`Pagina da colorare (${selectedTheme?.name ?? themeId})`}
-            referrerPolicy="no-referrer"
-            className="cs-sheet-media block h-full w-full bg-white object-contain"
-          />
-        ) : photo ? (
-          <img
-            src={photo.previewUrl}
-            alt={`Anteprima della foto ${photo.name}`}
-            className="cs-sheet-media block h-full w-full bg-white object-cover"
-          />
-        ) : (
-          <div className="cs-sheet-empty">{creator.emptyCanvasLabel}</div>
-        )}
-      </div>
+      {!isInviteGated ? (
+        <>
+          {activeInvite ? (
+            <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border-2 border-[var(--cs-border)] bg-[var(--cs-surface)] px-3 py-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold">Invito: {activeInvite.label}</span>
+                <UiBadge tone="mint" className="font-mono-num">
+                  {activeInvite.remainingGenerations}/{activeInvite.maxGenerations}{' '}
+                  rimaste
+                </UiBadge>
+                {activeInvite.expiresAtMs ? (
+                  <span className="text-[var(--cs-ink-muted)] font-mono-num">
+                    Scade il{' '}
+                    {new Intl.DateTimeFormat('it-IT', {
+                      day: '2-digit',
+                      month: '2-digit',
+                    }).format(new Date(activeInvite.expiresAtMs))}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleLogoutInvite()}
+                className="font-bold text-[var(--cs-ink-muted)] underline underline-offset-2 hover:text-[var(--cs-ink)] cursor-pointer"
+              >
+                {creator.inviteLogoutCta}
+              </button>
+            </div>
+          ) : null}
+
+          <div
+            className={sheetClassName}
+            role="img"
+            aria-label={creator.sheetAriaLabel}
+          >
+            {result ? (
+              <img
+                src={result.imageDataUrl}
+                alt={`Pagina da colorare (${selectedTheme?.name ?? themeId})`}
+                referrerPolicy="no-referrer"
+                className="cs-sheet-media block h-full w-full bg-white object-contain"
+              />
+            ) : photo ? (
+              <img
+                src={photo.previewUrl}
+                alt={`Anteprima della foto ${photo.name}`}
+                className="cs-sheet-media block h-full w-full bg-white object-cover"
+              />
+            ) : (
+              <div className="cs-sheet-empty">{creator.emptyCanvasLabel}</div>
+            )}
+          </div>
+        </>
+      ) : null}
 
       <div
         className="px-4 pb-[calc(20px+env(safe-area-inset-bottom,0px))]"
         aria-live="polite"
       >
-        {result ? (
+        {isInviteGated ? (
+          <UiCard className="space-y-3">
+            {accessSession?.invite && accessSession.invite.remainingGenerations === 0 ? (
+              <UiCard tone="yellow" className="!p-3 text-sm font-bold">
+                {creator.inviteExhaustedPrefix} «{accessSession.invite.label}» (
+                {accessSession.invite.usedGenerations}/
+                {accessSession.invite.maxGenerations}). {creator.inviteExhaustedHint}
+              </UiCard>
+            ) : (
+              <p className="text-sm leading-relaxed">{creator.inviteGateHint}</p>
+            )}
+
+            <form
+              onSubmit={(event) => void handleRedeemInvite(event)}
+              className="space-y-2.5"
+            >
+              <label className="block space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wide">
+                  {creator.inviteInputLabel}
+                </span>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  placeholder={creator.inviteInputPlaceholder}
+                  value={inviteCodeInput}
+                  disabled={isRedeemingInvite}
+                  onChange={(event) =>
+                    setInviteCodeInput(event.target.value.toUpperCase())
+                  }
+                  className="w-full rounded-[10px] border-[3px] border-[var(--cs-border)] bg-white px-3 py-2.5 text-base font-mono-num font-bold uppercase"
+                />
+              </label>
+
+              {inviteError ? (
+                <UiCard
+                  tone="danger"
+                  className="!p-3 text-sm font-bold"
+                  role="alert"
+                >
+                  {inviteError}
+                </UiCard>
+              ) : null}
+
+              <UiButton type="submit" disabled={isRedeemingInvite}>
+                {isRedeemingInvite
+                  ? creator.inviteUnlockingCta
+                  : creator.inviteUnlockCta}
+              </UiButton>
+            </form>
+          </UiCard>
+        ) : result ? (
           <div className="space-y-3">
             {result.sceneSummary ? (
               <p className="text-center text-sm font-medium text-[var(--cs-ink-muted)]">

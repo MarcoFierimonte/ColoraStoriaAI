@@ -36,6 +36,23 @@ test('parseServerConfig validates defaults, --port CLI override, and fails fast 
     () => parseServerConfig({ ADMIN_EMAILS: 'not-an-email' }),
     /ADMIN_EMAILS contains invalid email/
   );
+
+  assert.throws(
+    () =>
+      parseServerConfig({
+        NODE_ENV: 'production',
+        BETA_INVITE_REQUIRED: 'true',
+      }),
+    /BETA_INVITE_REQUIRED=true in production requires BETA_SESSION_SECRET/
+  );
+
+  const betaProd = parseServerConfig({
+    NODE_ENV: 'production',
+    BETA_INVITE_REQUIRED: 'true',
+    BETA_SESSION_SECRET: 'secret-at-least-16-chars-long',
+  });
+  assert.equal(betaProd.betaInviteRequired, true);
+  assert.equal(betaProd.betaSessionSecret, 'secret-at-least-16-chars-long');
 });
 
 test('FirebaseAdminTokenVerifier enforces email_verified and custom claim / allowlist', async () => {

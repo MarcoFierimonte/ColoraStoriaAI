@@ -10,9 +10,14 @@ import {
 import {
   isAllowedThemeId,
   isPrintPdfLayout,
+  type AccessSessionResponse,
+  type AdminInviteMutationResponse,
+  type AdminInvitesListResponse,
   type AdminSessionResponse,
   type ColoringGenerationResponse,
+  type CreateInviteRequest,
   type HealthResponse,
+  type UpdateInviteRequest,
 } from '../../../shared/types/index.ts';
 import {
   ProviderConfigurationError,
@@ -25,6 +30,12 @@ import {
   type AdminAuthContext,
   type AuthTokenVerifier,
 } from '../modules/auth/index.ts';
+import {
+  BetaAccessError,
+  betaAccessService,
+  type BetaAccessService,
+  type InviteReservation,
+} from '../modules/beta-access/index.ts';
 import {
   BotProtectionError,
   botProtectionVerifier,
@@ -92,6 +103,19 @@ const exportPdfRateLimiter = rateLimit({
   },
 });
 
+const redeemInviteRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      error:
+        'Troppi tentativi di verifica codice. Attendi qualche minuto e riprova.',
+    });
+  },
+});
+
 export interface ColoringRouterDeps {
   providers: AiProviderRegistry;
   auth: AuthTokenVerifier;
@@ -99,6 +123,7 @@ export interface ColoringRouterDeps {
   botProtection: BotProtectionVerifier;
   mediaValidator: ServerMediaValidator;
   printPdf?: PrintPdfGenerator;
+  betaAccess?: BetaAccessService;
 }
 
 interface RequestWithAdmin extends Request {
@@ -113,15 +138,162 @@ export function createColoringRouter(
     botProtection: botProtectionVerifier,
     mediaValidator: serverMediaValidator,
     printPdf: printPdfGenerator,
+    betaAccess: betaAccessService,
   }
 ): Router {
   const router = Router();
+  const betaAccess = deps.betaAccess ?? betaAccessService;
 
   router.get('/health', (_req: Request, res: Response) => {
     const payload: HealthResponse = {
       ok: true,
     };
     res.json(payload);
+  });
+
+  router.get('/access/session', async (req: Request, res: Response) => {
+    try {
+      const adminCtx = await deps.auth.verifyOptionalRequest(req);
+      const session: AccessSessionResponse = await betaAccess.getSession(
+        req,
+        adminCtx.isAdmin
+      );
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(session);
+    } catch (error) {
+      console.error('Failed to read access session:', error);
+      res.status(500).json({
+        error: 'Impossibile verificare lo stato dell’accesso in questo momento.',
+      });
+    }
+  });
+
+  router.post(
+    '/access/redeem',
+    redeemInviteRateLimiter,
+    async (req: Request, res: Response) => {
+      try {
+        const rawCode =
+          typeof req.body?.code === 'string' ? req.body.code : '';
+        const { session, setCookieHeader } =
+          await betaAccess.redeemCode(rawCode);
+        if (setCookieHeader) {
+          res.setHeader('Set-Cookie', setCookieHeader);
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(session);
+      } catch (error) {
+        if (error instanceof BetaAccessError) {
+          res.status(error.statusCode).json({ error: error.message });
+          return;
+        }
+        console.error('Unexpected invite redeem error:', error);
+        res.status(500).json({
+          error: 'Errore durante la verifica dell’invito. Riprova.',
+        });
+      }
+    }
+  );
+
+  router.post('/access/logout', (_req: Request, res: Response) => {
+    res.setHeader('Set-Cookie', betaAccess.buildClearCookieHeader());
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true });
+  });
+
+  router.get('/admin/invites', async (req: Request, res: Response) => {
+    try {
+      const adminCtx = await deps.auth.verifyOptionalRequest(req);
+      if (!adminCtx.isAdmin) {
+        res.status(403).json({ error: 'Accesso riservato agli amministratori.' });
+        return;
+      }
+      const invites = await betaAccess.listInvites();
+      const payload: AdminInvitesListResponse = { invites };
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(payload);
+    } catch (error) {
+      console.error('Failed to list admin invites:', error);
+      res.status(500).json({ error: 'Impossibile caricare gli inviti.' });
+    }
+  });
+
+  router.post('/admin/invites', async (req: Request, res: Response) => {
+    try {
+      const adminCtx = await deps.auth.verifyOptionalRequest(req);
+      if (!adminCtx.isAdmin) {
+        res.status(403).json({ error: 'Accesso riservato agli amministratori.' });
+        return;
+      }
+      const body = (req.body ?? {}) as Partial<CreateInviteRequest>;
+      const invite = await betaAccess.createInvite(
+        {
+          label: String(body.label ?? ''),
+          code: typeof body.code === 'string' ? body.code : undefined,
+          maxGenerations: Number(body.maxGenerations ?? 0),
+          expiresInDays:
+            body.expiresInDays === undefined ? undefined : body.expiresInDays,
+          expiresAtMs:
+            body.expiresAtMs === undefined ? undefined : body.expiresAtMs,
+        },
+        adminCtx.email ?? 'admin'
+      );
+      const payload: AdminInviteMutationResponse = { invite };
+      res.status(201).json(payload);
+    } catch (error) {
+      if (error instanceof BetaAccessError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      console.error('Failed to create admin invite:', error);
+      res.status(500).json({ error: 'Impossibile creare l’invito.' });
+    }
+  });
+
+  router.patch('/admin/invites/:code', async (req: Request, res: Response) => {
+    try {
+      const adminCtx = await deps.auth.verifyOptionalRequest(req);
+      if (!adminCtx.isAdmin) {
+        res.status(403).json({ error: 'Accesso riservato agli amministratori.' });
+        return;
+      }
+      const rawCode = Array.isArray(req.params.code)
+        ? req.params.code[0]
+        : req.params.code;
+      const body = (req.body ?? {}) as Partial<UpdateInviteRequest>;
+      const invite = await betaAccess.updateInvite(rawCode ?? '', body);
+      const payload: AdminInviteMutationResponse = { invite };
+      res.json(payload);
+    } catch (error) {
+      if (error instanceof BetaAccessError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      console.error('Failed to update admin invite:', error);
+      res.status(500).json({ error: 'Impossibile aggiornare l’invito.' });
+    }
+  });
+
+  router.delete('/admin/invites/:code', async (req: Request, res: Response) => {
+    try {
+      const adminCtx = await deps.auth.verifyOptionalRequest(req);
+      if (!adminCtx.isAdmin) {
+        res.status(403).json({ error: 'Accesso riservato agli amministratori.' });
+        return;
+      }
+      const rawCode = Array.isArray(req.params.code)
+        ? req.params.code[0]
+        : req.params.code;
+      await betaAccess.deleteInvite(rawCode ?? '');
+      res.json({ ok: true });
+    } catch (error) {
+      if (error instanceof BetaAccessError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      console.error('Failed to delete admin invite:', error);
+      res.status(500).json({ error: 'Impossibile eliminare l’invito.' });
+    }
   });
 
   router.get('/admin/session', async (req: Request, res: Response) => {
@@ -153,9 +325,14 @@ export function createColoringRouter(
           clientIp: req.ip,
           isAdmin: adminCtx.isAdmin,
         });
+        await betaAccess.assertCanGenerate(req, adminCtx.isAdmin);
         next();
       } catch (err) {
         const isAdminUser = req.adminCtx?.isAdmin === true;
+        if (err instanceof BetaAccessError) {
+          res.status(err.statusCode).json({ error: err.message });
+          return;
+        }
         if (err instanceof BotProtectionError) {
           console.warn(
             `[BOT_PROTECTION] status=${err.statusCode} details="${err.rawDetails ?? err.message}"`
@@ -210,6 +387,7 @@ export function createColoringRouter(
       const adminCtx = req.adminCtx ?? { authenticated: false, isAdmin: false };
       const isAdminUser = adminCtx.isAdmin;
       let requestedProviderName: string | undefined;
+      let reservation: InviteReservation | null = null;
 
       try {
         const file = req.file;
@@ -269,6 +447,7 @@ export function createColoringRouter(
             : undefined;
 
         const provider = deps.providers.getProvider(requestedProvider);
+        reservation = await betaAccess.reserveGeneration(req, adminCtx.isAdmin);
 
         const result = await provider.generateColoringPage({
           imageBuffer: preparedImage.buffer,
@@ -289,6 +468,7 @@ export function createColoringRouter(
           imageDataUrl: result.imageDataUrl,
           svgMarkup: result.svgMarkup,
           sceneSummary: result.sceneSummary,
+          ...(reservation ? { inviteQuota: reservation.inviteQuota } : {}),
           ...(adminCtx.isAdmin
             ? {
                 adminTelemetry: {
@@ -305,6 +485,14 @@ export function createColoringRouter(
 
         res.json(responsePayload);
       } catch (error) {
+        await betaAccess.refundGeneration(reservation).catch((refundErr) => {
+          console.error('[BETA_ACCESS] Failed to refund generation quota:', refundErr);
+        });
+
+        if (error instanceof BetaAccessError) {
+          res.status(error.statusCode).json({ error: error.message });
+          return;
+        }
         if (
           error instanceof ImageValidationError ||
           error instanceof ProviderConfigurationError ||
@@ -369,6 +557,9 @@ export function createColoringRouter(
     exportPdfRateLimiter,
     async (req: Request, res: Response) => {
       try {
+        const adminCtx = await deps.auth.verifyOptionalRequest(req);
+        await betaAccess.assertCanExportPdf(req, adminCtx.isAdmin);
+
         const rawDataUrl =
           typeof req.body?.imageDataUrl === 'string' ? req.body.imageDataUrl : '';
         const rawLayout =
@@ -402,6 +593,10 @@ export function createColoringRouter(
         res.setHeader('Cache-Control', 'no-store');
         res.send(pdfResult.pdfBuffer);
       } catch (error) {
+        if (error instanceof BetaAccessError) {
+          res.status(error.statusCode).json({ error: error.message });
+          return;
+        }
         if (error instanceof PrintPdfError) {
           console.error(
             `[PrintPdfError] status=${error.statusCode} message="${error.message}" raw="${error.rawDetails ?? ''}"`

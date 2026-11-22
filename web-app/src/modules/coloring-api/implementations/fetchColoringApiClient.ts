@@ -250,15 +250,23 @@ export class FetchColoringApiClient implements ColoringApiClient {
     return payload;
   }
 
-  async exportPrintPdf(params: ExportPrintPdfRequest): Promise<Blob> {
+  async exportPrintPdf(
+    params: ExportPrintPdfRequest,
+    idToken?: string | null
+  ): Promise<Blob> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (idToken) {
+      headers.Authorization = `Bearer ${idToken}`;
+    }
+
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl}/coloring/export-pdf`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
+        headers,
+        credentials: 'same-origin',
         redirect: 'manual',
         body: JSON.stringify(params),
       });

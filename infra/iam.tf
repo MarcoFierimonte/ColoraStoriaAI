@@ -19,6 +19,13 @@ resource "google_secret_manager_secret_iam_member" "turnstile_secret_access" {
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "beta_session_secret_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.beta_session_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
 # Grant access to Firestore (datastore.user)
 resource "google_project_iam_member" "firestore_user" {
   project = var.project_id

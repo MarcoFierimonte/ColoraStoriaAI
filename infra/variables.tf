@@ -112,3 +112,16 @@ variable "enable_iap" {
   type        = bool
   default     = false
 }
+
+variable "beta_invite_required" {
+  description = "If true, requires a valid personal invite code (or Google Admin session) to generate pages or export PDFs while keeping the landing page public."
+  type        = bool
+  default     = true
+}
+
+variable "beta_session_secret" {
+  description = "HMAC signing secret (>= 16 chars) for beta invite session cookies stored in Secret Manager."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

@@ -20,3 +20,15 @@ export {
   type ThemeId,
   type UsageBreakdown,
 } from './coloring.ts';
+
+export {
+  type AccessSessionResponse,
+  type AccessSource,
+  type AdminInviteMutationResponse,
+  type AdminInvitesListResponse,
+  type BetaInviteQuota,
+  type BetaInviteSummary,
+  type CreateInviteRequest,
+  type RedeemInviteRequest,
+  type UpdateInviteRequest,
+} from './access.ts';

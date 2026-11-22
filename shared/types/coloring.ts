@@ -8,6 +8,7 @@ import {
   type ProviderId,
   type ThemeId,
 } from '../config/limits.ts';
+import type { BetaInviteQuota } from './access.ts';
 
 export {
   ALLOWED_THEME_IDS,
@@ -81,6 +82,7 @@ export interface ColoringGenerationResponse {
   svgMarkup?: string;
   sceneSummary: string;
   adminTelemetry?: AdminTelemetry;
+  inviteQuota?: BetaInviteQuota;
 }
 
 export interface ColoringErrorResponse {

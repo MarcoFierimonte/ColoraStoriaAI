@@ -25,8 +25,10 @@ resource "google_cloud_run_v2_service" "app" {
     google_project_service.apis["iap.googleapis.com"],
     google_secret_manager_secret_version.gemini_api_key_version,
     google_secret_manager_secret_version.turnstile_secret_key_version,
+    google_secret_manager_secret_version.beta_session_secret_version,
     google_secret_manager_secret_iam_member.gemini_secret_access,
     google_secret_manager_secret_iam_member.turnstile_secret_access,
+    google_secret_manager_secret_iam_member.beta_session_secret_access,
   ]
 
   project     = var.project_id
@@ -96,6 +98,11 @@ resource "google_cloud_run_v2_service" "app" {
         value = var.turnstile_secret_key != "" ? "true" : "false"
       }
 
+      env {
+        name  = "BETA_INVITE_REQUIRED"
+        value = var.beta_invite_required ? "true" : "false"
+      }
+
       # Secrets mounted securely from Secret Manager
       env {
         name = "GEMINI_API_KEY"
@@ -112,6 +119,16 @@ resource "google_cloud_run_v2_service" "app" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.turnstile_secret_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "BETA_SESSION_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.beta_session_secret.secret_id
             version = "latest"
           }
         }

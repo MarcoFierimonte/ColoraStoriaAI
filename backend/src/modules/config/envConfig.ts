@@ -19,6 +19,8 @@ export interface ServerConfig {
   turnstileSecretKey: string;
   appCheckEnabled: boolean;
   botProtectionRequired: boolean;
+  betaInviteRequired: boolean;
+  betaSessionSecret: string;
 }
 
 const rawEnvSchema = z.object({
@@ -50,6 +52,11 @@ const rawEnvSchema = z.object({
     .optional()
     .default('false'),
   BOT_PROTECTION_REQUIRED: z.enum(['true', 'false', '']).optional().default(''),
+  BETA_INVITE_REQUIRED: z
+    .enum(['true', 'false', ''])
+    .optional()
+    .default('false'),
+  BETA_SESSION_SECRET: z.string().optional().default(''),
 });
 
 const emailSchema = z.string().email();
@@ -120,9 +127,23 @@ export function parseServerConfig(
     );
   }
 
+  const isDevelopment = data.NODE_ENV === 'development';
+  const betaInviteRequired = data.BETA_INVITE_REQUIRED === 'true';
+  let betaSessionSecret = data.BETA_SESSION_SECRET.trim();
+
+  if (betaInviteRequired && !isDevelopment && betaSessionSecret.length < 16) {
+    throw new Error(
+      'Invalid server environment configuration: BETA_INVITE_REQUIRED=true in production requires BETA_SESSION_SECRET (>= 16 chars).'
+    );
+  }
+
+  if (betaInviteRequired && isDevelopment && !betaSessionSecret) {
+    betaSessionSecret = 'dev-only-beta-session-secret-change-me';
+  }
+
   return {
     port: data.PORT,
-    isDevelopment: data.NODE_ENV === 'development',
+    isDevelopment,
     defaultProvider: data.AI_PROVIDER,
     promptVersion: data.PROMPT_VERSION.trim(),
     adminEmails: parseAdminEmails(data.ADMIN_EMAILS),
@@ -133,5 +154,7 @@ export function parseServerConfig(
     turnstileSecretKey,
     appCheckEnabled,
     botProtectionRequired,
+    betaInviteRequired,
+    betaSessionSecret,
   };
 }
