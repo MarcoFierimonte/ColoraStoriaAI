@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DefaultAiProviderRegistry } from '../backend/src/modules/ai-providers/index.ts';
 import { FirebaseAdminTokenVerifier } from '../backend/src/modules/auth/index.ts';
+import {
+  BotProtectionError,
+  DefaultBotProtectionVerifier,
+} from '../backend/src/modules/bot-protection/index.ts';
 import { parseServerConfig } from '../backend/src/modules/config/index.ts';
 import { calculateGenerationCost } from '../backend/src/modules/cost-estimation/index.ts';
 import { FilesystemPromptRepository } from '../backend/src/modules/prompts/index.ts';
@@ -163,5 +167,36 @@ test('calculateGenerationCost calculates known rates and warns on unknown models
   assert.equal(
     paid.projectedBook16CostUsd,
     Number((31.5 * PROJECTED_BOOK_PAGES).toFixed(4))
+  );
+});
+
+test('DefaultBotProtectionVerifier ignores placeholder Turnstile "none" and enforces real secrets', async () => {
+  const placeholderConfig = parseServerConfig({
+    NODE_ENV: 'production',
+    TURNSTILE_SECRET_KEY: 'none',
+    BOT_PROTECTION_REQUIRED: 'false',
+  });
+  assert.equal(placeholderConfig.turnstileSecretKey, '');
+  assert.equal(placeholderConfig.botProtectionRequired, false);
+
+  const disabledVerifier = new DefaultBotProtectionVerifier(placeholderConfig);
+  assert.equal(disabledVerifier.isEnforced(), false);
+  const bypassResult = await disabledVerifier.verifyRequest({
+    headers: {},
+    isAdmin: false,
+  });
+  assert.deepEqual(bypassResult, { verified: true, provider: 'disabled' });
+
+  const enforcedConfig = parseServerConfig({
+    NODE_ENV: 'production',
+    TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA',
+  });
+  assert.equal(enforcedConfig.botProtectionRequired, true);
+  const enforcedVerifier = new DefaultBotProtectionVerifier(enforcedConfig);
+  assert.equal(enforcedVerifier.isEnforced(), true);
+
+  await assert.rejects(
+    () => enforcedVerifier.verifyRequest({ headers: {}, isAdmin: false }),
+    (err: unknown) => err instanceof BotProtectionError && err.statusCode === 403
   );
 });

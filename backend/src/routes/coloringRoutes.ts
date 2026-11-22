@@ -320,12 +320,12 @@ export function createColoringRouter(
       try {
         const adminCtx = await deps.auth.verifyOptionalRequest(req);
         req.adminCtx = adminCtx;
+        await betaAccess.assertCanGenerate(req, adminCtx.isAdmin);
         await deps.botProtection.verifyRequest({
           headers: req.headers,
           clientIp: req.ip,
           isAdmin: adminCtx.isAdmin,
         });
-        await betaAccess.assertCanGenerate(req, adminCtx.isAdmin);
         next();
       } catch (err) {
         const isAdminUser = req.adminCtx?.isAdmin === true;

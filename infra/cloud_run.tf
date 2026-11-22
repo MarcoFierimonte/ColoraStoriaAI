@@ -114,12 +114,15 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
-      env {
-        name = "TURNSTILE_SECRET_KEY"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.turnstile_secret_key.secret_id
-            version = "latest"
+      dynamic "env" {
+        for_each = var.turnstile_secret_key != "" ? [1] : []
+        content {
+          name = "TURNSTILE_SECRET_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.turnstile_secret_key.secret_id
+              version = "latest"
+            }
           }
         }
       }

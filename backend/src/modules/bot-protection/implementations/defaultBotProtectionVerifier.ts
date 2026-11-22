@@ -58,11 +58,7 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
   }
 
   isEnforced(): boolean {
-    return Boolean(
-      this.config.turnstileSecretKey ||
-        this.config.appCheckEnabled ||
-        this.config.botProtectionRequired
-    );
+    return this.config.botProtectionRequired;
   }
 
   async verifyRequest(
@@ -70,6 +66,10 @@ export class DefaultBotProtectionVerifier implements BotProtectionVerifier {
   ): Promise<BotVerificationResult> {
     if (req.isAdmin) {
       return { verified: true, provider: 'admin-bypass' };
+    }
+
+    if (!this.config.botProtectionRequired) {
+      return { verified: true, provider: 'disabled' };
     }
 
     if (this.config.turnstileSecretKey) {

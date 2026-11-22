@@ -112,7 +112,9 @@ export function parseServerConfig(
   }
 
   const data = parsed.data;
-  const turnstileSecretKey = data.TURNSTILE_SECRET_KEY.trim();
+  const rawTurnstileSecret = data.TURNSTILE_SECRET_KEY.trim();
+  const turnstileSecretKey =
+    rawTurnstileSecret.toLowerCase() === 'none' ? '' : rawTurnstileSecret;
   const appCheckEnabled = data.APP_CHECK_ENABLED === 'true';
   const botProtectionRequired =
     data.BOT_PROTECTION_REQUIRED === 'true'
