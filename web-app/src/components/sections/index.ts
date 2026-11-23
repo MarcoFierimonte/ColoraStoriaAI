@@ -1,6 +1,14 @@
 export { BottomCtaSection, type BottomCtaSectionProps } from './BottomCtaSection';
 export { CategoriesSection } from './CategoriesSection';
-export { ExampleTrio, type ExampleTrioProps } from './ExampleTrio';
+export {
+  ExamplesGallerySection,
+  type ExamplesGallerySectionProps,
+} from './ExamplesGallerySection';
+export {
+  ExampleTrio,
+  type ExampleTilePreview,
+  type ExampleTrioProps,
+} from './ExampleTrio';
 export { HeroSection, type HeroSectionProps } from './HeroSection';
 export { HowItWorksSection } from './HowItWorksSection';
 export { Navbar, type NavbarProps } from './Navbar';

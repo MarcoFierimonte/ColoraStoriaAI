@@ -4,11 +4,10 @@ import { ExampleTrio } from './ExampleTrio';
 
 export interface HeroSectionProps {
   onStartClick: () => void;
-  onOpenExamples: () => void;
 }
 
-export function HeroSection({ onStartClick, onOpenExamples }: HeroSectionProps) {
-  const { hero } = SITE_TEMPLATE;
+export function HeroSection({ onStartClick }: HeroSectionProps) {
+  const { hero, examplesGallery } = SITE_TEMPLATE;
 
   return (
     <div className="cs-wrap">
@@ -31,14 +30,14 @@ export function HeroSection({ onStartClick, onOpenExamples }: HeroSectionProps) 
 
         <ExampleTrio
           item={hero.showcase}
+          loading="eager"
           footerSlot={
-            <UiButton
-              variant="secondary"
-              className="mt-[10px]"
-              onClick={onOpenExamples}
+            <a
+              href={`#${examplesGallery.id}`}
+              className="cs-btn cs-btn-secondary mt-[10px]"
             >
               {hero.examplesCtaLabel}
-            </UiButton>
+            </a>
           }
         />
       </section>

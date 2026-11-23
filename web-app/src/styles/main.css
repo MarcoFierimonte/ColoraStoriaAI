@@ -167,6 +167,11 @@
     justify-self: center;
   }
 
+  .cs-trio-full {
+    width: 100%;
+    max-width: none;
+  }
+
   .cs-tile {
     position: relative;
     border: var(--cs-border-width) solid var(--cs-border);

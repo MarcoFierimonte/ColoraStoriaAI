@@ -3,7 +3,6 @@ import { X } from 'lucide-react';
 import { AdminInvitesPanel } from './components/AdminInvitesPanel';
 import { AdminTelemetryPanel } from './components/AdminTelemetryPanel';
 import { CreatorDialog } from './components/CreatorDialog';
-import { ExamplesDialog } from './components/ExamplesDialog';
 import {
   LEGAL_ROUTES,
   LegalPage,
@@ -13,6 +12,7 @@ import {
 import {
   BottomCtaSection,
   CategoriesSection,
+  ExamplesGallerySection,
   HeroSection,
   HowItWorksSection,
   Navbar,
@@ -54,7 +54,6 @@ export default function App() {
       : null
   );
   const [creatorOpen, setCreatorOpen] = useState(false);
-  const [examplesOpen, setExamplesOpen] = useState(false);
   const [latestTelemetry, setLatestTelemetry] = useState<AdminTelemetry | null>(
     null
   );
@@ -144,7 +143,6 @@ export default function App() {
   };
 
   const openCreator = () => {
-    setExamplesOpen(false);
     setCreatorOpen(true);
   };
 
@@ -218,11 +216,9 @@ export default function App() {
           />
         ) : (
           <>
-            <HeroSection
-              onStartClick={openCreator}
-              onOpenExamples={() => setExamplesOpen(true)}
-            />
+            <HeroSection onStartClick={openCreator} />
             <CategoriesSection />
+            <ExamplesGallerySection onStartClick={openCreator} />
             <HowItWorksSection />
             <BottomCtaSection onStartClick={openCreator} />
 
@@ -246,11 +242,6 @@ export default function App() {
         onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
         onSignIn={() => void signInWithGoogle()}
         onSignOut={() => void signOutUser()}
-      />
-
-      <ExamplesDialog
-        open={examplesOpen}
-        onClose={() => setExamplesOpen(false)}
       />
 
       <CreatorDialog

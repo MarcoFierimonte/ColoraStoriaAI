@@ -102,3 +102,72 @@ test('prompts/v2 modes.json and ages.json match shared/config constants', () => 
     'prompts/v2/ages.json keys must match ALLOWED_AGE_GROUPS'
   );
 });
+
+const EXAMPLE_GALLERY_SLUGS = [
+  'toy-boy',
+  'doll-girl',
+  'cute-dog',
+  'cute-cat',
+  'mountain-landscape',
+  'toddler-playing',
+] as const;
+
+test('all 6 real example trios exist with valid magic bytes and cover all ALLOWED_THEME_IDS', () => {
+  const examplesDir = path.join(
+    ROOT_DIR,
+    'web-app',
+    'src',
+    'assets',
+    'images',
+    'examples'
+  );
+
+  for (const slug of EXAMPLE_GALLERY_SLUGS) {
+    const photoPath = path.join(examplesDir, `${slug}-photo.jpg`);
+    assert.ok(fs.existsSync(photoPath), `Missing ${photoPath}`);
+    const photoBuf = fs.readFileSync(photoPath);
+    assert.ok(photoBuf.length > 0, `${photoPath} must be non-empty`);
+    assert.equal(
+      photoBuf[0] === 0xff && photoBuf[1] === 0xd8 && photoBuf[2] === 0xff,
+      true,
+      `${photoPath} must have JPEG magic bytes`
+    );
+
+    for (const suffix of ['faithful', 'creative'] as const) {
+      const pngPath = path.join(examplesDir, `${slug}-${suffix}.png`);
+      assert.ok(fs.existsSync(pngPath), `Missing ${pngPath}`);
+      const pngBuf = fs.readFileSync(pngPath);
+      assert.ok(pngBuf.length > 0, `${pngPath} must be non-empty`);
+      assert.equal(
+        pngBuf[0] === 0x89 &&
+          pngBuf[1] === 0x50 &&
+          pngBuf[2] === 0x4e &&
+          pngBuf[3] === 0x47,
+        true,
+        `${pngPath} must have PNG magic bytes`
+      );
+    }
+  }
+
+  const templateSource = fs.readFileSync(
+    path.join(ROOT_DIR, 'web-app', 'src', 'config', 'siteTemplate.ts'),
+    'utf8'
+  );
+  const galleryStart = templateSource.indexOf('examplesGallery:');
+  assert.ok(galleryStart !== -1, 'siteTemplate.ts must define examplesGallery');
+  const gallerySection = templateSource.slice(galleryStart).toLowerCase();
+
+  for (const slug of EXAMPLE_GALLERY_SLUGS) {
+    assert.ok(
+      gallerySection.includes(`'${slug}'`),
+      `examplesGallery must reference example id "${slug}"`
+    );
+  }
+
+  for (const themeId of ALLOWED_THEME_IDS) {
+    assert.ok(
+      gallerySection.includes(`'${themeId}'`),
+      `examplesGallery must showcase creative theme "${themeId}"`
+    );
+  }
+});
