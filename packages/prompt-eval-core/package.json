@@ -1,0 +1,10 @@
+{
+  "name": "@colorastoria/prompt-eval-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generic, framework-agnostic TypeScript contracts, cost utilities, and pure ZIP archiver for prompt evaluation workbenches (standard and batch APIs).",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -438,9 +438,13 @@ export default [
       ],
     },
   },
-  // 5. Pure interfaces & shared contracts: zero vendor SDKs, runtime frameworks, or implementations/
+  // 5. Pure interfaces, shared contracts, & generic prompt-eval-core: zero vendor SDKs, runtime frameworks, or implementations/
   {
-    files: ['**/*.interface.ts', 'shared/**/*.ts'],
+    files: [
+      '**/*.interface.ts',
+      'shared/**/*.ts',
+      'packages/prompt-eval-core/**/*.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -495,6 +499,112 @@ export default [
               group: ['firebase/*', 'firebase-admin/*', 'node:*'],
               message:
                 'Interfaces and shared types must stay free of vendor SDK or Node runtime imports.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // 6. Reusable packages isolation: prompt-eval-backend stays decoupled from host app & frontend
+  {
+    files: ['packages/prompt-eval-backend/**/*.ts'],
+    ignores: ['**/implementations/**', '**/index.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@google/genai',
+              message:
+                'Keep @google/genai encapsulated inside packages/prompt-eval-backend/src/implementations/.',
+            },
+            {
+              name: 'firebase-admin',
+              message:
+                'Keep firebase-admin encapsulated inside packages/prompt-eval-backend/src/implementations/.',
+            },
+          ],
+          patterns: [
+            {
+              regex: '(^|/)implementations(/|$)',
+              message:
+                'Import from promptEval.interface.ts or barrel index.ts instead of implementations/.',
+            },
+            {
+              regex: '(^|/)(backend|web-app|prompt-eval-frontend)(/|$)',
+              message:
+                'Generic prompt-eval-backend package must stay decoupled from host app and frontend.',
+            },
+            {
+              group: ['firebase-admin/*'],
+              message:
+                'Keep firebase-admin encapsulated inside implementations/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/prompt-eval-backend/src/index.ts',
+      'packages/prompt-eval-backend/src/implementations/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)(backend|web-app|prompt-eval-frontend)(/|$)',
+              message:
+                'Generic prompt-eval-backend package must stay decoupled from host app and frontend.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // 7. Reusable packages isolation: prompt-eval-frontend stays decoupled from host app & backend
+  {
+    files: ['packages/prompt-eval-frontend/**/*.ts', 'packages/prompt-eval-frontend/**/*.tsx'],
+    ignores: ['**/implementations/**', '**/index.ts', '**/client.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)implementations(/|$)',
+              message:
+                'Import from promptEvalClient.interface.ts or barrel index.ts instead of implementations/.',
+            },
+            {
+              regex: '(^|/)(backend|web-app|prompt-eval-backend)(/|$)',
+              message:
+                'Generic prompt-eval-frontend package must stay decoupled from host app and backend.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/prompt-eval-frontend/src/index.ts',
+      'packages/prompt-eval-frontend/src/client.ts',
+      'packages/prompt-eval-frontend/src/implementations/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)(backend|web-app|prompt-eval-backend)(/|$)',
+              message:
+                'Generic prompt-eval-frontend package must stay decoupled from host app and backend.',
             },
           ],
         },

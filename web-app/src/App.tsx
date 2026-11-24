@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { AdminInvitesPanel } from './components/AdminInvitesPanel';
-import { AdminTelemetryPanel } from './components/AdminTelemetryPanel';
+import {
+  ADMIN_BASE_PATH,
+  AdminPage,
+  buildAdminUrl,
+  isAdminPath,
+  parseAdminRunIdFromSearch,
+  parseAdminTabFromSearch,
+  type AdminServiceTab,
+} from './components/AdminPage';
 import { CreatorDialog } from './components/CreatorDialog';
 import {
   LEGAL_ROUTES,
@@ -34,24 +41,60 @@ interface InviteBanner {
   text: string;
 }
 
+interface RouteState {
+  kind: 'home' | 'legal' | 'admin';
+  legalSlug: LegalRouteSlug | null;
+  adminTab: AdminServiceTab;
+  adminRunId: string | null;
+}
+
+function readCurrentRoute(): RouteState {
+  if (typeof window === 'undefined') {
+    return {
+      kind: 'home',
+      legalSlug: null,
+      adminTab: 'prompt-lab',
+      adminRunId: null,
+    };
+  }
+  const { pathname, search } = window.location;
+  if (isAdminPath(pathname)) {
+    return {
+      kind: 'admin',
+      legalSlug: null,
+      adminTab: parseAdminTabFromSearch(search),
+      adminRunId: parseAdminRunIdFromSearch(search),
+    };
+  }
+  const legalSlug = parseLegalSlugFromPathname(pathname);
+  if (legalSlug) {
+    return {
+      kind: 'legal',
+      legalSlug,
+      adminTab: 'prompt-lab',
+      adminRunId: null,
+    };
+  }
+  return {
+    kind: 'home',
+    legalSlug: null,
+    adminTab: 'prompt-lab',
+    adminRunId: null,
+  };
+}
+
 export default function App() {
   const {
     user,
     authReady,
     isAdmin,
     idToken,
-    isSigningIn,
     authNotice,
-    signInWithGoogle,
     signOutUser,
     clearAuthNotice,
   } = useAuth();
 
-  const [legalSlug, setLegalSlug] = useState<LegalRouteSlug | null>(() =>
-    typeof window !== 'undefined'
-      ? parseLegalSlugFromPathname(window.location.pathname)
-      : null
-  );
+  const [route, setRoute] = useState<RouteState>(() => readCurrentRoute());
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [latestTelemetry, setLatestTelemetry] = useState<AdminTelemetry | null>(
     null
@@ -65,25 +108,32 @@ export default function App() {
 
   useEffect(() => {
     const onPopState = () => {
-      setLegalSlug(parseLegalSlugFromPathname(window.location.pathname));
+      setRoute(readCurrentRoute());
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   useEffect(() => {
-    if (legalSlug) {
-      document.title = `${LEGAL_ROUTES[legalSlug].title} — ColoraStoria`;
+    if (route.kind === 'admin') {
+      document.title = 'Console Admin — ColoraStoria';
+    } else if (route.kind === 'legal' && route.legalSlug) {
+      document.title = `${LEGAL_ROUTES[route.legalSlug].title} — ColoraStoria`;
     } else {
       document.title = HOME_TITLE;
     }
 
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) {
-      const targetPath = legalSlug ? LEGAL_ROUTES[legalSlug].path : '/';
+      const targetPath =
+        route.kind === 'admin'
+          ? ADMIN_BASE_PATH
+          : route.kind === 'legal' && route.legalSlug
+            ? LEGAL_ROUTES[route.legalSlug].path
+            : '/';
       canonical.setAttribute('href', `${window.location.origin}${targetPath}`);
     }
-  }, [legalSlug]);
+  }, [route]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -133,13 +183,34 @@ export default function App() {
       });
   }, []);
 
-  const navigateToPath = (path: string) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState(null, '', path);
+  const navigateToPath = useCallback((url: string, replace = false) => {
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl !== url) {
+      if (replace) {
+        window.history.replaceState(null, '', url);
+      } else {
+        window.history.pushState(null, '', url);
+      }
     }
-    setLegalSlug(parseLegalSlugFromPathname(path));
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  };
+    setRoute(readCurrentRoute());
+    if (!replace) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, []);
+
+  const navigateToAdmin = useCallback(
+    (tab: AdminServiceTab = 'prompt-lab', runId?: string | null) => {
+      navigateToPath(buildAdminUrl(tab, runId));
+    },
+    [navigateToPath]
+  );
+
+  const handleAdminRunSelected = useCallback(
+    (runId: string | null) => {
+      navigateToPath(buildAdminUrl('prompt-lab', runId), true);
+    },
+    [navigateToPath]
+  );
 
   const openCreator = () => {
     setCreatorOpen(true);
@@ -164,8 +235,14 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[var(--cs-bg)] text-[var(--cs-ink)]">
       <Navbar
+        isAdmin={isAdmin}
+        userEmail={user?.email ?? null}
+        isOnAdminPage={route.kind === 'admin'}
         onLogoClick={() => navigateToPath('/')}
         onStartClick={openCreator}
+        onNavigateAdmin={(tab) => navigateToAdmin(tab ?? 'prompt-lab')}
+        onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
+        onSignOut={() => void signOutUser()}
       />
 
       {inviteBanner ? (
@@ -207,9 +284,18 @@ export default function App() {
       ) : null}
 
       <main className="flex-1">
-        {legalSlug ? (
+        {route.kind === 'admin' ? (
+          <AdminPage
+            activeTab={route.adminTab}
+            selectedRunId={route.adminRunId}
+            latestTelemetry={latestTelemetry}
+            onSelectTab={(tab) => navigateToAdmin(tab)}
+            onSelectRunId={handleAdminRunSelected}
+            onNavigateHome={() => navigateToPath('/')}
+          />
+        ) : route.kind === 'legal' && route.legalSlug ? (
           <LegalPage
-            slug={legalSlug}
+            slug={route.legalSlug}
             onNavigateHome={() => navigateToPath('/')}
             onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
           />
@@ -219,26 +305,16 @@ export default function App() {
             <CategoriesSection />
             <HowItWorksSection />
             <BottomCtaSection onStartClick={openCreator} />
-
-            {isAdmin ? (
-              <section className="cs-sec" aria-label="Pannello Admin">
-                <div className="cs-wrap space-y-6">
-                  <AdminInvitesPanel />
-                  <AdminTelemetryPanel latestTelemetry={latestTelemetry} />
-                </div>
-              </section>
-            ) : null}
           </>
         )}
       </main>
 
       <SiteFooter
-        isSigningIn={isSigningIn}
         isAdmin={isAdmin}
         userEmail={user?.email ?? null}
         onNavigateHome={() => navigateToPath('/')}
         onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
-        onSignIn={() => void signInWithGoogle()}
+        onNavigateAdmin={() => navigateToAdmin('prompt-lab')}
         onSignOut={() => void signOutUser()}
       />
 

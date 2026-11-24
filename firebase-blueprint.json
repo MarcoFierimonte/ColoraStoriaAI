@@ -173,6 +173,77 @@
         "createdAtMs",
         "createdByEmail"
       ]
+    },
+    "PromptEvalRun": {
+      "title": "PromptEvalRun",
+      "description": "Server-managed admin prompt evaluation run supporting standard and batch APIs, email delivery status, and run-level notes/ratings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "createdByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdByEmail": { "type": "string", "minLength": 1, "maxLength": 254 },
+        "modality": { "type": "string", "enum": ["image", "text"] },
+        "executionMode": { "type": "string", "enum": ["standard", "batch"] },
+        "providerId": { "type": "string", "enum": ["gemini", "openai"] },
+        "model": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "promptSource": { "type": "string", "enum": ["catalog", "custom"] },
+        "promptLabel": { "type": "string" },
+        "promptText": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "running", "completed", "partial", "failed", "cancelled"]
+        },
+        "totalItems": { "type": "integer" },
+        "completedItems": { "type": "integer" },
+        "failedItems": { "type": "integer" },
+        "totalEstimatedCostUsd": { "type": "number" },
+        "externalBatchJobId": { "type": ["string", "null"] },
+        "notifyEmail": { "type": ["string", "null"] },
+        "notificationStatus": {
+          "type": "string",
+          "enum": ["not_requested", "pending", "sent", "failed"]
+        },
+        "createdAtMs": { "type": "integer" },
+        "updatedAtMs": { "type": "integer" }
+      },
+      "required": [
+        "id",
+        "title",
+        "createdByUid",
+        "createdByEmail",
+        "modality",
+        "executionMode",
+        "providerId",
+        "model",
+        "promptSource",
+        "promptText",
+        "status",
+        "totalItems",
+        "completedItems",
+        "failedItems",
+        "createdAtMs",
+        "updatedAtMs"
+      ]
+    },
+    "PromptEvalItem": {
+      "title": "PromptEvalItem",
+      "description": "Individual image or text input result, output media, usage breakdown, and admin rating/notes inside a PromptEvalRun",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "index": { "type": "integer" },
+        "inputName": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "running", "completed", "failed"]
+        },
+        "outputFormat": { "type": "string", "enum": ["raster", "svg", "text"] },
+        "outputImageDataUrl": { "type": "string" },
+        "outputText": { "type": "string" },
+        "errorMessage": { "type": "string" }
+      },
+      "required": ["id", "index", "inputName", "status"]
     }
   },
   "firestore": {
@@ -193,6 +264,18 @@
         "$ref": "#/entities/BetaInvite"
       },
       "description": "Server-only invite codes and generation quotas managed by backend Cloud Run service account"
+    },
+    "/prompt_eval_runs/{runId}": {
+      "schema": {
+        "$ref": "#/entities/PromptEvalRun"
+      },
+      "description": "Server-only admin prompt evaluation runs managed via backend API"
+    },
+    "/prompt_eval_runs/{runId}/items/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/PromptEvalItem"
+      },
+      "description": "Server-only per-item evaluation outputs, thumbnails, ratings, and notes"
     }
   }
 }

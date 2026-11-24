@@ -1,8 +1,8 @@
 # ColoraStoria — Wiki dei Requisiti (Funzionali, Non-Funzionali & Roadmap)
 
-> **Versione:** `1.2.0`  
-> **Data:** `2026-11-23`  
-> **Stato attuale del prodotto:** **Fase 1 — Beta Privata su Invito (Pagine singole istantanee + Stampa A4)**
+> **Versione:** `1.3.0`  
+> **Data:** `2026-11-24`  
+> **Stato attuale del prodotto:** **Fase 1 — Beta Privata su Invito (Pagine singole istantanee + Stampa A4 + Console Admin & Laboratorio Prompt Batch)**
 
 ---
 
@@ -74,9 +74,16 @@ La generazione AI supporta due modalità rigorosamente isolate sia lato UI (`web
   - `4-up`: griglia 2×2 su A4 verticale con guide di taglio tratteggiate.
 - **Esportazione PNG:** Download diretto dell’illustrazione in formato `.png` (raster o rasterizzazione client da SVG).
 
-### `REQ-FN-06` — Console e Strumenti Amministratore
+### `REQ-FN-06` — Console Amministratore Multi-Servizio (`/admin`), Burger Menu & Laboratorio Prompt Batch
+- **Accesso tramite Burger Menu & pagina dedicata `/admin`:** Dal menu hamburger nella navbar dell’app principale l’amministratore (e la voce *Area Admin*) raggiunge la pagina dedicata `/admin` strettamente riservata agli Admin (`isAdmin === true`, con gate di autenticazione Google per chi non è autorizzato). Le sezioni admin esistenti (**Inviti Beta** e **Telemetria & Costi**) sono spostate dalla landing pubblica in schede dedicate di questa console multi-servizio (`?tab=prompt-lab|invites|telemetry`).
+- **Laboratorio Prompt & Batch API (`packages/prompt-eval-*`):** Pacchetti generici e riutilizzabili (`prompt-eval-core`, `prompt-eval-backend`, `prompt-eval-frontend`) per testare sistematicamente prompt su più immagini (o input testuali):
+  - **Upload multi-immagine:** Caricamento multiplo in RAM (fino a 20 foto per run, max 12 MB ciascuna, validazione magic bytes/dimensioni) con opzione rapida per caricare anche le 6 foto esempio dell’app.
+  - **Selezione e copia prompt completo:** Selezione guidata da tutte le combinazioni dell’app (`v1`/`v2`, `fedele` o `creativa` con tema ed età, adattatore raster/SVG) oppure prompt personalizzato, con visualizzazione del testo completo integrale, stima token e pulsante di copia immediata.
+  - **Scelta API Normali (Standard) vs Batch API (-50%):** Per le immagini, selezione esplicita tra elaborazione sincrona (risultato immediato, singola elaborazione per immagine) e Batch API asincrona (`-50%` costo AI su Gemini e OpenAI compatibili).
+  - **Salvataggio su dispositivo & notifica email Free Tier:** Download singola immagine o archivio `.zip` completo (`outputs/` + `prompt.txt` + `evaluation-report.json`); per i job batch asincroni, invio automatico dell’email con riepilogo e allegato ZIP tramite provider con piano gratuito (**Resend** 3.000/mese o **Brevo** 300/giorno) e endpoint `/api/admin/prompt-eval/poll-pending` compatibile con Google Cloud Scheduler (piano gratuito).
+  - **Persistenza esecuzioni, voti e note:** Ogni esecuzione e ogni singolo output (con miniatura di confronto) sono salvati su Firestore (`prompt_eval_runs/{runId}/items/{itemId}`, free tier, server-only), con valutazione in stelle (`1–5`), esito (`Promosso`/`Da migliorare`/`Scartato`), tag e note testuali modificabili nel tempo.
 - **Gestione inviti (`AdminInvitesPanel` + CLI `scripts/manage-invites.ts`):** Creazione inviti con codice automatico o personalizzato, quota massima (`1–1000`), durata opzionale (`1–365` giorni), copia link `?invite=...`, ricarica rapida `+5`, sospensione/riattivazione ed eliminazione.
-- **Diagnostica & Telemetria AI:** Override di provider (`gemini` / `openai`) e versione prompt (`v1` / `v2`), copia dettagli completi di errore, calcolo costi stimati per pagina e proiezione 16 pagine (`rateCardCostEstimator.ts`), e persistenza log su Firestore (`generation_logs` con `themeId` esteso anche a `'fedele'`).
+- **Diagnostica & Telemetria AI (`AdminTelemetryPanel`):** Override di provider (`gemini` / `openai`) e versione prompt (`v1` / `v2`), copia dettagli completi di errore, calcolo costi stimati per pagina e proiezione 16 pagine (`rateCardCostEstimator.ts`), e persistenza log su Firestore (`generation_logs` con `themeId` esteso anche a `'fedele'`).
 
 ---
 
@@ -91,10 +98,10 @@ La generazione AI supporta due modalità rigorosamente isolate sia lato UI (`web
 - `helmet` applica Content Security Policy restrittiva su script, font, stili e frame (consentendo i popup di Google Auth e Cloudflare Turnstile).
 
 ### `REQ-NFR-03` — Sicurezza Applicativa & Regole Firestore
-- **Rate limiting per IP:** `15` richieste / `15 min` su `/api/coloring/generate`, `30` / `15 min` su `/api/coloring/export-pdf`, `20` / `15 min` su `/api/access/redeem`.
+- **Rate limiting per IP:** `15` richieste / `15 min` su `/api/coloring/generate`, `30` / `15 min` su `/api/coloring/export-pdf`, `20` / `15 min` su `/api/access/redeem`, `60` / `15 min` su `/api/admin/prompt-eval/poll-pending`.
 - **Anti-bot opzionale:** Supporto Cloudflare Turnstile e Firebase App Check configurabile via env (il segnaposto Terraform `"none"` su `TURNSTILE_SECRET_KEY` viene normalizzato come disattivato).
 - **Validazione file binaria:** Verifica server-side tramite *magic bytes* e coerenza MIME prima di passare i dati a Sharp o ai modelli AI.
-- **Firestore Security Rules (`firestore.rules`):** Criterio *deny-all* predefinito; `beta_invites` completamente inaccessibile dai client (`allow read, write: if false`); `generation_logs` accessibile solo ad Admin con email verificata e custom claim `{ admin: true }`.
+- **Firestore Security Rules (`firestore.rules`):** Criterio *deny-all* predefinito; `beta_invites` e `prompt_eval_runs` (con sottocollezione `items`) sono completamente inaccessibili dai client (`allow read, write: if false`) e gestite solo lato server da backend autenticato; `generation_logs` accessibile solo ad Admin con email verificata e custom claim `{ admin: true }`.
 
 ### `REQ-NFR-04` — Infrastruttura Cloud & Controllo Costi (Free Tier)
 - Infrastruttura dichiarata interamente come IaC in `infra/` (Terraform): Cloud Run v2 `min_instances = 0` (scale-to-zero) e `max_instances = 2` (`512Mi` RAM, `concurrency = 10`), Artifact Registry, Secret Manager (`GEMINI_API_KEY`, `BETA_SESSION_SECRET`, opzionale `TURNSTILE_SECRET_KEY`), Firestore nativo e Firebase Auth.
@@ -123,6 +130,7 @@ I requisiti seguenti descrivono l’evoluzione prevista dopo la validazione dell
 
 | Versione | Data | Autore / Contesto | Modifiche Principali |
 | :--- | :--- | :--- | :--- |
+| **`1.3.0`** | `2026-11-24` | Console Admin `/admin`, Burger Menu & Pacchetti Prompt Eval Batch | Aggiornati `REQ-FN-06` e `REQ-NFR-03`: creati pacchetti riutilizzabili `packages/prompt-eval-core`, `packages/prompt-eval-backend` e `packages/prompt-eval-frontend` per test prompt multi-immagine (API Standard vs Batch `-50%`), anteprima/copia prompt completo, download singolo/ZIP, notifiche email free-tier (Resend/Brevo) e valutazioni/note persistenti su Firestore (`prompt_eval_runs`). Aggiunta pagina Admin-Only `/admin` accessibile da burger menu con spostamento delle sezioni *Inviti Beta* e *Telemetria & Costi*. |
 | **`1.2.0`** | `2026-11-23` | Carousel esempi fisso in Hero | Aggiornato `REQ-FN-01`: spostati tutti i 6 esempi reali in un singolo spazio fisso subito visibile in apertura nella Hero con slide orizzontale (`ExamplesCarousel`, swipe laterale/frecce/pallini e zoom al clic), sostituendo la sezione verticale espansa `ExamplesGallerySection`. |
 | **`1.1.0`** | `2026-11-23` | Galleria esempi reali inline | Aggiornato `REQ-FN-01`: sostituita la modale `ExamplesDialog` con la sezione inline `#esempi` (`ExamplesGallerySection`) nella landing page, completa di 6 foto reali (`Gattino`, `Cagnolino`, `Giocattolo`, `Bambola`, `Montagna con alberi`, `Bimbo di 2 anni che gioca`) e relative 12 generazioni `Fedele` + `Creativa` su tutti i 6 temi, con anteprima ingrandibile su clic. |
 | **`1.0.0`** | `2026-11-22` | Baseline post-redesign & prompt `v2` | Prima stesura formale del Wiki dei Requisiti: consolidamento Fase 1 (Beta su invito Firestore `beta-access`, pagine singole con modalità `Fedele` vs `Creativa` + temi/età esclusivi di `Creativa`, PDF A4 `1-up`/`2-up`/`4-up`, redesign templetizzabile) e separazione chiara verso la Fase 2 (Libro 10–15 foto e monetizzazione post-beta da validare). |

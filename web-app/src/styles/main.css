@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@source "../../../packages/prompt-eval-frontend/src";
 @import './theme.css';
 
 @font-face {

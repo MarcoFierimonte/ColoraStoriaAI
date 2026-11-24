@@ -2,21 +2,23 @@ import { SITE_TEMPLATE } from '../../config/siteTemplate';
 import { LEGAL_ROUTES, type LegalRouteSlug } from '../LegalPage';
 
 export interface SiteFooterProps {
-  isSigningIn: boolean;
+  isSigningIn?: boolean;
   isAdmin: boolean;
   userEmail: string | null;
   onNavigateHome: () => void;
   onNavigateLegal: (slug: LegalRouteSlug) => void;
-  onSignIn: () => void;
+  onNavigateAdmin?: () => void;
+  onSignIn?: () => void;
   onSignOut: () => void;
 }
 
 export function SiteFooter({
-  isSigningIn,
+  isSigningIn = false,
   isAdmin,
   userEmail,
   onNavigateHome,
   onNavigateLegal,
+  onNavigateAdmin,
   onSignIn,
   onSignOut,
 }: SiteFooterProps) {
@@ -61,7 +63,29 @@ export function SiteFooter({
 
           {isAdmin ? (
             <span className="inline-flex items-center gap-2 rounded-[8px] border-2 border-[var(--cs-border)] bg-[var(--cs-mint)] px-2.5 py-1 text-xs font-bold">
-              <span>Admin{userEmail ? `: ${userEmail}` : ''}</span>
+              {onNavigateAdmin ? (
+                <a
+                  href="/admin"
+                  onClick={(event) => {
+                    if (
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey ||
+                      event.button !== 0
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    onNavigateAdmin();
+                  }}
+                  className="underline decoration-2 underline-offset-2 hover:text-[var(--cs-pink-strong)]"
+                >
+                  Console Admin{userEmail ? ` (${userEmail})` : ''}
+                </a>
+              ) : (
+                <span>Admin{userEmail ? `: ${userEmail}` : ''}</span>
+              )}
               <button
                 type="button"
                 onClick={onSignOut}
@@ -70,7 +94,27 @@ export function SiteFooter({
                 Esci
               </button>
             </span>
-          ) : (
+          ) : onNavigateAdmin ? (
+            <a
+              href="/admin"
+              onClick={(event) => {
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  event.button !== 0
+                ) {
+                  return;
+                }
+                event.preventDefault();
+                onNavigateAdmin();
+              }}
+              className="text-xs font-bold text-[var(--cs-ink-muted)] underline decoration-2 underline-offset-4 hover:text-[var(--cs-ink)]"
+            >
+              Area riservata
+            </a>
+          ) : onSignIn ? (
             <button
               type="button"
               disabled={isSigningIn}
@@ -79,7 +123,7 @@ export function SiteFooter({
             >
               {isSigningIn ? 'Accesso…' : 'Area riservata'}
             </button>
-          )}
+          ) : null}
         </nav>
       </div>
     </footer>

@@ -6,12 +6,13 @@ Currently operating in **Phase 1 (Private Beta)** for instant single-page genera
 
 ## Repository Layout
 - `AGENTS.md` — Engineering guidelines enforcing Interface vs. Implementation module separation and mandatory Wiki/Requirements maintenance.
-- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.0.0`: Phase 1 active specs, non-functional security/cost rules, Phase 2 roadmap, and changelog).
+- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.3.0`: Phase 1 active specs, Admin `/admin` console & Prompt/Batch Lab, non-functional security/cost rules, Phase 2 roadmap, and changelog).
 - `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
 - `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/modes/themes/ages (`shared/config/`) shared by `backend/` and `web-app/`.
-- `web-app/` — React + TypeScript + Tailwind CSS frontend with a neo-brutalist themeable UI (`theme.css`, `siteTemplate.ts`, `CreatorDialog`, `AdminInvitesPanel`), domain modules under `web-app/src/modules/`, self-hosted `@fontsource` fonts, and real-URL legal routes (`web-app/README.md`).
-- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` (including `beta-access` invite quotas and `print-pdf` A4 mastering) and Zod startup env validation (`backend/README.md`).
-- `tests/` — Native Node test runner suite (`node --test`) verifying upload validation, auth/providers, beta-access quotas/revocation, prompt mode/theme/age combinations, PDF export, and config/rules consistency.
+- `packages/` — Generic, host-app agnostic reusable packages for multi-input Prompt & Batch API evaluation (`packages/prompt-eval-core/`, `packages/prompt-eval-backend/`, `packages/prompt-eval-frontend/`).
+- `web-app/` — React + TypeScript + Tailwind CSS frontend with a neo-brutalist themeable UI (`theme.css`, `siteTemplate.ts`, `Navbar` burger menu, `CreatorDialog`), dedicated Admin-Only `/admin` console (`AdminPage` hosting `PromptEvalWorkbench`, `AdminInvitesPanel`, and `AdminTelemetryPanel`), domain modules under `web-app/src/modules/`, self-hosted `@fontsource` fonts, and real-URL legal routes (`web-app/README.md`).
+- `backend/` — Express + TypeScript API server with domain modules under `backend/src/modules/` (including `beta-access` invite quotas, `print-pdf` A4 mastering, and `prompt-eval` Standard/Batch testing) and Zod startup env validation (`backend/README.md`).
+- `tests/` — Native Node test runner suite (`node --test`) verifying upload validation, auth/providers, beta-access quotas/revocation, prompt mode/theme/age combinations, Prompt & Batch Lab flows, PDF export, and config/rules consistency.
 - `Dockerfile` & `.dockerignore` — Multi-stage non-root production container (`node:24-slim`).
 - `.github/workflows/ci.yml` — Automated CI running `lint`, `test`, `build`, and `npm audit --audit-level=high`.
 - `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
@@ -42,6 +43,12 @@ Copy `.env.example` or set secrets in Secret Manager / hosting environment:
 - `TURNSTILE_SECRET_KEY` / `VITE_TURNSTILE_SITE_KEY` — Optional free Cloudflare Turnstile anti-bot keys
 - `APP_CHECK_ENABLED` — Set `true` if using Firebase App Check instead of Turnstile
 - `BOT_PROTECTION_REQUIRED` — Set `true`/`false` to explicitly require or disable anti-bot verification
+- `EMAIL_PROVIDER` — Optional free-tier transactional email adapter for Admin Prompt & Batch Lab notifications (`resend` 3,000/mo free, `brevo` 300/day free, or `none`)
+- `RESEND_API_KEY` / `BREVO_API_KEY` — Optional API key for the selected `EMAIL_PROVIDER`
+- `EMAIL_FROM` — Optional sender address for Prompt & Batch Lab result emails (e.g., `ColoraStoria Prompt Lab <onboarding@resend.dev>`)
+- `APP_BASE_URL` — Optional public app URL used to build `/admin?tab=prompt-lab&run=<runId>` deep links inside batch result emails
+- `PROMPT_EVAL_CRON_SECRET` — Optional shared secret (`>= 16` chars) authorizing free-tier Cloud Scheduler `POST /api/admin/prompt-eval/poll-pending` requests via `X-Cron-Secret`
+- `PROMPT_EVAL_STORE` — Storage adapter for Admin Prompt & Batch Lab runs (`firestore` free tier by default, or `memory` for local dev without GCP credentials)
 
 ## Architecture & Product Phases
 
@@ -52,18 +59,18 @@ flowchart LR
   subgraph Client["Frontend (web-app/)"]
     Landing["Public Neo-Brutalist Landing<br/>theme.css + siteTemplate.ts + Legal Routes<br/>(Implemented)"]:::done
     Creator["CreatorDialog & ExamplesCarousel<br/>6-Example Hero Slider, Invite Gate, Fedele vs Creativa<br/>A4 PDF (1/2/4-up) & PNG Download<br/>(Implemented)"]:::done
-    AdminUI["Google Admin Panels<br/>Invites Manager, Prompt/Provider Overrides<br/>& Cost Telemetry<br/>(Implemented)"]:::done
+    AdminUI["Admin-Only Console (/admin via Burger Menu)<br/>Prompt & Batch Lab (-50%), Invites Manager<br/>& Cost Telemetry<br/>(Implemented)"]:::done
     BookUI["Multi-Page Book UI (10–15 Photos)<br/>Cover Title & Order Flow<br/>(Phase 2 Roadmap)"]:::pending
   end
 
   subgraph Firebase["Firebase (Auth & Firestore)"]
     FirebaseAuth["Firebase Auth (Google Popup)<br/>Admin Sign-In<br/>(Implemented)"]:::done
-    Firestore["Cloud Firestore + Hardened Rules<br/>beta_invites (server-only) & generation_logs<br/>(Implemented)"]:::done
+    Firestore["Cloud Firestore + Hardened Rules<br/>beta_invites & prompt_eval_runs (server-only)<br/>+ generation_logs<br/>(Implemented)"]:::done
   end
 
-  subgraph Server["Backend (backend/)"]
+  subgraph Server["Backend (backend/ + packages/)"]
     BetaGate["beta-access Module<br/>HMAC Cookie + Atomic Quotas & Refunds<br/>(Implemented)"]:::done
-    API["Express API (/api/coloring/generate & export-pdf)<br/>In-Memory Multer + Sharp Mastering<br/>(Implemented)"]:::done
+    API["Express API (/api/coloring/* & /api/admin/prompt-eval/*)<br/>In-Memory Multer, Sharp Mastering & Batch Lab<br/>(Implemented)"]:::done
     Prompts["Versioned Prompts (prompts/v2)<br/>Fedele Isolation + Creativa Themes & Ages<br/>(Implemented)"]:::done
     JobQueue["Async Book Job Queue &<br/>Post-Beta Monetization / Email<br/>(Phase 2 Roadmap)"]:::pending
   end
@@ -93,7 +100,7 @@ flowchart LR
 ```
 
 ### Status Summary
-- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, fixed-position 6-example `ExamplesCarousel` hero slider, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), Google Admin panel (`AdminInvitesPanel`, cost telemetry, prompt/provider overrides, `generation_logs`), `prompts/v2`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
+- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, `Navbar` burger menu, fixed-position 6-example `ExamplesCarousel` hero slider, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), dedicated Admin-Only `/admin` console accessible via the navbar burger menu (hosting reusable `packages/prompt-eval-*` **Prompt & Batch Lab** with Standard vs Batch `-50%` APIs, full prompt inspection/copy, ZIP/single downloads, free-tier Resend/Brevo email notifications, and Firestore-persisted run/item ratings & notes, plus `AdminInvitesPanel` and `AdminTelemetryPanel`), `prompts/v2`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
 - **Planned for Phase 2 (Future Roadmap):** Multi-page coloring book composition (`10–15` photos + cover), post-beta monetization model to be validated after beta feedback (credit packs / pay-per-page / subscription), async job queue & automated email delivery, and final commercial/legal copy alignment.
 
 ## Scripts

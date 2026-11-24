@@ -95,5 +95,14 @@ service cloud.firestore {
     match /beta_invites/{inviteCode} {
       allow read, write: if false;
     }
+
+    // Admin prompt evaluation runs & per-item outputs/notes are strictly managed server-side via firebase-admin
+    match /prompt_eval_runs/{runId} {
+      allow read, write: if false;
+
+      match /items/{itemId} {
+        allow read, write: if false;
+      }
+    }
   }
 }

@@ -8,6 +8,10 @@ import express, {
 import helmet from 'helmet';
 import { botProtectionVerifier } from './src/modules/bot-protection/index.ts';
 import { getServerConfig } from './src/modules/config/index.ts';
+import {
+  createColoraStoriaPromptEvalRouter,
+  promptEvalService,
+} from './src/modules/prompt-eval/index.ts';
 import { createColoringRouter } from './src/routes/coloringRoutes.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,6 +102,7 @@ export async function startServer() {
   );
 
   app.use(express.json({ limit: '12mb' }));
+  app.use('/api/admin/prompt-eval', createColoraStoriaPromptEvalRouter());
   app.use('/api', createColoringRouter());
   app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: 'Endpoint non trovato.' });
@@ -176,11 +181,17 @@ export async function startServer() {
     process.exit(1);
   });
 
+  const batchPoller =
+    process.env.NODE_ENV !== 'test'
+      ? promptEvalService.startBackgroundPoller(5 * 60 * 1000)
+      : null;
+
   let isShuttingDown = false;
   const shutdown = (signal: NodeJS.Signals) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
     console.log(`[SERVER] Received ${signal}, shutting down gracefully...`);
+    batchPoller?.stop();
 
     const forceTimer = setTimeout(() => {
       console.error('[SERVER] Forced shutdown after 10s timeout.');

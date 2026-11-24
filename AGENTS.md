@@ -35,6 +35,15 @@ modules/<module-name>/
 
 ## 2. Current Module Inventory
 
+### Reusable Packages (`packages/`)
+Host-app agnostic packages isolated from both `backend/` and `web-app/` (enforced by `eslint.config.mjs`):
+
+| Package | Key Exports | Responsibility |
+| :--- | :--- | :--- |
+| `packages/prompt-eval-core/` | `types.ts`, `cost.ts`, `zip.ts` | Zero-dependency TS contracts, Standard/Batch (`-50%`) cost calculator, and pure ZIP archive builder |
+| `packages/prompt-eval-backend/` | `promptEval.interface.ts`, `DefaultPromptEvalService`, `GeminiPromptEvalProvider`, `OpenAIPromptEvalProvider`, `FirestorePromptEvalStore`, `InMemoryPromptEvalStore`, `ResendEmailSender`/`BrevoEmailSender`/`NoopEmailSender`, `createPromptEvalRouter` | Generic multi-provider prompt & async Batch API evaluation engine, Firestore/memory persistence, free-tier email notifications, and Express router |
+| `packages/prompt-eval-frontend/` | `promptEvalClient.interface.ts`, `FetchPromptEvalClient`, `PromptEvalWorkbench`, download helpers | Generic typed HTTP client, single/ZIP/JSON download helpers, and reusable React workbench UI (image & text modalities) |
+
 ### Backend (`backend/src/modules/`)
 | Module | Interface (`*.interface.ts`) | Implementation(s) (`implementations/`) | Responsibility |
 | :--- | :--- | :--- | :--- |
@@ -46,11 +55,13 @@ modules/<module-name>/
 | `print-pdf` | `printPdf.interface.ts` (`PrintPdfGenerator`) | `sharpPdfLibGenerator.ts` | Sharp B&W print mastering (300 DPI grayscale) & A4 PDF layout (`1-up`, `2-up`, `4-up`) |
 | `ai-providers` | `aiProvider.interface.ts` (`ColoringProvider`, `AiProviderRegistry`, errors) | `geminiColoringProvider.ts`, `openaiColoringProvider.ts`, `defaultAiProviderRegistry.ts` | Multi-provider AI generation & provider registry |
 | `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts (`v2` multi-mode/age + `v1` fallback) from `prompts/` & `prompts/config.json` |
+| `prompt-eval` | *(implements `@colorastoria/prompt-eval-backend` interfaces)* | `coloraStoriaPromptCatalog.ts`, `sharpMediaPreparer.ts` | Host-app adapter wiring `prompts/` combinations (`fedele`/`creativa` + theme/age), Sharp preprocessing/storage compression, free-tier Firestore/Email config, and `/api/admin/prompt-eval/*` router |
 | `cost-estimation` *(simple)* | `rateCardCostEstimator.ts` (`calculateGenerationCost`) | *(direct typed module)* | Computes token & image generation costs per model (warns on unknown model) |
 
-Delivery layer (`backend/src/routes/coloringRoutes.ts`):
-- Exposes `createColoringRouter(deps: ColoringRouterDeps)` accepting injected `{ providers, auth, prompts, botProtection, mediaValidator, printPdf, betaAccess }` interfaces.
-- `backend/server.ts` configures `helmet` CSP (`crossOriginOpenerPolicy: same-origin-allow-popups`), `trust proxy`, global JSON error handler, listen error handling & `SIGTERM`/`SIGINT` graceful shutdown, `/api`, serves Vite middleware only when `NODE_ENV === 'development'`, and uses `app.use(...)` (Express 5-safe) for production SPA fallback.
+Delivery layer (`backend/src/routes/coloringRoutes.ts` & `backend/server.ts`):
+- `createColoringRouter(deps: ColoringRouterDeps)` accepts injected `{ providers, auth, prompts, botProtection, mediaValidator, printPdf, betaAccess }` interfaces.
+- `createColoraStoriaPromptEvalRouter()` mounts `/api/admin/prompt-eval/*` (admin-only + rate-limited `/poll-pending` also supporting timing-safe `X-Cron-Secret`).
+- `backend/server.ts` configures `helmet` CSP (`crossOriginOpenerPolicy: same-origin-allow-popups`), `trust proxy`, global JSON error handler, background batch poller, listen error handling & `SIGTERM`/`SIGINT` graceful shutdown, `/api`, serves Vite middleware only when `NODE_ENV === 'development'`, and uses `app.use(...)` (Express 5-safe) for production SPA fallback.
 
 ### Frontend (`web-app/src/modules/`)
 | Module | Interface (`*.interface.ts`) | Implementation(s) (`implementations/`) | Responsibility |
@@ -60,9 +71,10 @@ Delivery layer (`backend/src/routes/coloringRoutes.ts`):
 | `database` | `database.interface.ts` (`GenerationLogRepository`, `GenerationLogRecord`) | `firebaseAppInstance.ts`, `firestoreGenerationLogRepository.ts` | Firestore persistence, schema validation, `handleFirestoreError` |
 | `coloring-api` | `coloringApi.interface.ts` (`ColoringApiClient`, `GenerateColoringResult`) | `fetchColoringApiClient.ts` | Typed `/api/*` client + proxy cookie-check detection (`fedele`/`creativa` payload isolation) |
 | `media-validation` | `mediaValidation.interface.ts` (`MediaValidator`, `PhotoValidationResult`) | `browserPhotoValidator.ts` | Client-side MIME, file size, and dimension validation |
+| `prompt-eval` | *(re-exports `PromptEvalApiClient` from `@colorastoria/prompt-eval-frontend`)* | `index.ts` (wired `promptEvalApiClient` singleton + `PromptEvalWorkbench`) | Typed `/api/admin/prompt-eval/*` client & reusable Prompt/Batch Lab workbench |
 
 UI template & configuration layer (`web-app/src/`):
-- `styles/theme.css` (`--cs-*` CSS tokens), `config/siteTemplate.ts` (editable landing/creator copy & example slots), `config/sampleScenes.ts` (2× procedural canvas examples), `config/generationPayload.ts` (pure UI-to-API request mapping), `components/ui/` (neo-brutalist primitives), `components/sections/` (composable landing blocks including `ExamplesCarousel`), and `components/` (`CreatorDialog`, `AdminInvitesPanel`, `AdminTelemetryPanel`, `LegalPage`).
+- `styles/theme.css` (`--cs-*` CSS tokens), `config/siteTemplate.ts` (editable landing/creator copy & example slots), `config/sampleScenes.ts` (2× procedural canvas examples), `config/generationPayload.ts` (pure UI-to-API request mapping), `components/ui/` (neo-brutalist primitives), `components/sections/` (composable landing blocks including `Navbar` burger menu, `ExamplesCarousel`, and `SiteFooter`), and `components/` (`CreatorDialog`, dedicated `/admin` console `AdminPage` hosting `PromptEvalWorkbench`, `AdminInvitesPanel`, and `AdminTelemetryPanel`, plus `LegalPage`).
 
 ---
 
@@ -88,9 +100,9 @@ UI template & configuration layer (`web-app/src/`):
 - **Firestore Config & Database ID**: Always initialize Firestore with `getFirestore(app, firebaseConfig.firestoreDatabaseId)` from `firebase-applet-config.json` (never assume `(default)`).
 - **Connection Test**: Keep `getDocFromServer(doc(db, 'test', 'connection'))` verification inside `firebaseAppInstance.ts`.
 - **Error Handling**: Keep structured JSON errors via `handleFirestoreError(err, OperationType, path)` and attach error callbacks to `onSnapshot`.
-- **Rules & Blueprint**: Any schema or access change MUST stay synchronized across `firebase-blueprint.json`, `firestore.rules`, `firestoreGenerationLogRepository.ts`, and `firestoreBetaInviteStore.ts`. `beta_invites` MUST remain server-only (`allow read, write: if false` in `firestore.rules`), and `generation_logs.themeId` accepts both `'fedele'` and the 6 creative `ThemeId` values. Validate rules with `npx eslint firestore.rules`.
+- **Rules & Blueprint**: Any schema or access change MUST stay synchronized across `firebase-blueprint.json`, `firestore.rules`, `firestoreGenerationLogRepository.ts`, `firestoreBetaInviteStore.ts`, and `firestorePromptEvalStore.ts`. `beta_invites` and `prompt_eval_runs` (including its `items` subcollection) MUST remain server-only (`allow read, write: if false` in `firestore.rules`), and `generation_logs.themeId` accepts both `'fedele'` and the 6 creative `ThemeId` values. Validate rules with `npx eslint firestore.rules`.
 - **In-Memory Uploads**: Uploaded user photos MUST stay strictly in memory (`multer.memoryStorage()`), never persisted to local disk.
-- **Admin Diagnostics**: Detailed provider errors, token telemetry, invite CRUD, and overrides MUST remain gated behind `authTokenVerifier.verifyOptionalRequest(req)` (`isAdmin === true`).
+- **Admin Diagnostics**: Detailed provider errors, token telemetry, invite CRUD, overrides, and `/api/admin/prompt-eval/*` runs MUST remain gated behind `authTokenVerifier.verifyOptionalRequest(req)` (`isAdmin === true`; `/api/admin/prompt-eval/poll-pending` additionally supports a timing-safe `X-Cron-Secret` header).
 
 ---
 
@@ -113,3 +125,4 @@ UI template & configuration layer (`web-app/src/`):
 3. Run production bundle check: `npm run build`.
 4. Confirm `docs/REQUIREMENTS.md` (with bumped version & changelog entry) and `docs/WIKI.md` are updated if any product requirements, dependencies, modules, security controls, or architectural choices changed.
 5. Ensure the server boots cleanly on port `3000` and `GET /api/health` returns `{ "ok": true }`.
+6. **Keep Git & Production Deploy Synchronized**: Unless the user explicitly asks to pause or review first, after all checks pass, commit and push changes to `origin/main`, apply any `firestore.rules` updates via targeted Terraform (`google_firebaserules_ruleset` + `google_firebaserules_release`), and build & deploy the pinned image digest to Cloud Run (`colorastoria`, `europe-west1`, project `gen-lang-client-0006936372`) with live smoke checks.

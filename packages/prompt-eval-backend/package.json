@@ -1,0 +1,10 @@
+{
+  "name": "@colorastoria/prompt-eval-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generic, reusable backend prompt evaluation package supporting standard & async batch APIs (Gemini, OpenAI), Firestore/in-memory run storage, evaluations/notes, and free-tier email notifications (Resend/Brevo).",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

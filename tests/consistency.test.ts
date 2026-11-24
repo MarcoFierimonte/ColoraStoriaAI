@@ -171,3 +171,79 @@ test('all 6 real example trios exist with valid magic bytes and cover all ALLOWE
     );
   }
 });
+
+function extractMatchBlockBody(source: string, headerPattern: RegExp): string {
+  const withoutComments = source.replace(/\/\/[^\n]*/g, '');
+  const match = headerPattern.exec(withoutComments);
+  assert.ok(match, `Missing expected rules block matching ${headerPattern}`);
+  const openBraceIndex = match.index + match[0].length - 1;
+  assert.equal(withoutComments[openBraceIndex], '{');
+
+  let depth = 0;
+  for (let i = openBraceIndex; i < withoutComments.length; i++) {
+    const ch = withoutComments[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return withoutComments.slice(openBraceIndex + 1, i);
+      }
+    }
+  }
+  assert.fail(`Unbalanced braces for rules block matching ${headerPattern}`);
+}
+
+function extractDirectAllowStatements(blockBody: string): string[] {
+  let topLevel = '';
+  let depth = 0;
+  for (const ch of blockBody) {
+    if (ch === '{') {
+      depth++;
+      continue;
+    }
+    if (ch === '}') {
+      depth--;
+      continue;
+    }
+    if (depth === 0) {
+      topLevel += ch;
+    }
+  }
+  return (topLevel.match(/allow\b[^;]*;/g) ?? []).map((stmt) =>
+    stmt.replace(/\s+/g, ' ').trim()
+  );
+}
+
+test('firestore.rules explicitly keeps beta_invites and prompt_eval_runs (+ items subcollection) server-only', () => {
+  const rules = fs.readFileSync(path.join(ROOT_DIR, 'firestore.rules'), 'utf8');
+
+  const betaInvitesBody = extractMatchBlockBody(
+    rules,
+    /match\s+\/beta_invites\/\{[^}]+\}\s*\{/
+  );
+  assert.deepEqual(
+    extractDirectAllowStatements(betaInvitesBody),
+    ['allow read, write: if false;'],
+    'beta_invites must deny all client read/write access'
+  );
+
+  const promptEvalRunsBody = extractMatchBlockBody(
+    rules,
+    /match\s+\/prompt_eval_runs\/\{[^}]+\}\s*\{/
+  );
+  assert.deepEqual(
+    extractDirectAllowStatements(promptEvalRunsBody),
+    ['allow read, write: if false;'],
+    'prompt_eval_runs must deny all client read/write access'
+  );
+
+  const promptEvalItemsBody = extractMatchBlockBody(
+    promptEvalRunsBody,
+    /match\s+\/items\/\{[^}]+\}\s*\{/
+  );
+  assert.deepEqual(
+    extractDirectAllowStatements(promptEvalItemsBody),
+    ['allow read, write: if false;'],
+    'prompt_eval_runs/{runId}/items must deny all client read/write access'
+  );
+});

@@ -6,6 +6,9 @@ import {
 
 export type SupportedProviderId = ProviderId;
 
+export type EmailProviderId = 'none' | 'resend' | 'brevo';
+export type PromptEvalStoreMode = 'firestore' | 'memory';
+
 export interface ServerConfig {
   port: number;
   isDevelopment: boolean;
@@ -21,6 +24,13 @@ export interface ServerConfig {
   botProtectionRequired: boolean;
   betaInviteRequired: boolean;
   betaSessionSecret: string;
+  emailProvider: EmailProviderId;
+  resendApiKey: string;
+  brevoApiKey: string;
+  emailFrom: string;
+  appBaseUrl: string;
+  promptEvalCronSecret: string;
+  promptEvalStoreMode: PromptEvalStoreMode;
 }
 
 const rawEnvSchema = z.object({
@@ -57,6 +67,19 @@ const rawEnvSchema = z.object({
     .optional()
     .default('false'),
   BETA_SESSION_SECRET: z.string().optional().default(''),
+  EMAIL_PROVIDER: z
+    .enum(['none', 'resend', 'brevo', ''])
+    .optional()
+    .default(''),
+  RESEND_API_KEY: z.string().optional().default(''),
+  BREVO_API_KEY: z.string().optional().default(''),
+  EMAIL_FROM: z.string().optional().default(''),
+  APP_BASE_URL: z.string().optional().default(''),
+  PROMPT_EVAL_CRON_SECRET: z.string().optional().default(''),
+  PROMPT_EVAL_STORE: z
+    .enum(['firestore', 'memory', ''])
+    .optional()
+    .default(''),
 });
 
 const emailSchema = z.string().email();
@@ -143,6 +166,21 @@ export function parseServerConfig(
     betaSessionSecret = 'dev-only-beta-session-secret-change-me';
   }
 
+  const resendApiKey = data.RESEND_API_KEY.trim();
+  const brevoApiKey = data.BREVO_API_KEY.trim();
+  const emailProvider: EmailProviderId =
+    data.EMAIL_PROVIDER === 'resend' ||
+    data.EMAIL_PROVIDER === 'brevo' ||
+    data.EMAIL_PROVIDER === 'none'
+      ? data.EMAIL_PROVIDER
+      : resendApiKey
+        ? 'resend'
+        : brevoApiKey
+          ? 'brevo'
+          : 'none';
+  const promptEvalStoreMode: PromptEvalStoreMode =
+    data.PROMPT_EVAL_STORE === 'memory' ? 'memory' : 'firestore';
+
   return {
     port: data.PORT,
     isDevelopment,
@@ -158,5 +196,12 @@ export function parseServerConfig(
     botProtectionRequired,
     betaInviteRequired,
     betaSessionSecret,
+    emailProvider,
+    resendApiKey,
+    brevoApiKey,
+    emailFrom: data.EMAIL_FROM.trim(),
+    appBaseUrl: data.APP_BASE_URL.trim(),
+    promptEvalCronSecret: data.PROMPT_EVAL_CRON_SECRET.trim(),
+    promptEvalStoreMode,
   };
 }

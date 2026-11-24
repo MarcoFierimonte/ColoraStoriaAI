@@ -1,0 +1,11 @@
+{
+  "name": "@colorastoria/prompt-eval-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generic, reusable React workbench and typed API client for testing prompts on multiple images or text inputs using standard or async batch APIs, with downloads, email notifications, and saved evaluations/notes.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
+  }
+}

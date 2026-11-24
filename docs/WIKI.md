@@ -18,9 +18,17 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ## 1. Architettura & Organizzazione del Codice
 
-### Monorepo leggero (`web-app/`, `backend/`, `shared/`)
-- **Cos’è:** La separazione in tre cartelle principali nello stesso repository: il sito mostrato nel browser (`web-app/`), il server API (`backend/`) e i contratti comuni (`shared/`).
-- **Come e dov’è usato:** `backend/` non può importare codice da `web-app/` e viceversa; tutto ciò che serve a entrambi passa da `shared/types/`. Questa regola è controllata automaticamente da ESLint.
+### Monorepo leggero (`web-app/`, `backend/`, `shared/`, `packages/`)
+- **Cos’è:** La separazione in cartelle principali nello stesso repository: il sito mostrato nel browser (`web-app/`), il server API (`backend/`), i contratti comuni (`shared/`) e i pacchetti generici riutilizzabili (`packages/`).
+- **Come e dov’è usato:** `backend/` non può importare codice da `web-app/` e viceversa; tutto ciò che serve a entrambi passa da `shared/types/`. I pacchetti in `packages/prompt-eval-*` sono isolati anche rispetto all’app host (`backend/` e `web-app/`), così da poter essere riutilizzati in altri progetti. Tutte queste regole sono controllate automaticamente da ESLint (`eslint.config.mjs`).
+
+### Pacchetti Riutilizzabili per Valutazione Prompt (`packages/prompt-eval-*`)
+- **Cos’è:** Tre pacchetti modulari e generici (`prompt-eval-core`, `prompt-eval-backend`, `prompt-eval-frontend`) progettati per testare prompt su più immagini o input testuali, confrontare **API Standard** e **Batch API (-50%)**, scaricare i risultati in `.zip`, ricevere email al termine dei job asincroni e salvare voti/note per ogni esecuzione e singola immagine.
+- **Come e dov’è usato:**
+  - `packages/prompt-eval-core/`: tipi puri, calcolo costi Standard/Batch e generatore `.zip` puro in TypeScript (zero dipendenze esterne).
+  - `packages/prompt-eval-backend/`: provider Gemini Batch (`@google/genai` `ai.batches` con inline o Files API JSONL) e OpenAI Batch (`/v1/files` + `/v1/batches`), persistenza Firestore Free Tier a sottocollezione per singola immagine (`prompt_eval_runs/{runId}/items/{itemId}`), adapter email Free Tier (**Resend** 3.000/mese o **Brevo** 300/giorno via `fetch` nativo) e router Express `createPromptEvalRouter` (con endpoint `POST /poll-pending` protetto anche da `X-Cron-Secret` per Google Cloud Scheduler free tier).
+  - `packages/prompt-eval-frontend/`: client HTTP tipizzato (`FetchPromptEvalClient`), helper download singolo/ZIP e workbench React `PromptEvalWorkbench`.
+  - L’adattamento specifico per ColoraStoria vive nel sottile modulo `backend/src/modules/prompt-eval/` (`ColoraStoriaPromptCatalogResolver` + `SharpPromptEvalMediaPreparer`) e nel barrel `web-app/src/modules/prompt-eval/`.
 
 ### Moduli con Interfaccia vs Implementazione (`*.interface.ts` + `implementations/`)
 - **Cos’è:** Un pattern architetturale (simile a una "presa elettrica" e alla sua "spina") che separa **cosa** fa un modulo (l’interfaccia pura in TypeScript) da **come** lo fa tecnicamente con una specifica libreria esterna (l’implementazione).
@@ -60,7 +68,7 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Rate Limiting (`express-rate-limit`)
 - **Cos’è:** Un "contagiri" che limita quante richieste può fare lo stesso indirizzo IP in un certo intervallo di tempo.
-- **Come e dov’è usato:** In `backend/src/routes/coloringRoutes.ts` su `POST /api/coloring/generate`: massimo **15 generazioni ogni 15 minuti** per IP, **30** per `export-pdf` e **20** per `/api/access/redeem`. Oltre quella soglia risponde `HTTP 429` evitando che qualcuno prosciughi quota o budget con script automatici.
+- **Come e dov’è usato:** In `backend/src/routes/coloringRoutes.ts` su `POST /api/coloring/generate`: massimo **15 generazioni ogni 15 minuti** per IP, **30** per `export-pdf` e **20** per `/api/access/redeem`; inoltre in `packages/prompt-eval-backend/src/router.ts` su `POST /api/admin/prompt-eval/poll-pending`: massimo **60 richieste ogni 15 minuti** per IP. Oltre quella soglia risponde `HTTP 429` evitando che qualcuno prosciughi quota o budget con script automatici.
 
 ### Accesso su Invito & Quote per Tester (`beta-access`)
 - **Cos’è:** Sistema ad inviti personali salvati su Firestore (`beta_invites`) con limite numerico di generazioni per utente, eventuale data di scadenza e revoca istantanea. La sessione dell’ospite usa un cookie `HttpOnly` firmato con HMAC-SHA256 (`BETA_SESSION_SECRET`), ma ogni richiesta di generazione o stampa PDF ricontrolla in tempo reale lo stato su Firestore tramite transazione atomica (e rimborsa automaticamente il credito se la chiamata AI fallisce).
@@ -158,6 +166,10 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 - **Cos’è:** Pacchetto npm e font locale che includono i file `.woff2`/`.ttf` direttamente dentro il bundle dell’applicazione, eliminando ogni chiamata ai server di Google Fonts (migliorando la privacy **GDPR**, perché l’IP del visitatore non viene inviato a terzi, e rendendo più stretta la CSP).
 - **Come e dov’è usato:** `Plus Jakarta Sans` importato in `web-app/src/main.tsx` per tutti i pesi usati e associato ai token `--cs-font-sans` / `--cs-font-display` in `web-app/src/styles/theme.css`, insieme al font monospace locale `DMMono-Regular.ttf`.
 
+### Console Admin Multi-Servizio (`/admin`) & Burger Menu
+- **Cos’è:** Pagina dedicata e protetta solo per amministratori (`/admin`) accessibile tramite menu hamburger (`Menu`) nella navbar dell’app principale, che raccoglie a schede tutti i servizi admin (**Laboratorio Prompt & Batch API**, **Inviti Beta** e **Telemetria & Costi**), mantenendo la landing page pubblica pulita.
+- **Come e dov’è usato:** `web-app/src/components/AdminPage.tsx`, `web-app/src/components/sections/Navbar.tsx` e routing client-side in `web-app/src/App.tsx` (con supporto deep link `?tab=prompt-lab&run=<runId>` usato anche nelle email di notifica Batch).
+
 ### Pagine Legali con URL Reali & SEO Meta
 - **Cos’è:** Invece di aprire finestre modali difficili da raggiungere con tastiera o link diretti, le pagine informative hanno veri indirizzi web navigabili e linkabili (`/contatti`, `/privacy`, `/condizioni`, `/recesso`) con gestione automatica del focus sul titolo `<h1>`.
 - **Come e dov’è usato:** `web-app/src/components/LegalPage.tsx` e routing client-side in `web-app/src/App.tsx`, accompagnati da `og:image`, `canonical` e `theme-color` in `web-app/index.html`.
@@ -184,7 +196,7 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 
 ### Firestore Security Rules (`firestore.rules`) & `firebase-blueprint.json`
 - **Cos’è:** Le regole di sicurezza (`firestore.rules`) agiscono come un firewall direttamente sul database Firestore: decidono chi può leggere/scrivere cosa e verificano tipo, lunghezza e timestamp di ogni campo. `firebase-blueprint.json` è lo schema di riferimento della struttura dati.
-- **Come e dov’è usato:** Nella root del progetto. Blocca tutto di default (`deny-all`), permette lettura/creazione/cancellazione su `generation_logs` **solo** ad account verificati con custom claim `admin == true` (includendo sia i 6 temi fantasy sia `'fedele'` per la modalità fedele alla foto) e vieta l’accesso diretto client a `beta_invites`.
+- **Come e dov’è usato:** Nella root del progetto. Blocca tutto di default (`deny-all`), permette lettura/creazione/cancellazione su `generation_logs` **solo** ad account verificati con custom claim `admin == true` (includendo sia i 6 temi fantasy sia `'fedele'` per la modalità fedele alla foto) e vieta esplicitamente qualsiasi accesso diretto client (`allow read, write: if false`) sia a `beta_invites` sia a `prompt_eval_runs` (inclusa la sottocollezione `items`), gestite esclusivamente lato server tramite `firebase-admin`.
 
 ### Prompt Versionati Multi-Modalità (`prompts/v2/`)
 - **Cos’è:** Raccolta versionata delle istruzioni inviate all’AI, separata per istruzioni base di fedeltà (`base.txt`), modalità (`modes.json`: `fedele` senza temi fantasy vs `creativa`), i 6 temi (`themes.json`) e le 4 fasce d’età (`ages.json`).

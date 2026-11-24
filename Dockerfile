@@ -9,6 +9,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY server.ts ./
 COPY shared ./shared
+COPY packages ./packages
 COPY backend ./backend
 COPY web-app ./web-app
 COPY prompts ./prompts
@@ -31,6 +32,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY server.ts ./
 COPY shared ./shared
+COPY packages ./packages
 COPY backend ./backend
 COPY prompts ./prompts
 COPY firebase-applet-config.json ./
