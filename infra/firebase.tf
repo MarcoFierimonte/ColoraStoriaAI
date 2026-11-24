@@ -70,14 +70,18 @@ resource "google_identity_platform_config" "auth_config" {
   ]
   project = var.project_id
 
-  authorized_domains = distinct(compact(concat([
-    "localhost",
-    "127.0.0.1",
-    "${var.project_id}.firebaseapp.com",
-    "${var.project_id}.web.app",
-    trimprefix(google_cloud_run_v2_service.app.uri, "https://"),
-    var.custom_domain != "" ? var.custom_domain : null,
-  ], var.extra_authorized_domains)))
+  authorized_domains = distinct(compact(concat(
+    [
+      "localhost",
+      "127.0.0.1",
+      "${var.project_id}.firebaseapp.com",
+      "${var.project_id}.web.app",
+      trimprefix(google_cloud_run_v2_service.app.uri, "https://"),
+      var.custom_domain != "" ? var.custom_domain : null,
+    ],
+    [for u in google_cloud_run_v2_service.app.urls : trimprefix(u, "https://")],
+    var.extra_authorized_domains
+  )))
 }
 
 # Enable Google Identity Provider for popup login (optional via Terraform;
