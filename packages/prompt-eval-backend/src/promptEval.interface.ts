@@ -211,6 +211,30 @@ export interface EmailNotificationSender {
   send(message: EmailMessage): Promise<void>;
 }
 
+export interface PromptEvalTelemetryEntry {
+  runId: string;
+  runTitle: string;
+  itemId: string;
+  inputName: string;
+  actorUid: string;
+  actorEmail: string;
+  modality: PromptEvalModality;
+  executionMode: PromptExecutionMode;
+  providerId: string;
+  model: string;
+  promptSource: 'catalog' | 'custom';
+  promptParams: Record<string, string>;
+  promptMetadata: Record<string, string>;
+  outputFormat?: 'raster' | 'svg' | 'text';
+  latencyMs: number;
+  usage: PromptEvalUsage;
+  completedAtMs: number;
+}
+
+export interface PromptEvalTelemetryRecorder {
+  recordCompletedItems(entries: PromptEvalTelemetryEntry[]): Promise<void>;
+}
+
 export interface CreatePromptEvalRunInput {
   actorUid: string;
   actorEmail: string;

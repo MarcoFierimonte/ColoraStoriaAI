@@ -1,8 +1,7 @@
 import type {
   AdminTelemetry,
-  ColoringOutputFormat,
+  AdminTelemetryLogRecord,
   GenerationLogThemeId,
-  ProviderId,
 } from '../../../../shared/types/index.ts';
 
 export enum OperationType {
@@ -31,22 +30,7 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export interface GenerationLogRecord {
-  id: string;
-  adminUid: string;
-  provider: ProviderId;
-  model: string;
-  promptVersion: string;
-  themeId: GenerationLogThemeId;
-  outputFormat: ColoringOutputFormat;
-  inputTokens: number;
-  cachedInputTokens: number;
-  textOutputTokens: number;
-  imageOutputTokens: number;
-  estimatedCostUsd: number;
-  latencyMs: number;
-  createdAtMs: number | null;
-}
+export type GenerationLogRecord = AdminTelemetryLogRecord;
 
 export interface SaveGenerationLogInput {
   adminUid: string;

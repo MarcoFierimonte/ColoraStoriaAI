@@ -1,5 +1,6 @@
 import type {
   AdminSessionResponse,
+  AdminTelemetryLogRecord,
   ColoringApiClient,
   ColoringGenerationResponse,
   ExportPrintPdfRequest,
@@ -13,6 +14,7 @@ export {
   type AdminErrorDetails,
   type AdminSessionResponse,
   type AdminTelemetry,
+  type AdminTelemetryLogRecord,
   type ColoringAgeGroup,
   type ColoringApiClient,
   type ColoringGenerationResponse,
@@ -32,6 +34,20 @@ export function fetchAdminSession(
   idToken?: string | null
 ): Promise<AdminSessionResponse> {
   return coloringApiClient.fetchAdminSession(idToken);
+}
+
+export function fetchAdminTelemetryLogsApi(
+  idToken?: string | null,
+  limit = 100
+): Promise<AdminTelemetryLogRecord[]> {
+  return coloringApiClient.fetchAdminTelemetryLogs(idToken, limit);
+}
+
+export function deleteAdminTelemetryLogApi(
+  logId: string,
+  idToken?: string | null
+): Promise<void> {
+  return coloringApiClient.deleteAdminTelemetryLog(logId, idToken);
 }
 
 export function generateColoringPageApi(

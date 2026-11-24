@@ -41,10 +41,16 @@ import { serverMediaValidator } from '../backend/src/modules/media-validation/in
 import {
   COLORASTORIA_CATALOG_ID,
   ColoraStoriaPromptCatalogResolver,
+  createColoraStoriaPromptEvalBundle,
   createColoraStoriaPromptEvalService,
   SharpPromptEvalMediaPreparer,
 } from '../backend/src/modules/prompt-eval/index.ts';
 import { FilesystemPromptRepository } from '../backend/src/modules/prompts/index.ts';
+import { createColoringRouter } from '../backend/src/routes/coloringRoutes.ts';
+import {
+  ColoringApiError,
+  FetchColoringApiClient,
+} from '../web-app/src/modules/coloring-api/index.ts';
 
 async function makeValidPngBuffer(
   width = 420,
@@ -2441,6 +2447,337 @@ test('Datasets end-to-end: repo dataset discovery (including WebP) + app dataset
       () => client.getDataset(createdAppDataset.id, 'admin-ok'),
       (err: unknown) =>
         err instanceof PromptEvalClientError && err.statusCode === 404
+    );
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test('Unified Admin Telemetry includes Prompt Lab Standard & Batch (-50%) runs, backfills historical runs once, and supports deletion', async () => {
+  const pngA = await makeValidPngBuffer(420, 420, { r: 210, g: 130, b: 90 });
+  const outPng = await makeValidPngBuffer(400, 400, { r: 255, g: 255, b: 255 });
+  const outPngBase64 = outPng.toString('base64');
+
+  let batchDone = false;
+  let capturedBatchItemIds: string[] = [];
+
+  const mockGeminiClient: GeminiClientLike = {
+    models: {
+      generateContent: (async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/png',
+                    data: outPngBase64,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 600,
+          candidatesTokenCount: 1120,
+          candidatesTokensDetails: [{ modality: 'IMAGE', tokenCount: 1120 }],
+        },
+      })) as unknown as GeminiClientLike['models']['generateContent'],
+    },
+    batches: {
+      create: (async (params: {
+        src?: Array<{ metadata?: { itemId?: string } }>;
+      }) => {
+        capturedBatchItemIds = (params.src ?? [])
+          .map((r) => r.metadata?.itemId ?? '')
+          .filter(Boolean);
+        return {
+          name: 'batches/telemetry-batch-1',
+          state: 'JOB_STATE_QUEUED',
+        };
+      }) as unknown as GeminiClientLike['batches']['create'],
+      get: (async () => {
+        if (!batchDone) {
+          return {
+            name: 'batches/telemetry-batch-1',
+            state: 'JOB_STATE_RUNNING',
+          };
+        }
+        return {
+          name: 'batches/telemetry-batch-1',
+          state: 'JOB_STATE_SUCCEEDED',
+          dest: {
+            inlinedResponses: capturedBatchItemIds.map((itemId, idx) => ({
+              metadata: { itemId, index: String(idx) },
+              response: {
+                candidates: [
+                  {
+                    content: {
+                      parts: [
+                        {
+                          inlineData: {
+                            mimeType: 'image/png',
+                            data: outPngBase64,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usageMetadata: {
+                  promptTokenCount: 600,
+                  candidatesTokenCount: 1120,
+                  candidatesTokensDetails: [
+                    { modality: 'IMAGE', tokenCount: 1120 },
+                  ],
+                },
+              },
+            })),
+          },
+        };
+      }) as unknown as GeminiClientLike['batches']['get'],
+      cancel: (async () => undefined) as unknown as GeminiClientLike['batches']['cancel'],
+    },
+    files: {
+      upload: (async () => ({
+        name: 'files/mock',
+      })) as unknown as GeminiClientLike['files']['upload'],
+    },
+  };
+
+  const evalStore = new InMemoryPromptEvalStore();
+  // Seed a pre-existing historical Prompt Lab run (simulating a run created before telemetry sync)
+  await evalStore.createRun({
+    id: 'eval_legacy_preexisting',
+    title: 'Legacy Run Pre-Sync',
+    createdByUid: 'admin-uid-1',
+    createdByEmail: 'admin@example.com',
+    modality: 'image',
+    executionMode: 'batch',
+    providerId: 'gemini',
+    model: 'gemini-nano-banana-2.1',
+    promptSource: 'catalog',
+    catalogId: COLORASTORIA_CATALOG_ID,
+    promptLabel: 'v2 · Fedele',
+    promptText: 'Prompt',
+    promptParams: { version: 'v2', mode: 'fedele' },
+    promptMetadata: { promptVersion: 'v2' },
+    status: 'completed',
+    totalItems: 1,
+    completedItems: 1,
+    failedItems: 0,
+    totalEstimatedCostUsd: 0.0177,
+    totalInputTokens: 500,
+    totalOutputTokens: 1120,
+    notificationStatus: 'not_requested',
+    createdAtMs: 1_000_000,
+    updatedAtMs: 1_000_000,
+    completedAtMs: 1_000_000,
+    items: [
+      {
+        id: 'item_legacy_1',
+        index: 0,
+        inputName: 'vecchio-test.jpg',
+        status: 'completed',
+        outputFormat: 'raster',
+        latencyMs: 0,
+        completedAtMs: 1_000_000,
+        usage: {
+          inputTokens: 500,
+          cachedInputTokens: 0,
+          textOutputTokens: 0,
+          imageOutputTokens: 1120,
+          estimatedCostUsd: 0.0177,
+          batchDiscountApplied: true,
+        },
+      },
+    ],
+  });
+
+  const bundle = createColoraStoriaPromptEvalBundle({
+    config: parseServerConfig(
+      { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'fake', PROMPT_EVAL_STORE: 'memory' },
+      []
+    ),
+    store: evalStore,
+  });
+
+  // Override provider with mock Gemini client so Standard & Batch execute offline
+  const service = new DefaultPromptEvalService({
+    providers: new DefaultPromptProviderRegistry({
+      providers: [
+        new GeminiPromptEvalProvider({
+          apiKey: 'fake',
+          defaultModel: 'gemini-nano-banana-2.1',
+          clientFactory: () => mockGeminiClient,
+        }),
+      ],
+      defaultProviderId: 'gemini',
+    }),
+    store: evalStore,
+    catalogResolver: new ColoraStoriaPromptCatalogResolver(
+      new FilesystemPromptRepository()
+    ),
+    mediaPreparer: new SharpPromptEvalMediaPreparer(serverMediaValidator),
+    emailSender: new NoopEmailSender(),
+    telemetryRecorder: bundle.telemetryService,
+  });
+
+  const mockAuth = {
+    verifyOptionalRequest: async (req: express.Request) => {
+      if (req.headers.authorization === 'Bearer admin-token') {
+        return {
+          authenticated: true,
+          isAdmin: true,
+          hasAdminClaim: false,
+          uid: 'admin-uid-1',
+          email: 'admin@example.com',
+        };
+      }
+      return {
+        authenticated: false,
+        isAdmin: false,
+        hasAdminClaim: false,
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json({ limit: '12mb' }));
+  app.use(
+    '/api/admin/prompt-eval',
+    createPromptEvalRouter({
+      service,
+      authorizeAdmin: async (req) => {
+        const ctx = await mockAuth.verifyOptionalRequest(req);
+        return { isAdmin: ctx.isAdmin, uid: ctx.uid, email: ctx.email };
+      },
+    })
+  );
+  app.use(
+    '/api',
+    createColoringRouter({
+      providers: {
+        getProvider: () => {
+          throw new Error('unused');
+        },
+        listStatuses: () => [],
+      },
+      auth: mockAuth,
+      prompts: new FilesystemPromptRepository(),
+      botProtection: {
+        isEnforced: () => false,
+        verifyRequest: async () => ({ verified: true, provider: 'disabled' }),
+      },
+      mediaValidator: serverMediaValidator,
+      telemetryService: bundle.telemetryService,
+    })
+  );
+
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as { port: number }).port;
+  const evalClient = new FetchPromptEvalClient(
+    `http://127.0.0.1:${port}/api/admin/prompt-eval`
+  );
+  const coloringClient = new FetchColoringApiClient(
+    `http://127.0.0.1:${port}/api`
+  );
+
+  try {
+    // 1. Non-admin blocked from reading telemetry logs
+    await assert.rejects(
+      () => coloringClient.fetchAdminTelemetryLogs(null),
+      (err: unknown) => err instanceof ColoringApiError
+    );
+
+    // 2. First admin read backfills the historical Prompt Lab run automatically
+    const initialLogs = await coloringClient.fetchAdminTelemetryLogs(
+      'admin-token'
+    );
+    assert.equal(initialLogs.length, 1);
+    assert.equal(initialLogs[0].source, 'prompt_lab');
+    assert.equal(initialLogs[0].executionMode, 'batch');
+    assert.equal(initialLogs[0].inputName, 'vecchio-test.jpg');
+
+    // 3. Running a Standard Prompt Lab test records telemetry immediately
+    await evalClient.createRun(
+      {
+        title: 'Std Telemetry Run',
+        modality: 'image',
+        executionMode: 'standard',
+        promptSource: 'catalog',
+        catalogId: COLORASTORIA_CATALOG_ID,
+        promptParams: {
+          version: 'v3',
+          mode: 'creativa',
+          themeId: 'pirati',
+          ageGroup: '5-7',
+        },
+        files: [
+          new File([new Uint8Array(pngA)], 'pirata.png', { type: 'image/png' }),
+        ],
+      },
+      'admin-token'
+    );
+
+    const afterStd = await coloringClient.fetchAdminTelemetryLogs('admin-token');
+    assert.equal(afterStd.length, 2);
+    const stdEntry = afterStd.find((l) => l.inputName === 'pirata.png');
+    assert.ok(stdEntry);
+    assert.equal(stdEntry.source, 'prompt_lab');
+    assert.equal(stdEntry.executionMode, 'standard');
+    assert.equal(stdEntry.themeId, 'pirati');
+    assert.equal(stdEntry.promptVersion, 'v3');
+
+    // 4. Running a Batch Prompt Lab test records telemetry once completed (idempotent on repeated polls)
+    const batchCreated = await evalClient.createRun(
+      {
+        title: 'Batch Telemetry Run',
+        modality: 'image',
+        executionMode: 'batch',
+        promptSource: 'catalog',
+        catalogId: COLORASTORIA_CATALOG_ID,
+        promptParams: { version: 'v3', mode: 'fedele' },
+        files: [
+          new File([new Uint8Array(pngA)], 'fedele-batch.png', {
+            type: 'image/png',
+          }),
+        ],
+      },
+      'admin-token'
+    );
+    batchDone = true;
+    await evalClient.refreshBatchRun(batchCreated.id, 'admin-token');
+    await evalClient.refreshBatchRun(batchCreated.id, 'admin-token');
+
+    const afterBatch =
+      await coloringClient.fetchAdminTelemetryLogs('admin-token');
+    assert.equal(afterBatch.length, 3);
+    const batchEntry = afterBatch.find(
+      (l) => l.inputName === 'fedele-batch.png'
+    );
+    assert.ok(batchEntry);
+    assert.equal(batchEntry.source, 'prompt_lab');
+    assert.equal(batchEntry.executionMode, 'batch');
+    assert.equal(batchEntry.batchDiscountApplied, true);
+    assert.equal(
+      batchEntry.estimatedCostUsd,
+      Number((stdEntry.estimatedCostUsd * 0.5).toFixed(6))
+    );
+
+    // 5. Deleting a backfilled log keeps it deleted permanently (does not re-backfill)
+    await coloringClient.deleteAdminTelemetryLog(
+      initialLogs[0].id,
+      'admin-token'
+    );
+    const afterDelete =
+      await coloringClient.fetchAdminTelemetryLogs('admin-token');
+    assert.equal(afterDelete.length, 2);
+    assert.equal(
+      afterDelete.find((l) => l.id === initialLogs[0].id),
+      undefined
     );
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

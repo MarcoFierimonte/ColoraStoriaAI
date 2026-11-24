@@ -37,6 +37,12 @@ import {
   COLORASTORIA_CATALOG_ID,
   ColoraStoriaPromptCatalogResolver,
 } from './implementations/coloraStoriaPromptCatalog.ts';
+import {
+  FirestoreGenerationTelemetryService,
+  InMemoryGenerationTelemetryService,
+  type AdminGenerationTelemetryService,
+  type CreatorGenerationTelemetryInput,
+} from './implementations/generationTelemetryRecorder.ts';
 import { SharpPromptEvalMediaPreparer } from './implementations/sharpMediaPreparer.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,7 +59,11 @@ const DEFAULT_REPO_DATASETS_DIR = path.resolve(
 export {
   COLORASTORIA_CATALOG_ID,
   ColoraStoriaPromptCatalogResolver,
+  FirestoreGenerationTelemetryService,
+  InMemoryGenerationTelemetryService,
   SharpPromptEvalMediaPreparer,
+  type AdminGenerationTelemetryService,
+  type CreatorGenerationTelemetryInput,
 };
 
 export function createEmailSenderFromConfig(
@@ -74,7 +84,7 @@ export function createEmailSenderFromConfig(
   return new NoopEmailSender();
 }
 
-export function createColoraStoriaPromptEvalService(params?: {
+export function createColoraStoriaPromptEvalBundle(params?: {
   config?: ServerConfig;
   prompts?: PromptRepository;
   mediaValidator?: ServerMediaValidator;
@@ -83,7 +93,11 @@ export function createColoraStoriaPromptEvalService(params?: {
   datasetStore?: PromptEvalDatasetStore;
   datasetsRootDir?: string;
   emailSender?: EmailNotificationSender;
-}): DefaultPromptEvalService {
+  telemetryService?: AdminGenerationTelemetryService;
+}): {
+  service: DefaultPromptEvalService;
+  telemetryService: AdminGenerationTelemetryService;
+} {
   const config = params?.config ?? getServerConfig();
   const prompts = params?.prompts ?? promptRepository;
   const mediaValidator = params?.mediaValidator ?? serverMediaValidator;
@@ -112,6 +126,15 @@ export function createColoraStoriaPromptEvalService(params?: {
       mediaPreparer,
     });
 
+  const telemetryService: AdminGenerationTelemetryService =
+    params?.telemetryService ??
+    (config.promptEvalStoreMode === 'memory'
+      ? new InMemoryGenerationTelemetryService({ evalStore: store })
+      : new FirestoreGenerationTelemetryService({
+          firebaseConfigPath: DEFAULT_FIREBASE_CONFIG_PATH,
+          evalStore: store,
+        }));
+
   const emailSender =
     params?.emailSender ?? createEmailSenderFromConfig(config);
 
@@ -130,7 +153,7 @@ export function createColoraStoriaPromptEvalService(params?: {
     ],
   });
 
-  return new DefaultPromptEvalService({
+  const service = new DefaultPromptEvalService({
     providers: providerRegistry,
     store,
     datasetRepository,
@@ -138,6 +161,7 @@ export function createColoraStoriaPromptEvalService(params?: {
     catalogResolver: new ColoraStoriaPromptCatalogResolver(prompts),
     mediaPreparer,
     emailSender,
+    telemetryRecorder: telemetryService,
     appBaseUrl: config.appBaseUrl || undefined,
     limits: {
       maxImagesPerRun: 20,
@@ -147,10 +171,31 @@ export function createColoraStoriaPromptEvalService(params?: {
       acceptedExtensionsLabel: ACCEPTED_IMAGE_EXTENSIONS_LABEL,
     },
   });
+
+  return { service, telemetryService };
 }
 
+export function createColoraStoriaPromptEvalService(params?: {
+  config?: ServerConfig;
+  prompts?: PromptRepository;
+  mediaValidator?: ServerMediaValidator;
+  store?: PromptEvalStore;
+  datasetRepository?: PromptEvalDatasetRepository;
+  datasetStore?: PromptEvalDatasetStore;
+  datasetsRootDir?: string;
+  emailSender?: EmailNotificationSender;
+  telemetryService?: AdminGenerationTelemetryService;
+}): DefaultPromptEvalService {
+  return createColoraStoriaPromptEvalBundle(params).service;
+}
+
+const defaultBundle = createColoraStoriaPromptEvalBundle();
+
 export const promptEvalService: DefaultPromptEvalService =
-  createColoraStoriaPromptEvalService();
+  defaultBundle.service;
+
+export const generationTelemetryService: AdminGenerationTelemetryService =
+  defaultBundle.telemetryService;
 
 export function createColoraStoriaPromptEvalRouter(params?: {
   service?: PromptEvalService;

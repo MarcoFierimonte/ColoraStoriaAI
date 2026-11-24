@@ -14,6 +14,8 @@ export {
   type PromptEvalService,
   type PromptEvalStore,
   type PromptEvalStoredDatasetItem,
+  type PromptEvalTelemetryEntry,
+  type PromptEvalTelemetryRecorder,
   type PromptEvalTextInput,
   type PromptExecutionProvider,
   type PromptProviderRegistry,

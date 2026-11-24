@@ -1,7 +1,7 @@
 # ColoraStoria — Wiki dei Requisiti (Funzionali, Non-Funzionali & Roadmap)
 
-> **Versione:** `1.5.0`  
-> **Data:** `2026-11-24`  
+> **Versione:** `1.6.0`  
+> **Data:** `2026-11-25`  
 > **Stato attuale del prodotto:** **Fase 1 — Beta Privata su Invito (Pagine singole istantanee + Stampa A4 + Console Admin & Laboratorio Prompt Batch)**
 
 ---
@@ -83,7 +83,7 @@ La generazione AI supporta due modalità rigorosamente isolate sia lato UI (`web
   - **Salvataggio su dispositivo & notifica email Free Tier:** Download singola immagine o archivio `.zip` completo (`outputs/` + `prompt.txt` + `evaluation-report.json`); per i job batch asincroni, invio automatico dell’email con riepilogo e allegato ZIP tramite provider con piano gratuito (**Resend** 3.000/mese o **Brevo** 300/giorno) e endpoint `/api/admin/prompt-eval/poll-pending` compatibile con Google Cloud Scheduler (piano gratuito).
   - **Persistenza esecuzioni, voti e note:** Ogni esecuzione e ogni singolo output (con miniatura di confronto) sono salvati su Firestore (`prompt_eval_runs/{runId}/items/{itemId}`, free tier, server-only), con valutazione in stelle (`1–5`), esito (`Promosso`/`Da migliorare`/`Scartato`), tag e note testuali modificabili nel tempo.
 - **Gestione inviti (`AdminInvitesPanel` + CLI `scripts/manage-invites.ts`):** Creazione inviti con codice automatico o personalizzato, quota massima (`1–1000`), durata opzionale (`1–365` giorni), copia link `?invite=...`, ricarica rapida `+5`, sospensione/riattivazione ed eliminazione.
-- **Diagnostica & Telemetria AI (`AdminTelemetryPanel`):** Override di provider (`gemini` / `openai`) e versione prompt (`v1` / `v2`), copia dettagli completi di errore, calcolo costi stimati per pagina e proiezione 16 pagine (`rateCardCostEstimator.ts`), e persistenza log su Firestore (`generation_logs` con `themeId` esteso anche a `'fedele'`).
+- **Diagnostica & Telemetria AI Unificata (`AdminTelemetryPanel` + `/api/admin/telemetry/logs`):** Override di provider (`gemini` / `openai`) e versione prompt (`v1` / `v2` / `v3`), copia dettagli completi di errore, calcolo costi stimati per pagina e proiezione 16 pagine (`rateCardCostEstimator.ts`), e storico unificato su Firestore (`generation_logs`) che registra automaticamente **sia** le generazioni singole avviate dall’app principale (`source: 'creator'`), **sia** tutte le singole immagini/input completati nel **Laboratorio Prompt & Batch API** (`source: 'prompt_lab'`, sia `standard` sia `batch` `-50%`, con sincronizzazione retroattiva una tantum dei run già eseguiti, filtri per origine e supporto sia a sessioni con custom claim `{ admin: true }` sia `ADMIN_EMAILS`).
 
 ---
 
@@ -130,6 +130,7 @@ I requisiti seguenti descrivono l’evoluzione prevista dopo la validazione dell
 
 | Versione | Data | Autore / Contesto | Modifiche Principali |
 | :--- | :--- | :--- | :--- |
+| **`1.6.0`** | `2026-11-25` | Telemetria Admin unificata con i test del Laboratorio Prompt | Aggiornato `REQ-FN-06`: esteso lo storico `generation_logs` e `AdminTelemetryPanel` per registrare e mostrare automaticamente anche tutte le valutazioni eseguite nel Laboratorio Prompt (sia API Standard sia Batch API `-50%`, inclusi i run già presenti su `prompt_eval_runs` tramite backfill automatico idempotente), con filtri per origine (*App Singola*, *Prompt Lab · Standard*, *Prompt Lab · Batch -50%*), KPI aggregati ed endpoint Admin `/api/admin/telemetry/logs`. |
 | **`1.5.0`** | `2026-11-24` | Gestione Dataset dal Repository & dall’App in Console Admin | Aggiornati `REQ-FN-06` e `REQ-NFR-03`: aggiunta gestione completa dei dataset di test immagine nei pacchetti `packages/prompt-eval-*` e nella Console Admin (`/admin`), con scoperta automatica dei dataset presenti nel repository (`dataset/<nome>/input/`, badge `REPO`), creazione/eliminazione di nuovi dataset direttamente dall’app caricando foto dal dispositivo (`prompt_eval_datasets/{datasetId}/items/{itemId}` su Firestore free tier, badge `APP`), esecuzione diretta senza ri-upload dei file ed esportazione `.zip` pronta per il repository. |
 | **`1.4.0`** | `2026-11-24` | Libreria prompt `prompts/v3` & fix riesecuzione Console Admin | Aggiornati `REQ-FN-04` e `REQ-FN-06`: introdotta la nuova versione attiva `prompts/v3/` ottimizzata su dataset reale per la Fase 1 (pulizia automatica scatole/cartellini/loghi/testi sui giocattoli, contorni neri `#000000` puri senza linee grigie né micro-texture incolorabili, tutela dei cappellini/occhiali reali in *Creativa*, staging naturale per animali/peluche e scalatura progressiva per età `1-2`/`3-4`/`5-7`/`8+`). Corretto il blocco della Console Admin `/admin` dopo la prima esecuzione tramite snapshot `ArrayBuffer` in RAM dei file caricati (immuni da `ERR_UPLOAD_FILE_CHANGED` se spostati su disco), feedback inline accanto al tasto *Avvia*, azione *Riusa impostazioni* e pulsante *Prova un altro stile con questa foto* anche in `CreatorDialog`. |
 | **`1.3.1`** | `2026-11-24` | Rimozione opzione vettoriale/SVG nel Prompt Lab | Aggiornato `REQ-FN-06`: rimosso il selettore «Adattatore output» (`raster`/`svg`) dal catalogo ColoraStoria e il modello vettoriale `gemini-4-hydrogen` dai modelli del Laboratorio Prompt Admin, limitando i test immagine ai soli modelli raster. |

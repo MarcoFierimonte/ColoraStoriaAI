@@ -3,6 +3,8 @@ import {
   type AdminDebugInfo,
   type AdminErrorDetails,
   type AdminSessionResponse,
+  type AdminTelemetryLogRecord,
+  type AdminTelemetryLogsResponse,
   type ColoringApiClient,
   type ColoringGenerationResponse,
   type ExportPrintPdfRequest,
@@ -49,6 +51,67 @@ export class FetchColoringApiClient implements ColoringApiClient {
       return (await response.json()) as AdminSessionResponse;
     } catch {
       return fallbackSession;
+    }
+  }
+
+  async fetchAdminTelemetryLogs(
+    idToken?: string | null,
+    limit = 100
+  ): Promise<AdminTelemetryLogRecord[]> {
+    const headers: Record<string, string> = {};
+    if (idToken) {
+      headers.Authorization = `Bearer ${idToken}`;
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/admin/telemetry/logs?limit=${encodeURIComponent(String(limit))}`,
+      {
+        method: 'GET',
+        headers,
+        credentials: 'same-origin',
+      }
+    );
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new ColoringApiError(
+        body?.error ??
+          `Impossibile caricare i log di telemetria (HTTP ${response.status}).`
+      );
+    }
+
+    const payload = (await response.json()) as AdminTelemetryLogsResponse;
+    return Array.isArray(payload.logs) ? payload.logs : [];
+  }
+
+  async deleteAdminTelemetryLog(
+    logId: string,
+    idToken?: string | null
+  ): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (idToken) {
+      headers.Authorization = `Bearer ${idToken}`;
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/admin/telemetry/logs/${encodeURIComponent(logId)}`,
+      {
+        method: 'DELETE',
+        headers,
+        credentials: 'same-origin',
+      }
+    );
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new ColoringApiError(
+        body?.error ??
+          `Impossibile eliminare il log selezionato (HTTP ${response.status}).`
+      );
     }
   }
 

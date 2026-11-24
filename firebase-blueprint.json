@@ -44,6 +44,32 @@
           "maxLength": 128,
           "pattern": "^[a-zA-Z0-9_\\-]+$"
         },
+        "source": {
+          "type": "string",
+          "enum": ["creator", "prompt_lab"],
+          "description": "Origin of the test generation (single creator dialog vs admin prompt lab)"
+        },
+        "executionMode": {
+          "type": "string",
+          "enum": ["standard", "batch"],
+          "description": "API execution mode used"
+        },
+        "batchDiscountApplied": {
+          "type": "boolean",
+          "description": "Whether -50% Batch API discount applied"
+        },
+        "runId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "runTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "inputName": {
+          "type": "string",
+          "maxLength": 120
+        },
         "provider": {
           "type": "string",
           "enum": ["gemini", "openai"],
@@ -57,10 +83,10 @@
         },
         "promptVersion": {
           "type": "string",
-          "description": "Version tag from prompts/config.json",
+          "description": "Version tag from prompts/config.json or custom",
           "minLength": 2,
           "maxLength": 20,
-          "pattern": "^v[0-9]+$"
+          "pattern": "^(v[0-9]+|custom)$"
         },
         "themeId": {
           "type": "string",
@@ -69,7 +95,7 @@
         },
         "outputFormat": {
           "type": "string",
-          "enum": ["svg", "raster"],
+          "enum": ["svg", "raster", "text"],
           "description": "Output asset format"
         },
         "inputTokens": {

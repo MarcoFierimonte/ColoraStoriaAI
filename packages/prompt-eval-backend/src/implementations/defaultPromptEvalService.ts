@@ -35,6 +35,8 @@ import {
   type PromptEvalService,
   type PromptEvalStore,
   type PromptEvalStoredDatasetItem,
+  type PromptEvalTelemetryEntry,
+  type PromptEvalTelemetryRecorder,
   type PromptEvalTextInput,
   type PromptProviderRegistry,
   type ProviderItemResult,
@@ -189,6 +191,7 @@ export interface DefaultPromptEvalServiceOptions {
   catalogResolver?: PromptCatalogResolver;
   mediaPreparer?: PromptEvalMediaPreparer;
   emailSender?: EmailNotificationSender;
+  telemetryRecorder?: PromptEvalTelemetryRecorder;
   appBaseUrl?: string;
   limits?: Partial<PromptEvalLimits>;
   standardConcurrency?: number;
@@ -203,6 +206,7 @@ export class DefaultPromptEvalService implements PromptEvalService {
   private readonly catalogResolver?: PromptCatalogResolver;
   private readonly mediaPreparer?: PromptEvalMediaPreparer;
   private readonly emailSender: EmailNotificationSender;
+  private readonly telemetryRecorder?: PromptEvalTelemetryRecorder;
   private readonly appBaseUrl?: string;
   private readonly limits: PromptEvalLimits;
   private readonly standardConcurrency: number;
@@ -221,6 +225,7 @@ export class DefaultPromptEvalService implements PromptEvalService {
     this.catalogResolver = options.catalogResolver;
     this.mediaPreparer = options.mediaPreparer;
     this.emailSender = options.emailSender ?? new NoopEmailSender();
+    this.telemetryRecorder = options.telemetryRecorder;
     this.appBaseUrl = options.appBaseUrl?.trim() || undefined;
     this.limits = { ...DEFAULT_LIMITS, ...(options.limits ?? {}) };
     this.standardConcurrency = Math.max(
@@ -1028,11 +1033,52 @@ export class DefaultPromptEvalService implements PromptEvalService {
       items: updatedItems,
     };
 
+    await this.recordCompletedRunTelemetry(completedRun);
+
     if (notifyEmail) {
       return this.deliverOrRecordEmailNotification(completedRun, notifyEmail);
     }
 
     return completedRun;
+  }
+
+  private async recordCompletedRunTelemetry(
+    run: PromptEvalRunDetail
+  ): Promise<void> {
+    if (!this.telemetryRecorder) return;
+    const entries: PromptEvalTelemetryEntry[] = [];
+    for (const item of run.items) {
+      if (item.status !== 'completed' || !item.usage) continue;
+      entries.push({
+        runId: run.id,
+        runTitle: run.title,
+        itemId: item.id,
+        inputName: item.inputName,
+        actorUid: run.createdByUid,
+        actorEmail: run.createdByEmail,
+        modality: run.modality,
+        executionMode: run.executionMode,
+        providerId: run.providerId,
+        model: run.model,
+        promptSource: run.promptSource,
+        promptParams: run.promptParams,
+        promptMetadata: run.promptMetadata,
+        outputFormat: item.outputFormat,
+        latencyMs: item.latencyMs ?? 0,
+        usage: item.usage,
+        completedAtMs: item.completedAtMs ?? run.completedAtMs ?? this.now(),
+      });
+    }
+    if (entries.length === 0) return;
+
+    try {
+      await this.telemetryRecorder.recordCompletedItems(entries);
+    } catch (err) {
+      console.error(
+        `[PROMPT_EVAL] Failed recording telemetry for run ${run.id}:`,
+        err
+      );
+    }
   }
 
   private async mergeItemResult(
@@ -1213,6 +1259,7 @@ export class DefaultPromptEvalService implements PromptEvalService {
     });
 
     const finalized = await this.getRun(runId);
+    await this.recordCompletedRunTelemetry(finalized);
     if (finalized.notifyEmail && finalized.notificationStatus !== 'sent') {
       return this.deliverOrRecordEmailNotification(
         finalized,

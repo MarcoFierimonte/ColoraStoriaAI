@@ -80,6 +80,8 @@ export class FirestoreGenerationLogRepository
 
     const payload = {
       adminUid: input.adminUid.slice(0, 128),
+      source: 'creator',
+      executionMode: 'standard',
       provider: input.telemetry.provider,
       model: input.telemetry.model.slice(0, 80) || 'unknown',
       promptVersion: safePromptVersion,
@@ -119,7 +121,7 @@ export class FirestoreGenerationLogRepository
     const q = query(
       collection(db, path),
       where('adminUid', '==', adminUid),
-      limit(50)
+      limit(150)
     );
 
     return onSnapshot(
@@ -134,11 +136,31 @@ export class FirestoreGenerationLogRepository
           return {
             id: docSnap.id,
             adminUid: String(data.adminUid ?? ''),
+            source:
+              data.source === 'prompt_lab' || docSnap.id.startsWith('pe_')
+                ? 'prompt_lab'
+                : 'creator',
+            executionMode:
+              data.executionMode === 'batch' ? 'batch' : 'standard',
+            batchDiscountApplied:
+              typeof data.batchDiscountApplied === 'boolean'
+                ? data.batchDiscountApplied
+                : undefined,
+            runId: typeof data.runId === 'string' ? data.runId : undefined,
+            runTitle:
+              typeof data.runTitle === 'string' ? data.runTitle : undefined,
+            inputName:
+              typeof data.inputName === 'string' ? data.inputName : undefined,
             provider: data.provider === 'openai' ? 'openai' : 'gemini',
             model: String(data.model ?? ''),
             promptVersion: String(data.promptVersion ?? 'v1'),
             themeId: (data.themeId as GenerationLogThemeId) ?? 'fedele',
-            outputFormat: data.outputFormat === 'raster' ? 'raster' : 'svg',
+            outputFormat:
+              data.outputFormat === 'text'
+                ? 'text'
+                : data.outputFormat === 'svg'
+                  ? 'svg'
+                  : 'raster',
             inputTokens: Number(data.inputTokens ?? 0),
             cachedInputTokens: Number(data.cachedInputTokens ?? 0),
             textOutputTokens: Number(data.textOutputTokens ?? 0),
@@ -150,7 +172,7 @@ export class FirestoreGenerationLogRepository
         });
 
         items.sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0));
-        onLogs(items.slice(0, 25));
+        onLogs(items.slice(0, 100));
       },
       (error) => {
         try {

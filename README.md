@@ -6,7 +6,7 @@ Currently operating in **Phase 1 (Private Beta)** for instant single-page genera
 
 ## Repository Layout
 - `AGENTS.md` — Engineering guidelines enforcing Interface vs. Implementation module separation and mandatory Wiki/Requirements maintenance.
-- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.5.0`: Phase 1 active specs, `prompts/v3`, Admin `/admin` console, Repo & App Datasets, Prompt/Batch Lab, non-functional security/cost rules, Phase 2 roadmap, and changelog).
+- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.6.0`: Phase 1 active specs, `prompts/v3`, Admin `/admin` console, Repo & App Datasets, unified Prompt/Batch Lab telemetry, non-functional security/cost rules, Phase 2 roadmap, and changelog).
 - `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
 - `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/modes/themes/ages (`shared/config/`) shared by `backend/` and `web-app/`.
 - `packages/` — Generic, host-app agnostic reusable packages for multi-input Prompt & Batch API evaluation (`packages/prompt-eval-core/`, `packages/prompt-eval-backend/`, `packages/prompt-eval-frontend/`).

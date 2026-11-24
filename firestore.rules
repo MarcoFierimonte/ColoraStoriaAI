@@ -44,6 +44,12 @@ service cloud.firestore {
         ]) &&
         data.keys().hasOnly([
           'adminUid',
+          'source',
+          'executionMode',
+          'batchDiscountApplied',
+          'runId',
+          'runTitle',
+          'inputName',
           'provider',
           'model',
           'promptVersion',
@@ -61,12 +67,18 @@ service cloud.firestore {
         data.adminUid == request.auth.uid &&
         data.adminUid.size() >= 1 && data.adminUid.size() <= 128 &&
         data.adminUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        (!('source' in data) || data.source in ['creator', 'prompt_lab']) &&
+        (!('executionMode' in data) || data.executionMode in ['standard', 'batch']) &&
+        (!('batchDiscountApplied' in data) || data.batchDiscountApplied is bool) &&
+        (!('runId' in data) || (data.runId is string && data.runId.size() <= 128)) &&
+        (!('runTitle' in data) || (data.runTitle is string && data.runTitle.size() <= 120)) &&
+        (!('inputName' in data) || (data.inputName is string && data.inputName.size() <= 120)) &&
         data.provider in ['gemini', 'openai'] &&
         data.model is string && data.model.size() >= 1 && data.model.size() <= 80 &&
         data.promptVersion is string && data.promptVersion.size() >= 2 && data.promptVersion.size() <= 20 &&
-        data.promptVersion.matches('^v[0-9]+$') &&
+        data.promptVersion.matches('^(v[0-9]+|custom)$') &&
         data.themeId in ['fedele', 'pirati', 'unicorni', 'draghi', 'spazio', 'dinosauri', 'principessa'] &&
-        data.outputFormat in ['svg', 'raster'] &&
+        data.outputFormat in ['svg', 'raster', 'text'] &&
         data.inputTokens is int && data.inputTokens >= 0 && data.inputTokens <= 1000000 &&
         data.cachedInputTokens is int && data.cachedInputTokens >= 0 && data.cachedInputTokens <= 1000000 &&
         data.textOutputTokens is int && data.textOutputTokens >= 0 && data.textOutputTokens <= 1000000 &&

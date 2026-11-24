@@ -2,6 +2,8 @@ import type {
   AdminErrorDetails,
   AdminSessionResponse,
   AdminTelemetry,
+  AdminTelemetryLogRecord,
+  AdminTelemetryLogsResponse,
   ColoringAgeGroup,
   ColoringGenerationResponse,
   ColoringStyleMode,
@@ -16,6 +18,8 @@ export type {
   AdminErrorDetails,
   AdminSessionResponse,
   AdminTelemetry,
+  AdminTelemetryLogRecord,
+  AdminTelemetryLogsResponse,
   ColoringAgeGroup,
   ColoringGenerationResponse,
   ColoringStyleMode,
@@ -59,6 +63,14 @@ export interface GenerateColoringPageRequest {
 
 export interface ColoringApiClient {
   fetchAdminSession(idToken?: string | null): Promise<AdminSessionResponse>;
+  fetchAdminTelemetryLogs(
+    idToken?: string | null,
+    limit?: number
+  ): Promise<AdminTelemetryLogRecord[]>;
+  deleteAdminTelemetryLog(
+    logId: string,
+    idToken?: string | null
+  ): Promise<void>;
   generateColoringPage(
     params: GenerateColoringPageRequest
   ): Promise<ColoringGenerationResponse>;

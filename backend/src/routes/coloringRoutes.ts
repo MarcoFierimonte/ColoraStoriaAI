@@ -17,6 +17,7 @@ import {
   type AdminInviteMutationResponse,
   type AdminInvitesListResponse,
   type AdminSessionResponse,
+  type AdminTelemetryLogsResponse,
   type ColoringAgeGroup,
   type ColoringGenerationResponse,
   type ColoringStyleMode,
@@ -57,6 +58,10 @@ import {
   printPdfGenerator,
   type PrintPdfGenerator,
 } from '../modules/print-pdf/index.ts';
+import {
+  generationTelemetryService,
+  type AdminGenerationTelemetryService,
+} from '../modules/prompt-eval/index.ts';
 import {
   promptRepository,
   type PromptRepository,
@@ -130,6 +135,7 @@ export interface ColoringRouterDeps {
   mediaValidator: ServerMediaValidator;
   printPdf?: PrintPdfGenerator;
   betaAccess?: BetaAccessService;
+  telemetryService?: AdminGenerationTelemetryService;
 }
 
 interface RequestWithAdmin extends Request {
@@ -145,10 +151,12 @@ export function createColoringRouter(
     mediaValidator: serverMediaValidator,
     printPdf: printPdfGenerator,
     betaAccess: betaAccessService,
+    telemetryService: generationTelemetryService,
   }
 ): Router {
   const router = Router();
   const betaAccess = deps.betaAccess ?? betaAccessService;
+  const telemetryService = deps.telemetryService;
 
   router.get('/health', (_req: Request, res: Response) => {
     const payload: HealthResponse = {
@@ -318,6 +326,68 @@ export function createColoringRouter(
     };
     res.json(payload);
   });
+
+  router.get('/admin/telemetry/logs', async (req: Request, res: Response) => {
+    try {
+      const adminCtx = await deps.auth.verifyOptionalRequest(req);
+      if (!adminCtx.isAdmin) {
+        res
+          .status(403)
+          .json({ error: 'Accesso riservato agli amministratori.' });
+        return;
+      }
+      if (!telemetryService) {
+        const empty: AdminTelemetryLogsResponse = { logs: [] };
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(empty);
+        return;
+      }
+      const rawLimit = Number(req.query.limit ?? 100);
+      const limit = Number.isFinite(rawLimit) ? rawLimit : 100;
+      const logs = await telemetryService.listLogsForAdmin(
+        adminCtx.uid ?? 'admin',
+        limit
+      );
+      const payload: AdminTelemetryLogsResponse = { logs };
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(payload);
+    } catch (error) {
+      console.error('Failed to list admin telemetry logs:', error);
+      res
+        .status(500)
+        .json({ error: 'Impossibile caricare i log di telemetria.' });
+    }
+  });
+
+  router.delete(
+    '/admin/telemetry/logs/:logId',
+    async (req: Request, res: Response) => {
+      try {
+        const adminCtx = await deps.auth.verifyOptionalRequest(req);
+        if (!adminCtx.isAdmin) {
+          res
+            .status(403)
+            .json({ error: 'Accesso riservato agli amministratori.' });
+          return;
+        }
+        const rawLogId = Array.isArray(req.params.logId)
+          ? req.params.logId[0]
+          : req.params.logId;
+        if (telemetryService && rawLogId) {
+          await telemetryService.deleteLogForAdmin(
+            rawLogId,
+            adminCtx.uid ?? 'admin'
+          );
+        }
+        res.json({ ok: true });
+      } catch (error) {
+        console.error('Failed to delete admin telemetry log:', error);
+        res
+          .status(500)
+          .json({ error: 'Impossibile eliminare il log di telemetria.' });
+      }
+    }
+  );
 
   router.post(
     '/coloring/generate',
@@ -527,6 +597,39 @@ export function createColoringRouter(
           `[COST] provider=${result.provider} model=${result.model} prompt=${result.promptVersion} mode=${mode} theme=${themeId ?? 'none'} age=${ageGroup ?? 'none'} format=${result.outputFormat} orig=${verifiedImage.width}x${verifiedImage.height} aiIn=${preparedImage.width}x${preparedImage.height} in=${result.usage.inputTokens} cached=${result.usage.cachedInputTokens} textOut=${result.usage.textOutputTokens} imgOut=${result.usage.imageOutputTokens} cost=$${result.usage.estimatedCostUsd.toFixed(6)} latency=${result.latencyMs}ms admin=${adminCtx.isAdmin}`
         );
 
+        const adminTelemetryPayload = adminCtx.isAdmin
+          ? {
+              provider: result.provider,
+              model: result.model,
+              promptVersion: result.promptVersion,
+              outputFormat: result.outputFormat,
+              latencyMs: result.latencyMs,
+              ...result.usage,
+            }
+          : undefined;
+
+        // When an Admin is authenticated via ADMIN_EMAILS without custom claim,
+        // client-side Firestore writes are blocked by rules, so persist server-side.
+        if (
+          adminTelemetryPayload &&
+          telemetryService &&
+          !adminCtx.hasAdminClaim &&
+          adminCtx.uid
+        ) {
+          void telemetryService
+            .recordCreatorGeneration({
+              adminUid: adminCtx.uid,
+              themeId: mode === 'creativa' && themeId ? themeId : 'fedele',
+              telemetry: adminTelemetryPayload,
+            })
+            .catch((telemetryErr) => {
+              console.warn(
+                '[TELEMETRY] Failed recording server-side creator log:',
+                telemetryErr
+              );
+            });
+        }
+
         const responsePayload: ColoringGenerationResponse = {
           ok: true,
           provider: result.provider,
@@ -536,17 +639,8 @@ export function createColoringRouter(
           svgMarkup: result.svgMarkup,
           sceneSummary: result.sceneSummary,
           ...(reservation ? { inviteQuota: reservation.inviteQuota } : {}),
-          ...(adminCtx.isAdmin
-            ? {
-                adminTelemetry: {
-                  provider: result.provider,
-                  model: result.model,
-                  promptVersion: result.promptVersion,
-                  outputFormat: result.outputFormat,
-                  latencyMs: result.latencyMs,
-                  ...result.usage,
-                },
-              }
+          ...(adminTelemetryPayload
+            ? { adminTelemetry: adminTelemetryPayload }
             : {}),
         };
 

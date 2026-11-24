@@ -41,6 +41,37 @@ export type ColoringOutputFormat = 'svg' | 'raster';
 
 export type GenerationLogThemeId = ThemeId | 'fedele';
 
+export type GenerationLogSource = 'creator' | 'prompt_lab';
+
+export type GenerationLogExecutionMode = 'standard' | 'batch';
+
+export interface AdminTelemetryLogRecord {
+  id: string;
+  adminUid: string;
+  source: GenerationLogSource;
+  executionMode: GenerationLogExecutionMode;
+  batchDiscountApplied?: boolean;
+  runId?: string;
+  runTitle?: string;
+  inputName?: string;
+  provider: ProviderId;
+  model: string;
+  promptVersion: string;
+  themeId: GenerationLogThemeId;
+  outputFormat: ColoringOutputFormat | 'text';
+  inputTokens: number;
+  cachedInputTokens: number;
+  textOutputTokens: number;
+  imageOutputTokens: number;
+  estimatedCostUsd: number;
+  latencyMs: number;
+  createdAtMs: number | null;
+}
+
+export interface AdminTelemetryLogsResponse {
+  logs: AdminTelemetryLogRecord[];
+}
+
 export interface ProviderStatus {
   id: ProviderId;
   label: string;
