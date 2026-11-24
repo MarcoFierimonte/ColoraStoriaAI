@@ -44,7 +44,23 @@ export class BrowserPhotoValidator implements MediaValidator {
       };
     }
 
-    const previewUrl = URL.createObjectURL(file);
+    let inMemoryFile: File;
+    try {
+      const buffer = await file.arrayBuffer();
+      inMemoryFile = new File([buffer], file.name, {
+        type: file.type,
+        lastModified: file.lastModified,
+      });
+    } catch {
+      return {
+        rejected: {
+          fileName: file.name,
+          reason: 'File danneggiato o non leggibile dal dispositivo.',
+        },
+      };
+    }
+
+    const previewUrl = URL.createObjectURL(inMemoryFile);
     try {
       const { width, height } = await loadImageDimensions(previewUrl);
       if (width < minWidth || height < minHeight) {
@@ -65,10 +81,10 @@ export class BrowserPhotoValidator implements MediaValidator {
 
       return {
         accepted: {
-          id: `${file.name}-${file.size}-${Date.now()}`,
-          file,
-          name: file.name,
-          sizeBytes: file.size,
+          id: `${inMemoryFile.name}-${inMemoryFile.size}-${Date.now()}`,
+          file: inMemoryFile,
+          name: inMemoryFile.name,
+          sizeBytes: inMemoryFile.size,
           width,
           height,
           previewUrl,

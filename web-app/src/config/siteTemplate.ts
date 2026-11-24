@@ -303,6 +303,7 @@ export const SITE_TEMPLATE = {
     downloadPdfCta: 'Scarica il PDF',
     exportingPdfCta: 'Preparo il PDF…',
     downloadPngCta: 'Scarica immagine PNG',
+    retrySamePhotoCta: 'Prova un altro stile con questa foto',
     resetCta: 'Crea un’altra pagina',
     closeConfirmTitle: 'Chiudere?',
     closeConfirmBody: 'Perdi la foto e le scelte fatte.',

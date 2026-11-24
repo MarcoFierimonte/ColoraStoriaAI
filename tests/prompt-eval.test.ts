@@ -28,7 +28,10 @@ import {
   type GeminiClientLike,
   type PromptExecutionProvider,
 } from '../packages/prompt-eval-backend/src/index.ts';
-import { FetchPromptEvalClient } from '../packages/prompt-eval-frontend/src/client.ts';
+import {
+  FetchPromptEvalClient,
+  PromptEvalClientError,
+} from '../packages/prompt-eval-frontend/src/client.ts';
 import { parseServerConfig } from '../backend/src/modules/config/index.ts';
 import { serverMediaValidator } from '../backend/src/modules/media-validation/index.ts';
 import {
@@ -148,6 +151,10 @@ test('ColoraStoriaPromptCatalogResolver resolves fedele/creativa combinations, i
   const catalogs = resolver.listCatalogs();
   assert.equal(catalogs.length, 1);
   assert.equal(catalogs[0].id, COLORASTORIA_CATALOG_ID);
+  const versionField = catalogs[0].fields.find((f) => f.id === 'version');
+  assert.equal(versionField?.defaultValue, 'v3');
+  assert.ok(versionField?.options?.some((opt) => opt.value === 'v3'));
+  assert.ok(versionField?.options?.some((opt) => opt.value === 'v2'));
   assert.equal(
     catalogs[0].fields.find((f) => f.id === 'outputFormat'),
     undefined,
@@ -2138,4 +2145,35 @@ test('DefaultPromptEvalService isolates cleanup store errors, cleans unfinished 
     'base64'
   ).toString('utf8');
   assert.ok(zipRaw.includes('echo:hello world'));
+
+  // 5. FetchPromptEvalClient wraps browser TypeError (e.g. ERR_UPLOAD_FILE_CHANGED / Failed to fetch) into actionable Italian PromptEvalClientError
+  const failingUploadClient = new FetchPromptEvalClient(
+    '/api/admin/prompt-eval',
+    (async () => {
+      throw new TypeError('Failed to fetch');
+    }) as typeof fetch
+  );
+  await assert.rejects(
+    () =>
+      failingUploadClient.createRun(
+        {
+          modality: 'image',
+          executionMode: 'batch',
+          promptSource: 'catalog',
+          catalogId: COLORASTORIA_CATALOG_ID,
+          promptParams: { version: 'v3', mode: 'fedele' },
+          files: [
+            new File([new Uint8Array([1, 2, 3])], 'test.jpg', {
+              type: 'image/jpeg',
+            }),
+          ],
+        },
+        'token'
+      ),
+    (err: unknown) =>
+      err instanceof PromptEvalClientError &&
+      err.statusCode === 0 &&
+      err.code === 'network_error' &&
+      err.message.includes('spostati/rinominati')
+  );
 });

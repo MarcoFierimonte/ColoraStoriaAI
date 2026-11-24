@@ -3,6 +3,9 @@ dist
 .DS_Store
 *.log
 
+# Local prompt evaluation datasets & test assets
+/dataset/
+
 # Environment files & local secrets
 .env
 .env.*

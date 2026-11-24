@@ -701,6 +701,19 @@ export function CreatorDialog({
               >
                 {creator.downloadPngCta}
               </UiButton>
+              {photo ? (
+                <UiButton
+                  variant="secondary"
+                  onClick={() => {
+                    setResult(null);
+                    setPdfError(null);
+                    setErrorBanner(null);
+                    setErrorDetails(null);
+                  }}
+                >
+                  {creator.retrySamePhotoCta}
+                </UiButton>
+              ) : null}
               <UiButton variant="secondary" onClick={resetCreator}>
                 {creator.resetCta}
               </UiButton>

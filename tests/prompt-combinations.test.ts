@@ -119,10 +119,11 @@ test('UI payload builder & FetchColoringApiClient strip theme and ageGroup in fe
 
 test('FilesystemPromptRepository isolates fedele from fantasy themes and builds all creativa theme/age combinations', () => {
   const repo = new FilesystemPromptRepository(parseServerConfig({}, []));
-  assert.equal(repo.getActiveVersion(), 'v2');
+  assert.equal(repo.getActiveVersion(), 'v3');
+  assert.deepEqual(repo.listVersions(), ['v1', 'v2', 'v3']);
 
   // Even if caller passes a leftover themeId, mode='fedele' must NOT include any fantasy theme
-  for (const versionOverride of ['v2', 'v1']) {
+  for (const versionOverride of ['v3', 'v2', 'v1']) {
     const faithful = repo.buildRasterPrompt({
       mode: 'fedele',
       themeId: 'pirati',
@@ -136,14 +137,22 @@ test('FilesystemPromptRepository isolates fedele from fantasy themes and builds 
     assert.doesNotMatch(faithful.prompt, /AGE COMPLEXITY/i);
   }
 
+  // Verify v3 packaging/logo cleanup & pure solid black ink rules in fedele mode
+  const faithfulV3 = repo.buildRasterPrompt({ mode: 'fedele' });
+  assert.equal(faithfulV3.version, 'v3');
+  assert.match(faithfulV3.prompt, /retail cardboard boxes/i);
+  assert.match(faithfulV3.prompt, /hangtags/i);
+  assert.match(faithfulV3.prompt, /Zero grey lines/i);
+
   for (const themeId of ALLOWED_THEME_IDS) {
     const built = repo.buildRasterPrompt({
       mode: 'creativa',
       themeId,
       ageGroup: '3-4',
     });
-    assert.equal(built.version, 'v2');
+    assert.equal(built.version, 'v3');
     assert.match(built.prompt, /CREATIVE FANTASY MODE/i);
+    assert.match(built.prompt, /Preserve any real glasses, baseball caps/i);
     assert.doesNotMatch(built.prompt, /FAITHFUL PHOTO MODE/i);
 
     for (const [otherTheme, regex] of Object.entries(

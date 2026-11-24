@@ -54,7 +54,7 @@ Host-app agnostic packages isolated from both `backend/` and `web-app/` (enforce
 | `media-validation` | `mediaValidation.interface.ts` (`ServerMediaValidator`) | `bufferImageValidator.ts` | Server-side JPG/PNG/WebP/AVIF magic-bytes verification & EXIF-strip/resize (`<=1280px`) |
 | `print-pdf` | `printPdf.interface.ts` (`PrintPdfGenerator`) | `sharpPdfLibGenerator.ts` | Sharp B&W print mastering (300 DPI grayscale) & A4 PDF layout (`1-up`, `2-up`, `4-up`) |
 | `ai-providers` | `aiProvider.interface.ts` (`ColoringProvider`, `AiProviderRegistry`, errors) | `geminiColoringProvider.ts`, `openaiColoringProvider.ts`, `defaultAiProviderRegistry.ts` | Multi-provider AI generation & provider registry |
-| `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts (`v2` multi-mode/age + `v1` fallback) from `prompts/` & `prompts/config.json` |
+| `prompts` | `promptRepository.interface.ts` (`PromptRepository`, `PromptBundle`) | `filesystemPromptRepository.ts` | Loads versioned prompts (`v3` active multi-mode/age + `v2`/`v1` baselines) from `prompts/` & `prompts/config.json` |
 | `prompt-eval` | *(implements `@colorastoria/prompt-eval-backend` interfaces)* | `coloraStoriaPromptCatalog.ts`, `sharpMediaPreparer.ts` | Host-app adapter wiring `prompts/` combinations (`fedele`/`creativa` + theme/age), Sharp preprocessing/storage compression, free-tier Firestore/Email config, and `/api/admin/prompt-eval/*` router |
 | `cost-estimation` *(simple)* | `rateCardCostEstimator.ts` (`calculateGenerationCost`) | *(direct typed module)* | Computes token & image generation costs per model (warns on unknown model) |
 
@@ -108,7 +108,7 @@ UI template & configuration layer (`web-app/src/`):
 
 ## 5. Prompts, Pricing, Requirements & Language Conventions
 
-- **Prompts (`prompts/`)**: Prompts are versioned under `prompts/v*` (`v2` adds `modes.json` & `ages.json` alongside `base.txt` and `themes.json`) and selected via `prompts/config.json` (`activeVersion: "latest"` or pinned) or `PROMPT_VERSION`. After editing prompt files, run `npm run prompts:sync`.
+- **Prompts (`prompts/`)**: Prompts are versioned under `prompts/v*` (`v3` active, `v2`/`v1` retained for A/B comparison; `v2`+ adds `modes.json` & `ages.json` alongside `base.txt` and `themes.json`) and selected via `prompts/config.json` (`activeVersion: "latest"` or pinned) or `PROMPT_VERSION`. After editing prompt files, run `npm run prompts:sync`.
 - **Pricing (`pricing/`)**: Document model pricing and cost assumptions in `pricing/` and keep rates synchronized with `rateCardCostEstimator.ts`.
 - **Requirements Wiki (`docs/REQUIREMENTS.md`)**: **MUST stay up to date and versioned (`MAJOR.MINOR.PATCH`).** Whenever product direction, functional scope, user flows, limits, invite/monetization rules, non-functional security/privacy targets, or roadmap items change, update `docs/REQUIREMENTS.md`, bump its semantic version, and record the change in its Changelog (written in Italian).
 - **Technical Wiki (`docs/WIKI.md`)**: **MUST stay up to date.** Whenever you add or remove a library, tool, security layer, module, or architectural pattern, add or update its brief plain-language entry ("Cos'è" + "Come e dov'è usato") in `docs/WIKI.md` (written in accessible Italian for the project owner).

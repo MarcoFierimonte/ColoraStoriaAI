@@ -79,28 +79,30 @@ test('ALLOWED_THEME_IDS and SUPPORTED_PROVIDER_IDS match firestore.rules', () =>
   );
 });
 
-test('prompts/v2 modes.json and ages.json match shared/config constants', () => {
-  const modesPath = path.join(ROOT_DIR, 'prompts', 'v2', 'modes.json');
-  const modesObj = JSON.parse(fs.readFileSync(modesPath, 'utf8')) as Record<
-    string,
-    string
-  >;
-  assert.deepEqual(
-    Object.keys(modesObj).sort(),
-    [...ALLOWED_COLORING_MODES].sort(),
-    'prompts/v2/modes.json keys must match ALLOWED_COLORING_MODES'
-  );
+test('prompts/v2 and prompts/v3 modes.json and ages.json match shared/config constants', () => {
+  for (const version of ['v2', 'v3'] as const) {
+    const modesPath = path.join(ROOT_DIR, 'prompts', version, 'modes.json');
+    const modesObj = JSON.parse(fs.readFileSync(modesPath, 'utf8')) as Record<
+      string,
+      string
+    >;
+    assert.deepEqual(
+      Object.keys(modesObj).sort(),
+      [...ALLOWED_COLORING_MODES].sort(),
+      `prompts/${version}/modes.json keys must match ALLOWED_COLORING_MODES`
+    );
 
-  const agesPath = path.join(ROOT_DIR, 'prompts', 'v2', 'ages.json');
-  const agesObj = JSON.parse(fs.readFileSync(agesPath, 'utf8')) as Record<
-    string,
-    string
-  >;
-  assert.deepEqual(
-    Object.keys(agesObj).sort(),
-    [...ALLOWED_AGE_GROUPS].sort(),
-    'prompts/v2/ages.json keys must match ALLOWED_AGE_GROUPS'
-  );
+    const agesPath = path.join(ROOT_DIR, 'prompts', version, 'ages.json');
+    const agesObj = JSON.parse(fs.readFileSync(agesPath, 'utf8')) as Record<
+      string,
+      string
+    >;
+    assert.deepEqual(
+      Object.keys(agesObj).sort(),
+      [...ALLOWED_AGE_GROUPS].sort(),
+      `prompts/${version}/ages.json keys must match ALLOWED_AGE_GROUPS`
+    );
+  }
 });
 
 const EXAMPLE_GALLERY_SLUGS = [

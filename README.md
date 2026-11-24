@@ -6,7 +6,7 @@ Currently operating in **Phase 1 (Private Beta)** for instant single-page genera
 
 ## Repository Layout
 - `AGENTS.md` — Engineering guidelines enforcing Interface vs. Implementation module separation and mandatory Wiki/Requirements maintenance.
-- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.3.0`: Phase 1 active specs, Admin `/admin` console & Prompt/Batch Lab, non-functional security/cost rules, Phase 2 roadmap, and changelog).
+- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.4.0`: Phase 1 active specs, `prompts/v3`, Admin `/admin` console & Prompt/Batch Lab, non-functional security/cost rules, Phase 2 roadmap, and changelog).
 - `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
 - `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/modes/themes/ages (`shared/config/`) shared by `backend/` and `web-app/`.
 - `packages/` — Generic, host-app agnostic reusable packages for multi-input Prompt & Batch API evaluation (`packages/prompt-eval-core/`, `packages/prompt-eval-backend/`, `packages/prompt-eval-frontend/`).
@@ -16,7 +16,7 @@ Currently operating in **Phase 1 (Private Beta)** for instant single-page genera
 - `Dockerfile` & `.dockerignore` — Multi-stage non-root production container (`node:24-slim`).
 - `.github/workflows/ci.yml` — Automated CI running `lint`, `test`, `build`, and `npm audit --audit-level=high`.
 - `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
-- `prompts/` — Versioned prompt library (`v2` multi-mode/age + `v1` fallback) and `config.json` version selector (`prompts/README.md`).
+- `prompts/` — Versioned prompt library (`v3` active multi-mode/age + `v2`/`v1` baselines) and `config.json` version selector (`prompts/README.md`).
 - `pricing/` — AI model cost estimates for Standard and Batch APIs (`pricing/ai/image-generation-costs.md`).
 - `infra/` — Infrastructure as Code (Terraform) to automatically provision Cloud Run, Artifact Registry, Secret Manager, Firestore, and Firebase Auth (`infra/README.md`).
 - `scripts/` — One-time admin utilities (`set-admin-claim.ts`, `manage-invites.ts`).
@@ -33,7 +33,7 @@ npm run dev
 ## Environment Variables
 Copy `.env.example` or set secrets in Secret Manager / hosting environment:
 - `AI_PROVIDER=gemini` (`gemini` or `openai`)
-- `PROMPT_VERSION` — Optional override (defaults to `prompts/config.json` `activeVersion: "latest"` -> `v2`)
+- `PROMPT_VERSION` — Optional override (defaults to `prompts/config.json` `activeVersion: "latest"` -> `v3`)
 - `GEMINI_API_KEY` — Required for the default Gemini provider
 - `GEMINI_MODEL=gemini-nano-banana-2.1` — Default high-quality raster image model (supports likeness across people, pets, toys, and landscapes)
 - `OPENAI_API_KEY` / `OPENAI_MODEL=gpt-image-1` — Optional OpenAI configuration
@@ -71,7 +71,7 @@ flowchart LR
   subgraph Server["Backend (backend/ + packages/)"]
     BetaGate["beta-access Module<br/>HMAC Cookie + Atomic Quotas & Refunds<br/>(Implemented)"]:::done
     API["Express API (/api/coloring/* & /api/admin/prompt-eval/*)<br/>In-Memory Multer, Sharp Mastering & Batch Lab<br/>(Implemented)"]:::done
-    Prompts["Versioned Prompts (prompts/v2)<br/>Fedele Isolation + Creativa Themes & Ages<br/>(Implemented)"]:::done
+    Prompts["Versioned Prompts (prompts/v3)<br/>Fedele Isolation + Creativa Themes & Ages<br/>(Implemented)"]:::done
     JobQueue["Async Book Job Queue &<br/>Post-Beta Monetization / Email<br/>(Phase 2 Roadmap)"]:::pending
   end
 
@@ -100,7 +100,7 @@ flowchart LR
 ```
 
 ### Status Summary
-- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, `Navbar` burger menu, fixed-position 6-example `ExamplesCarousel` hero slider, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), dedicated Admin-Only `/admin` console accessible via the navbar burger menu (hosting reusable `packages/prompt-eval-*` **Prompt & Batch Lab** with Standard vs Batch `-50%` APIs, full prompt inspection/copy, ZIP/single downloads, free-tier Resend/Brevo email notifications, and Firestore-persisted run/item ratings & notes, plus `AdminInvitesPanel` and `AdminTelemetryPanel`), `prompts/v2`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
+- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, `Navbar` burger menu, fixed-position 6-example `ExamplesCarousel` hero slider, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), dedicated Admin-Only `/admin` console accessible via the navbar burger menu (hosting reusable `packages/prompt-eval-*` **Prompt & Batch Lab** with Standard vs Batch `-50%` APIs, full prompt inspection/copy, ZIP/single downloads, free-tier Resend/Brevo email notifications, and Firestore-persisted run/item ratings & notes, plus `AdminInvitesPanel` and `AdminTelemetryPanel`), `prompts/v3`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
 - **Planned for Phase 2 (Future Roadmap):** Multi-page coloring book composition (`10–15` photos + cover), post-beta monetization model to be validated after beta feedback (credit packs / pay-per-page / subscription), async job queue & automated email delivery, and final commercial/legal copy alignment.
 
 ## Scripts

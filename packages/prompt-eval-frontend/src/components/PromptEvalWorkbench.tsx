@@ -8,6 +8,7 @@ import {
 } from 'react';
 import {
   AlertCircle,
+  ArrowDown,
   Check,
   Clock,
   Copy,
@@ -21,6 +22,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Sparkles,
   Star,
@@ -571,6 +573,7 @@ export function PromptEvalWorkbench({
 
   // Multi-image & text inputs
   const [queuedImages, setQueuedImages] = useState<QueuedImageEntry[]>([]);
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [loadingSampleId, setLoadingSampleId] = useState<string | null>(null);
   const [queuedTexts, setQueuedTexts] = useState<QueuedTextEntry[]>([
@@ -614,6 +617,8 @@ export function PromptEvalWorkbench({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composerSectionRef = useRef<HTMLElement | null>(null);
+  const resultsSectionRef = useRef<HTMLElement | null>(null);
   const queuedImagesRef = useRef<QueuedImageEntry[]>([]);
   const getAuthTokenRef = useRef(getAuthToken);
   const onSelectRunIdRef = useRef(onSelectRunId);
@@ -735,6 +740,7 @@ export function PromptEvalWorkbench({
       try {
         const token = await getAuthTokenRef.current();
         const detail = await client.getRun(runId, token);
+        selectedRunIdRef.current = detail.id;
         setSelectedRun(detail);
         if (syncUrl) {
           onSelectRunIdRef.current?.(detail.id);
@@ -1043,7 +1049,7 @@ export function PromptEvalWorkbench({
   }, [selectedRunId, selectedRunIsActiveBatch, handleRefreshBatch]);
 
   const addFilesToQueue = useCallback(
-    (incoming: FileList | File[]) => {
+    async (incoming: FileList | File[]) => {
       const list = Array.from(incoming);
       if (list.length === 0) return;
 
@@ -1058,53 +1064,78 @@ export function PromptEvalWorkbench({
       );
       const maxBytes = (config?.limits.maxFileSizeMb ?? 12) * 1024 * 1024;
       const errors: string[] = [];
-      const current = queuedImagesRef.current;
       const additions: QueuedImageEntry[] = [];
 
-      for (const rawFile of list) {
-        if (current.length + additions.length >= maxImages) {
-          errors.push(`Limite massimo raggiunto (${maxImages} immagini per run).`);
-          break;
-        }
-        const effectiveMime =
-          rawFile.type || inferMimeTypeFromFilename(rawFile.name);
-        if (!effectiveMime || !accepted.has(effectiveMime)) {
-          errors.push(
-            `"${rawFile.name}": formato ${rawFile.type || 'sconosciuto'} non ammesso.`
-          );
-          continue;
-        }
-        if (rawFile.size > maxBytes) {
-          errors.push(
-            `"${rawFile.name}": supera il limite di ${config?.limits.maxFileSizeMb ?? 12} MB.`
-          );
-          continue;
-        }
-        const normalizedFile =
-          rawFile.type === effectiveMime
-            ? rawFile
-            : new File([rawFile], rawFile.name, {
-                type: effectiveMime,
-                lastModified: rawFile.lastModified,
-              });
-        additions.push({
-          id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          file: normalizedFile,
-          previewUrl: URL.createObjectURL(normalizedFile),
-          sizeKb: Math.max(1, Math.round(normalizedFile.size / 1024)),
-        });
-      }
+      setIsReadingFiles(true);
+      try {
+        for (const rawFile of list) {
+          if (queuedImagesRef.current.length + additions.length >= maxImages) {
+            errors.push(
+              `Limite massimo raggiunto (${maxImages} immagini per run).`
+            );
+            break;
+          }
+          const effectiveMime =
+            rawFile.type || inferMimeTypeFromFilename(rawFile.name);
+          if (!effectiveMime || !accepted.has(effectiveMime)) {
+            errors.push(
+              `"${rawFile.name}": formato ${rawFile.type || 'sconosciuto'} non ammesso.`
+            );
+            continue;
+          }
+          if (rawFile.size > maxBytes) {
+            errors.push(
+              `"${rawFile.name}": supera il limite di ${config?.limits.maxFileSizeMb ?? 12} MB.`
+            );
+            continue;
+          }
 
-      if (additions.length > 0) {
-        const next = [...current, ...additions];
-        queuedImagesRef.current = next;
-        setQueuedImages(next);
-      }
+          // Snapshot file bytes into RAM immediately so subsequent runs never fail
+          // with net::ERR_UPLOAD_FILE_CHANGED if the user moves/renames local files.
+          let inMemoryFile: File;
+          try {
+            const buffer = await rawFile.arrayBuffer();
+            inMemoryFile = new File([buffer], rawFile.name, {
+              type: effectiveMime,
+              lastModified: rawFile.lastModified,
+            });
+          } catch {
+            errors.push(
+              `"${rawFile.name}": impossibile leggere il file dal disco.`
+            );
+            continue;
+          }
 
-      if (errors.length > 0) {
-        setGlobalError(errors.join(' '));
-      } else {
-        setGlobalError(null);
+          additions.push({
+            id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            file: inMemoryFile,
+            previewUrl: URL.createObjectURL(inMemoryFile),
+            sizeKb: Math.max(1, Math.round(inMemoryFile.size / 1024)),
+          });
+        }
+
+        if (!isMountedRef.current) {
+          for (const item of additions) {
+            URL.revokeObjectURL(item.previewUrl);
+          }
+          return;
+        }
+
+        if (additions.length > 0) {
+          const next = [...queuedImagesRef.current, ...additions];
+          queuedImagesRef.current = next;
+          setQueuedImages(next);
+        }
+
+        if (errors.length > 0) {
+          setGlobalError(errors.join(' '));
+        } else {
+          setGlobalError(null);
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setIsReadingFiles(false);
+        }
       }
     },
     [config]
@@ -1132,7 +1163,8 @@ export function PromptEvalWorkbench({
     event.preventDefault();
     setIsDragging(false);
     if (event.dataTransfer?.files?.length) {
-      addFilesToQueue(event.dataTransfer.files);
+      const droppedFiles = Array.from(event.dataTransfer.files);
+      void addFilesToQueue(droppedFiles);
     }
   };
 
@@ -1141,7 +1173,7 @@ export function PromptEvalWorkbench({
     setGlobalError(null);
     try {
       const files = await sample.loadFiles();
-      addFilesToQueue(files);
+      await addFilesToQueue(files);
     } catch (err) {
       setGlobalError(
         err instanceof Error
@@ -1236,6 +1268,7 @@ export function PromptEvalWorkbench({
         token
       );
 
+      selectedRunIdRef.current = created.id;
       setSelectedRun(created);
       onSelectRunIdRef.current?.(created.id);
       setRuns((prev) => {
@@ -1271,6 +1304,37 @@ export function PromptEvalWorkbench({
     } finally {
       setIsSubmittingRun(false);
     }
+  };
+
+  const handleReuseRunInComposer = (run: PromptEvalRunDetail) => {
+    setGlobalError(null);
+    setModality(run.modality);
+    setProviderId(run.providerId);
+    setModelId(run.model);
+    setExecutionMode(run.executionMode);
+    if (
+      run.promptSource === 'catalog' &&
+      run.catalogId &&
+      config?.catalogs.some((c) => c.id === run.catalogId)
+    ) {
+      const matchedCatalog = config.catalogs.find((c) => c.id === run.catalogId);
+      setPromptSource('catalog');
+      setCatalogId(run.catalogId);
+      setCatalogParams({
+        ...(matchedCatalog ? buildDefaultCatalogParams(matchedCatalog) : {}),
+        ...(run.promptParams ?? {}),
+      });
+    } else {
+      setPromptSource('custom');
+      setCustomPromptText(run.promptText);
+    }
+    setStatusNotice(
+      `Impostazioni di "${run.title}" ricaricate nel composer. Modifica il prompt o le immagini e avvia un nuovo test.`
+    );
+    composerSectionRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
   };
 
   const handleSaveRunEvaluation = async () => {
@@ -1499,6 +1563,7 @@ export function PromptEvalWorkbench({
 
       {/* COMPOSER CARD */}
       <section
+        ref={composerSectionRef}
         aria-label="Configura nuova valutazione prompt"
         className="rounded-[14px] border-[3px] border-[var(--cs-border,#24284f)] bg-white p-5 shadow-[5px_5px_0_var(--cs-border,#24284f)] space-y-5"
       >
@@ -1804,9 +1869,10 @@ export function PromptEvalWorkbench({
                     ]
                   ).join(',')}
                   onChange={(event) => {
-                    if (event.target.files) {
-                      addFilesToQueue(event.target.files);
+                    if (event.target.files?.length) {
+                      const selectedFiles = Array.from(event.target.files);
                       event.target.value = '';
+                      void addFilesToQueue(selectedFiles);
                     }
                   }}
                   className="sr-only"
@@ -1823,11 +1889,14 @@ export function PromptEvalWorkbench({
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <button
                       type="button"
+                      disabled={isReadingFiles}
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-[10px] border-[3px] border-[var(--cs-border,#24284f)] bg-[var(--cs-blue,#9acfff)] px-4 py-2 text-xs font-bold shadow-[3px_3px_0_var(--cs-border,#24284f)] cursor-pointer active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+                      className="inline-flex items-center gap-1.5 rounded-[10px] border-[3px] border-[var(--cs-border,#24284f)] bg-[var(--cs-blue,#9acfff)] px-4 py-2 text-xs font-bold shadow-[3px_3px_0_var(--cs-border,#24284f)] cursor-pointer active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-50"
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
-                      <span>Seleziona immagini</span>
+                      <span>
+                        {isReadingFiles ? 'Lettura file…' : 'Seleziona immagini'}
+                      </span>
                     </button>
 
                     {quickSamples.map((sample) => (
@@ -2154,18 +2223,74 @@ export function PromptEvalWorkbench({
             ) : null}
           </div>
 
+          {globalError ? (
+            <div
+              role="alert"
+              className="rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-danger-bg,#ffe4e8)] p-3 text-xs font-bold text-[var(--cs-danger-ink,#8f1d2c)] flex items-start justify-between gap-2"
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle
+                  className="h-4 w-4 shrink-0 mt-0.5"
+                  aria-hidden="true"
+                />
+                <span>{globalError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGlobalError(null)}
+                aria-label="Chiudi messaggio di errore"
+                className="rounded-[6px] border border-[var(--cs-border,#24284f)] bg-white p-0.5 cursor-pointer shrink-0"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </div>
+          ) : statusNotice ? (
+            <div
+              role="status"
+              className="rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-mint,#b4f0cb)] p-3 text-xs font-bold text-[var(--cs-ink,#24284f)] flex flex-wrap items-center justify-between gap-2"
+            >
+              <span>{statusNotice}</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {selectedRun ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      resultsSectionRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      })
+                    }
+                    className="inline-flex items-center gap-1 rounded-[6px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2 py-0.5 text-[11px] font-bold cursor-pointer"
+                  >
+                    <span>Vai ai risultati</span>
+                    <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setStatusNotice(null)}
+                  aria-label="Chiudi avviso di stato"
+                  className="rounded-[6px] border border-[var(--cs-border,#24284f)] bg-white p-0.5 cursor-pointer"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <p className="text-xs text-[var(--cs-ink-muted,#4b5075)]">
               {activeProvider && !activeProvider.configured
                 ? `Chiave API mancante per ${activeProvider.label}: configura la variabile d’ambiente sul server.`
                 : modality === 'image'
-                  ? 'Ogni immagine viene elaborata singolarmente con il prompt selezionato e salvata nello storico valutazioni.'
+                  ? 'Le immagini caricate restano in memoria pronte per esecuzioni multiple: puoi cambiare prompt e rilanciare subito un altro test.'
                   : 'Ogni input testuale viene elaborato singolarmente con il prompt selezionato e salvato nello storico valutazioni.'}
             </p>
             <button
               type="button"
               disabled={
                 isSubmittingRun ||
+                isReadingFiles ||
                 activeItemCount === 0 ||
                 !activePromptText.trim() ||
                 (activeProvider ? !activeProvider.configured : false)
@@ -2297,6 +2422,7 @@ export function PromptEvalWorkbench({
 
         {/* SELECTED RUN DETAIL + RESULTS + EVALUATION */}
         <section
+          ref={resultsSectionRef}
           aria-label="Dettagli e valutazione esecuzione selezionata"
           className="rounded-[14px] border-[3px] border-[var(--cs-border,#24284f)] bg-white p-5 shadow-[5px_5px_0_var(--cs-border,#24284f)] space-y-5 min-w-0"
         >
@@ -2385,6 +2511,15 @@ export function PromptEvalWorkbench({
                       <span>Scarica tutto (.zip)</span>
                     </button>
                   ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => handleReuseRunInComposer(selectedRun)}
+                    className="inline-flex items-center gap-1 rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-lavender,#d9ccff)] px-2.5 py-1.5 text-xs font-bold cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Riusa impostazioni</span>
+                  </button>
 
                   <button
                     type="button"

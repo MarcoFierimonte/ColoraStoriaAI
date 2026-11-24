@@ -61,8 +61,32 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     this.fetchImpl = fetchImpl ?? ((...args) => fetch(...args));
   }
 
+  private async performFetch(
+    url: string,
+    init: RequestInit,
+    hasFileUpload = false
+  ): Promise<Response> {
+    try {
+      return await this.fetchImpl(url, init);
+    } catch (err) {
+      if (err instanceof PromptEvalClientError) {
+        throw err;
+      }
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      const userMessage = hasFileUpload
+        ? 'Impossibile inviare i file al server (connessione interrotta oppure file locali spostati/rinominati sul disco). Riprova o riseleziona le immagini.'
+        : 'Errore di rete durante la comunicazione con il server. Verifica la connessione e riprova.';
+      throw new PromptEvalClientError(
+        userMessage,
+        0,
+        'network_error',
+        rawMessage
+      );
+    }
+  }
+
   async fetchConfig(idToken: string | null): Promise<PromptEvalConfigResponse> {
-    const response = await this.fetchImpl(`${this.baseUrl}/config`, {
+    const response = await this.performFetch(`${this.baseUrl}/config`, {
       method: 'GET',
       headers: buildAuthHeaders(idToken),
       credentials: 'same-origin',
@@ -75,15 +99,18 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     params: Record<string, string>,
     idToken: string | null
   ): Promise<ResolvedPromptPreview> {
-    const response = await this.fetchImpl(`${this.baseUrl}/catalog/resolve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildAuthHeaders(idToken),
-      },
-      credentials: 'same-origin',
-      body: JSON.stringify({ catalogId, params }),
-    });
+    const response = await this.performFetch(
+      `${this.baseUrl}/catalog/resolve`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildAuthHeaders(idToken),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ catalogId, params }),
+      }
+    );
     return readJsonOrThrow<ResolvedPromptPreview>(response);
   }
 
@@ -91,7 +118,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     idToken: string | null,
     limit = 50
   ): Promise<PromptEvalRunSummary[]> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs?limit=${encodeURIComponent(String(limit))}`,
       {
         method: 'GET',
@@ -107,7 +134,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     runId: string,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}`,
       {
         method: 'GET',
@@ -145,17 +172,21 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
         formData.append('files', file, file.name);
       }
 
-      const response = await this.fetchImpl(`${this.baseUrl}/runs`, {
-        method: 'POST',
-        headers: buildAuthHeaders(idToken),
-        credentials: 'same-origin',
-        body: formData,
-      });
+      const response = await this.performFetch(
+        `${this.baseUrl}/runs`,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(idToken),
+          credentials: 'same-origin',
+          body: formData,
+        },
+        true
+      );
       const data = await readJsonOrThrow<PromptEvalRunResponse>(response);
       return data.run;
     }
 
-    const response = await this.fetchImpl(`${this.baseUrl}/runs`, {
+    const response = await this.performFetch(`${this.baseUrl}/runs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -184,7 +215,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     runId: string,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}/refresh`,
       {
         method: 'POST',
@@ -200,7 +231,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     runId: string,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}/cancel`,
       {
         method: 'POST',
@@ -217,7 +248,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     body: NotifyRunEmailRequest,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}/notify`,
       {
         method: 'POST',
@@ -238,7 +269,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     patch: UpdateRunEvaluationRequest,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}/evaluation`,
       {
         method: 'PATCH',
@@ -260,7 +291,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     patch: UpdateItemEvaluationRequest,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}/evaluation`,
       {
         method: 'PATCH',
@@ -277,7 +308,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
   }
 
   async deleteRun(runId: string, idToken: string | null): Promise<void> {
-    const response = await this.fetchImpl(
+    const response = await this.performFetch(
       `${this.baseUrl}/runs/${encodeURIComponent(runId)}`,
       {
         method: 'DELETE',
@@ -291,7 +322,7 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
   async pollPendingBatchRuns(
     idToken: string | null
   ): Promise<PollPendingRunsResponse> {
-    const response = await this.fetchImpl(`${this.baseUrl}/poll-pending`, {
+    const response = await this.performFetch(`${this.baseUrl}/poll-pending`, {
       method: 'POST',
       headers: buildAuthHeaders(idToken),
       credentials: 'same-origin',

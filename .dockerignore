@@ -8,4 +8,5 @@ bun.lock
 *.log
 .DS_Store
 infra/
+dataset/
 *.tfvars
