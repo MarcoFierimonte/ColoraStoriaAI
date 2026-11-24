@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import type {
   NotifyRunEmailRequest,
+  PromptEvalDatasetItemRef,
   PromptEvalModality,
   PromptExecutionMode,
   ResolvePromptRequest,
@@ -116,6 +117,40 @@ function parseTextInputs(
     .filter((item) => item.text.trim().length > 0);
 }
 
+function parseDatasetItemRefs(
+  raw: unknown
+): PromptEvalDatasetItemRef[] | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      throw new PromptEvalError(
+        'Lista datasetItems JSON non valida.',
+        400,
+        'invalid_json'
+      );
+    }
+  }
+  if (!Array.isArray(parsed)) return undefined;
+  return parsed
+    .map((entry) => {
+      if (entry && typeof entry === 'object') {
+        const obj = entry as { datasetId?: unknown; itemId?: unknown };
+        return {
+          datasetId:
+            typeof obj.datasetId === 'string' ? obj.datasetId.trim() : '',
+          itemId: typeof obj.itemId === 'string' ? obj.itemId.trim() : '',
+        };
+      }
+      return { datasetId: '', itemId: '' };
+    })
+    .filter((entry) => entry.datasetId.length > 0 && entry.itemId.length > 0);
+}
+
 function handleError(res: Response, error: unknown, fallbackMessage: string) {
   if (error instanceof PromptEvalError) {
     res.status(error.statusCode).json({
@@ -202,6 +237,140 @@ export function createPromptEvalRouter(deps: PromptEvalRouterDeps): Router {
     }
   );
 
+  const handleMultipartImages = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const contentType = (req.headers['content-type'] ?? '').toLowerCase();
+    if (!contentType.includes('multipart/form-data')) {
+      next();
+      return;
+    }
+    upload.array('files', limits.maxImagesPerRun)(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          res.status(400).json({
+            error: `Uno o più file superano il limite di ${limits.maxFileSizeMb} MB.`,
+          });
+          return;
+        }
+        if (
+          err.code === 'LIMIT_FILE_COUNT' ||
+          err.code === 'LIMIT_UNEXPECTED_FILE'
+        ) {
+          res.status(400).json({
+            error: `Puoi caricare al massimo ${limits.maxImagesPerRun} immagini alla volta.`,
+          });
+          return;
+        }
+      }
+      handleError(res, err, 'Errore durante il caricamento delle immagini.');
+    });
+  };
+
+  router.get('/datasets', requireAdmin, async (_req: Request, res: Response) => {
+    try {
+      const datasets = await deps.service.listDatasets();
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ datasets });
+    } catch (error) {
+      handleError(res, error, 'Impossibile caricare l’elenco dei dataset.');
+    }
+  });
+
+  router.get(
+    '/datasets/:datasetId',
+    requireAdmin,
+    async (req: Request, res: Response) => {
+      try {
+        const dataset = await deps.service.getDataset(
+          readParam(req.params.datasetId)
+        );
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({ dataset });
+      } catch (error) {
+        handleError(res, error, 'Impossibile caricare i dettagli del dataset.');
+      }
+    }
+  );
+
+  router.get(
+    '/datasets/:datasetId/archive',
+    requireAdmin,
+    async (req: Request, res: Response) => {
+      try {
+        const archive = await deps.service.exportDatasetZip(
+          readParam(req.params.datasetId)
+        );
+        const safeFilename = archive.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${safeFilename}"`
+        );
+        res.send(Buffer.from(archive.bytes));
+      } catch (error) {
+        handleError(
+          res,
+          error,
+          'Impossibile esportare l’archivio ZIP del dataset.'
+        );
+      }
+    }
+  );
+
+  router.post(
+    '/datasets',
+    requireAdmin,
+    handleMultipartImages,
+    async (req: RequestWithActor, res: Response) => {
+      try {
+        const actor = req.promptEvalActor ?? { isAdmin: false };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const uploadedFiles = Array.isArray(req.files)
+          ? (req.files as Express.Multer.File[])
+          : [];
+
+        const dataset = await deps.service.createDataset({
+          actorUid: actor.uid ?? 'admin',
+          actorEmail: actor.email ?? 'admin',
+          name: typeof body.name === 'string' ? body.name : '',
+          description:
+            typeof body.description === 'string' ? body.description : undefined,
+          sourceItems: parseDatasetItemRefs(body.sourceItems),
+          files: uploadedFiles.map((file) => ({
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            bytes: file.buffer,
+          })),
+        });
+
+        res.status(201).json({ dataset });
+      } catch (error) {
+        handleError(res, error, 'Impossibile creare il nuovo dataset.');
+      }
+    }
+  );
+
+  router.delete(
+    '/datasets/:datasetId',
+    requireAdmin,
+    async (req: Request, res: Response) => {
+      try {
+        await deps.service.deleteDataset(readParam(req.params.datasetId));
+        res.json({ ok: true });
+      } catch (error) {
+        handleError(res, error, 'Impossibile eliminare il dataset.');
+      }
+    }
+  );
+
   router.get('/runs', requireAdmin, async (req: Request, res: Response) => {
     try {
       const rawLimit = Number(req.query.limit ?? 50);
@@ -231,34 +400,7 @@ export function createPromptEvalRouter(deps: PromptEvalRouterDeps): Router {
   router.post(
     '/runs',
     requireAdmin,
-    (req: Request, res: Response, next: NextFunction) => {
-      const contentType = (req.headers['content-type'] ?? '').toLowerCase();
-      if (!contentType.includes('multipart/form-data')) {
-        next();
-        return;
-      }
-      upload.array('files', limits.maxImagesPerRun)(req, res, (err: unknown) => {
-        if (!err) {
-          next();
-          return;
-        }
-        if (err instanceof multer.MulterError) {
-          if (err.code === 'LIMIT_FILE_SIZE') {
-            res.status(400).json({
-              error: `Uno o più file superano il limite di ${limits.maxFileSizeMb} MB.`,
-            });
-            return;
-          }
-          if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
-            res.status(400).json({
-              error: `Puoi caricare al massimo ${limits.maxImagesPerRun} immagini per esecuzione.`,
-            });
-            return;
-          }
-        }
-        handleError(res, err, 'Errore durante il caricamento delle immagini.');
-      });
-    },
+    handleMultipartImages,
     async (req: RequestWithActor, res: Response) => {
       try {
         const actor = req.promptEvalActor ?? { isAdmin: false };
@@ -295,6 +437,9 @@ export function createPromptEvalRouter(deps: PromptEvalRouterDeps): Router {
               : undefined,
           notifyEmail:
             typeof body.notifyEmail === 'string' ? body.notifyEmail : undefined,
+          datasetId:
+            typeof body.datasetId === 'string' ? body.datasetId : undefined,
+          datasetItems: parseDatasetItemRefs(body.datasetItems),
           files: uploadedFiles.map((file) => ({
             originalName: file.originalname,
             mimeType: file.mimetype,

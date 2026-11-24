@@ -2,6 +2,10 @@ import type {
   PollPendingRunsResponse,
   PromptCatalogDefinition,
   PromptEvalConfigResponse,
+  PromptEvalDatasetDetail,
+  PromptEvalDatasetItemRef,
+  PromptEvalDatasetItemSummary,
+  PromptEvalDatasetSummary,
   PromptEvalEmailConfigStatus,
   PromptEvalItem,
   PromptEvalItemEvaluation,
@@ -220,6 +224,8 @@ export interface CreatePromptEvalRunInput {
   promptParams?: Record<string, string>;
   customPromptText?: string;
   notifyEmail?: string;
+  datasetId?: string;
+  datasetItems?: PromptEvalDatasetItemRef[];
   files?: Array<{
     originalName: string;
     mimeType: string;
@@ -231,6 +237,46 @@ export interface CreatePromptEvalRunInput {
   }>;
 }
 
+export interface PromptEvalStoredDatasetItem extends PromptEvalDatasetItemSummary {
+  bytes: Uint8Array;
+}
+
+export interface PromptEvalDatasetRepository {
+  listDatasets(): Promise<PromptEvalDatasetSummary[]>;
+  getDataset(datasetId: string): Promise<PromptEvalDatasetDetail | null>;
+  loadDatasetItemBytes(
+    datasetId: string,
+    itemId: string
+  ): Promise<PromptEvalStoredDatasetItem | null>;
+}
+
+export interface PromptEvalDatasetStore {
+  createDataset(
+    dataset: PromptEvalDatasetDetail,
+    itemsWithBytes: PromptEvalStoredDatasetItem[]
+  ): Promise<PromptEvalDatasetDetail>;
+  listDatasets(limit?: number): Promise<PromptEvalDatasetSummary[]>;
+  getDataset(datasetId: string): Promise<PromptEvalDatasetDetail | null>;
+  loadDatasetItemBytes(
+    datasetId: string,
+    itemId: string
+  ): Promise<PromptEvalStoredDatasetItem | null>;
+  deleteDataset(datasetId: string): Promise<boolean>;
+}
+
+export interface CreatePromptEvalDatasetInput {
+  actorUid: string;
+  actorEmail: string;
+  name: string;
+  description?: string;
+  files?: Array<{
+    originalName: string;
+    mimeType: string;
+    bytes: Uint8Array;
+  }>;
+  sourceItems?: PromptEvalDatasetItemRef[];
+}
+
 export interface PromptEvalService {
   getConfig(): PromptEvalConfigResponse;
   getLimits(): PromptEvalLimits;
@@ -238,6 +284,15 @@ export interface PromptEvalService {
     catalogId: string,
     params: Record<string, string>
   ): ResolvedPromptPreview;
+  listDatasets(): Promise<PromptEvalDatasetSummary[]>;
+  getDataset(datasetId: string): Promise<PromptEvalDatasetDetail>;
+  createDataset(
+    input: CreatePromptEvalDatasetInput
+  ): Promise<PromptEvalDatasetDetail>;
+  deleteDataset(datasetId: string): Promise<void>;
+  exportDatasetZip(
+    datasetId: string
+  ): Promise<{ filename: string; bytes: Uint8Array }>;
   createRun(input: CreatePromptEvalRunInput): Promise<PromptEvalRunDetail>;
   listRuns(limit?: number): Promise<PromptEvalRunSummary[]>;
   getRun(runId: string): Promise<PromptEvalRunDetail>;

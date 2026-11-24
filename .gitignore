@@ -3,8 +3,9 @@ dist
 .DS_Store
 *.log
 
-# Local prompt evaluation datasets & test assets
-/dataset/
+# Local unzipped evaluation output dumps inside dataset/ (keep dataset/<name>/input/ tracked)
+dataset/**/*eval_*/
+dataset/**/outputs/
 
 # Environment files & local secrets
 .env

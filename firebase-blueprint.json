@@ -244,6 +244,54 @@
         "errorMessage": { "type": "string" }
       },
       "required": ["id", "index", "inputName", "status"]
+    },
+    "PromptEvalDataset": {
+      "title": "PromptEvalDataset",
+      "description": "Server-managed reusable admin evaluation image dataset created from the app",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "slug": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 240 },
+        "source": { "type": "string", "enum": ["app"] },
+        "readOnly": { "type": "boolean" },
+        "itemCount": { "type": "integer" },
+        "previewThumbnails": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAtMs": { "type": "integer" },
+        "updatedAtMs": { "type": "integer" },
+        "createdByEmail": { "type": "string" }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "source",
+        "readOnly",
+        "itemCount",
+        "createdAtMs",
+        "updatedAtMs"
+      ]
+    },
+    "PromptEvalDatasetItem": {
+      "title": "PromptEvalDatasetItem",
+      "description": "Normalized input image stored inside a server-managed PromptEvalDataset",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "index": { "type": "integer" },
+        "name": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "sizeBytes": { "type": "integer" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "thumbnailDataUrl": { "type": "string" },
+        "imageDataUrl": { "type": "string" }
+      },
+      "required": ["id", "index", "name", "mimeType", "sizeBytes", "imageDataUrl"]
     }
   },
   "firestore": {
@@ -276,6 +324,18 @@
         "$ref": "#/entities/PromptEvalItem"
       },
       "description": "Server-only per-item evaluation outputs, thumbnails, ratings, and notes"
+    },
+    "/prompt_eval_datasets/{datasetId}": {
+      "schema": {
+        "$ref": "#/entities/PromptEvalDataset"
+      },
+      "description": "Server-only reusable admin evaluation datasets created from the app"
+    },
+    "/prompt_eval_datasets/{datasetId}/items/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/PromptEvalDatasetItem"
+      },
+      "description": "Server-only normalized dataset images and thumbnails"
     }
   }
 }

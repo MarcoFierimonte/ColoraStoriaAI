@@ -15,6 +15,7 @@ import {
   Download,
   FileArchive,
   FileJson,
+  FolderOpen,
   Image as ImageIcon,
   Layers,
   Mail,
@@ -39,6 +40,8 @@ import {
   type PromptCatalogDefinition,
   type PromptCatalogField,
   type PromptEvalConfigResponse,
+  type PromptEvalDatasetDetail,
+  type PromptEvalDatasetSummary,
   type PromptEvalItem,
   type PromptEvalModality,
   type PromptEvalModelInfo,
@@ -76,6 +79,17 @@ interface QueuedImageEntry {
   file: File;
   previewUrl: string;
   sizeKb: number;
+}
+
+interface QueuedDatasetImageEntry {
+  queueKey: string;
+  datasetId: string;
+  datasetName: string;
+  datasetSource: 'repo' | 'app';
+  itemId: string;
+  name: string;
+  sizeKb: number;
+  thumbnailUrl?: string;
 }
 
 interface QueuedTextEntry {
@@ -571,7 +585,26 @@ export function PromptEvalWorkbench({
   const [autoEmailOnComplete, setAutoEmailOnComplete] = useState<boolean>(true);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  // Multi-image & text inputs
+  // Datasets (repo + app) & multi-image / text inputs
+  const [datasets, setDatasets] = useState<PromptEvalDatasetSummary[]>([]);
+  const [isLoadingDatasets, setIsLoadingDatasets] = useState(false);
+  const [loadingDatasetId, setLoadingDatasetId] = useState<string | null>(null);
+  const [exportingDatasetId, setExportingDatasetId] = useState<string | null>(
+    null
+  );
+  const [activeDatasetId, setActiveDatasetId] = useState<string | null>(null);
+  const [confirmDeleteDatasetId, setConfirmDeleteDatasetId] = useState<
+    string | null
+  >(null);
+  const [isDeletingDataset, setIsDeletingDataset] = useState(false);
+  const [showCreateDatasetForm, setShowCreateDatasetForm] = useState(false);
+  const [newDatasetName, setNewDatasetName] = useState('');
+  const [newDatasetDescription, setNewDatasetDescription] = useState('');
+  const [isSavingDataset, setIsSavingDataset] = useState(false);
+
+  const [queuedDatasetItems, setQueuedDatasetItems] = useState<
+    QueuedDatasetImageEntry[]
+  >([]);
   const [queuedImages, setQueuedImages] = useState<QueuedImageEntry[]>([]);
   const [isReadingFiles, setIsReadingFiles] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -619,6 +652,7 @@ export function PromptEvalWorkbench({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composerSectionRef = useRef<HTMLElement | null>(null);
   const resultsSectionRef = useRef<HTMLElement | null>(null);
+  const queuedDatasetItemsRef = useRef<QueuedDatasetImageEntry[]>([]);
   const queuedImagesRef = useRef<QueuedImageEntry[]>([]);
   const getAuthTokenRef = useRef(getAuthToken);
   const onSelectRunIdRef = useRef(onSelectRunId);
@@ -647,6 +681,10 @@ export function PromptEvalWorkbench({
   useEffect(() => {
     selectedRunIdRef.current = selectedRun?.id ?? null;
   }, [selectedRun?.id]);
+
+  useEffect(() => {
+    queuedDatasetItemsRef.current = queuedDatasetItems;
+  }, [queuedDatasetItems]);
 
   useEffect(() => {
     queuedImagesRef.current = queuedImages;
@@ -715,6 +753,29 @@ export function PromptEvalWorkbench({
     [modalityModels, modelId]
   );
 
+  const loadDatasetsList = useCallback(async () => {
+    setIsLoadingDatasets(true);
+    try {
+      const token = await getAuthTokenRef.current();
+      const list = await client.listDatasets(token);
+      if (isMountedRef.current) {
+        setDatasets(list);
+      }
+    } catch (err) {
+      if (isMountedRef.current) {
+        setGlobalError(
+          err instanceof Error
+            ? err.message
+            : 'Impossibile caricare i dataset disponibili.'
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingDatasets(false);
+      }
+    }
+  }, [client]);
+
   const loadRunsList = useCallback(async () => {
     setIsLoadingRuns(true);
     try {
@@ -769,13 +830,15 @@ export function PromptEvalWorkbench({
     void (async () => {
       try {
         const token = await getAuthTokenRef.current();
-        const [cfg, runList] = await Promise.all([
+        const [cfg, runList, datasetList] = await Promise.all([
           client.fetchConfig(token),
           client.listRuns(token, 50),
+          client.listDatasets(token).catch(() => []),
         ]);
         if (cancelled) return;
         setConfig(cfg);
         setRuns(runList);
+        setDatasets(datasetList);
 
         const defaultProvider =
           cfg.providers.find((p) => p.isDefault && p.configured) ??
@@ -1069,7 +1132,12 @@ export function PromptEvalWorkbench({
       setIsReadingFiles(true);
       try {
         for (const rawFile of list) {
-          if (queuedImagesRef.current.length + additions.length >= maxImages) {
+          if (
+            queuedDatasetItemsRef.current.length +
+              queuedImagesRef.current.length +
+              additions.length >=
+            maxImages
+          ) {
             errors.push(
               `Limite massimo raggiunto (${maxImages} immagini per run).`
             );
@@ -1125,6 +1193,9 @@ export function PromptEvalWorkbench({
           const next = [...queuedImagesRef.current, ...additions];
           queuedImagesRef.current = next;
           setQueuedImages(next);
+          if (queuedDatasetItemsRef.current.length === 0) {
+            setActiveDatasetId(null);
+          }
         }
 
         if (errors.length > 0) {
@@ -1140,6 +1211,17 @@ export function PromptEvalWorkbench({
     },
     [config]
   );
+
+  const removeQueuedDatasetItem = (queueKey: string) => {
+    const next = queuedDatasetItemsRef.current.filter(
+      (item) => item.queueKey !== queueKey
+    );
+    queuedDatasetItemsRef.current = next;
+    setQueuedDatasetItems(next);
+    if (next.length === 0) {
+      setActiveDatasetId(null);
+    }
+  };
 
   const removeQueuedImage = (id: string) => {
     const target = queuedImagesRef.current.find((item) => item.id === id);
@@ -1157,6 +1239,237 @@ export function PromptEvalWorkbench({
     }
     queuedImagesRef.current = [];
     setQueuedImages([]);
+    queuedDatasetItemsRef.current = [];
+    setQueuedDatasetItems([]);
+    setActiveDatasetId(null);
+  };
+
+  const mapDatasetDetailToQueueEntries = (
+    detail: PromptEvalDatasetDetail
+  ): QueuedDatasetImageEntry[] =>
+    detail.items.map((item) => ({
+      queueKey: `${detail.id}::${item.id}`,
+      datasetId: detail.id,
+      datasetName: detail.name,
+      datasetSource: detail.source,
+      itemId: item.id,
+      name: item.name,
+      sizeKb: Math.max(1, Math.round(item.sizeBytes / 1024)),
+      thumbnailUrl: item.thumbnailDataUrl,
+    }));
+
+  const handleSelectDataset = async (
+    datasetId: string,
+    mode: 'replace' | 'append'
+  ) => {
+    setLoadingDatasetId(datasetId);
+    setGlobalError(null);
+    try {
+      const token = await getAuthTokenRef.current();
+      const detail = await client.getDataset(datasetId, token);
+      if (!isMountedRef.current) return;
+
+      const maxImages = config?.limits.maxImagesPerRun ?? 20;
+      const incomingEntries = mapDatasetDetailToQueueEntries(detail);
+
+      if (mode === 'replace') {
+        for (const item of queuedImagesRef.current) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+        queuedImagesRef.current = [];
+        setQueuedImages([]);
+        const capped = incomingEntries.slice(0, maxImages);
+        queuedDatasetItemsRef.current = capped;
+        setQueuedDatasetItems(capped);
+        setActiveDatasetId(detail.id);
+        setStatusNotice(
+          `Dataset "${detail.name}" (${capped.length} foto · ${detail.source === 'repo' ? 'Repository' : 'App'}) caricato nella coda di test.`
+        );
+      } else {
+        const existingKeys = new Set(
+          queuedDatasetItemsRef.current.map((entry) => entry.queueKey)
+        );
+        const remainingSlots = Math.max(
+          0,
+          maxImages -
+            (queuedDatasetItemsRef.current.length +
+              queuedImagesRef.current.length)
+        );
+        const toAppend = incomingEntries
+          .filter((entry) => !existingKeys.has(entry.queueKey))
+          .slice(0, remainingSlots);
+        const next = [...queuedDatasetItemsRef.current, ...toAppend];
+        queuedDatasetItemsRef.current = next;
+        setQueuedDatasetItems(next);
+        if (toAppend.length === 0) {
+          setGlobalError(
+            remainingSlots === 0
+              ? `Limite massimo di ${maxImages} immagini già raggiunto nella coda.`
+              : `Tutte le immagini di "${detail.name}" sono già presenti nella coda.`
+          );
+        } else {
+          setStatusNotice(
+            `Aggiunte ${toAppend.length} foto dal dataset "${detail.name}".`
+          );
+        }
+      }
+    } catch (err) {
+      if (isMountedRef.current) {
+        setGlobalError(
+          err instanceof Error
+            ? err.message
+            : 'Impossibile caricare le immagini del dataset selezionato.'
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingDatasetId(null);
+      }
+    }
+  };
+
+  const handleCreateDatasetFromQueue = async () => {
+    if (isSavingDataset) return;
+    const trimmedName = newDatasetName.trim();
+    if (!trimmedName) {
+      setGlobalError('Inserisci un nome per il nuovo dataset prima di salvarlo.');
+      return;
+    }
+    if (
+      queuedDatasetItemsRef.current.length === 0 &&
+      queuedImagesRef.current.length === 0
+    ) {
+      setGlobalError(
+        'Seleziona o carica almeno una foto nella coda prima di creare il dataset.'
+      );
+      return;
+    }
+
+    setIsSavingDataset(true);
+    setGlobalError(null);
+    setStatusNotice(null);
+    try {
+      const token = await getAuthTokenRef.current();
+      const created = await client.createDataset(
+        {
+          name: trimmedName,
+          description: newDatasetDescription.trim() || undefined,
+          sourceItems:
+            queuedDatasetItemsRef.current.length > 0
+              ? queuedDatasetItemsRef.current.map((entry) => ({
+                  datasetId: entry.datasetId,
+                  itemId: entry.itemId,
+                }))
+              : undefined,
+          files:
+            queuedImagesRef.current.length > 0
+              ? queuedImagesRef.current.map((entry) => entry.file)
+              : undefined,
+        },
+        token
+      );
+      if (!isMountedRef.current) return;
+
+      const { items: _items, ...summary } = created;
+      setDatasets((prev) => [
+        ...prev.filter((d) => d.source === 'repo'),
+        summary,
+        ...prev.filter((d) => d.source !== 'repo' && d.id !== summary.id),
+      ]);
+
+      for (const local of queuedImagesRef.current) {
+        URL.revokeObjectURL(local.previewUrl);
+      }
+      queuedImagesRef.current = [];
+      setQueuedImages([]);
+
+      const savedEntries = mapDatasetDetailToQueueEntries(created);
+      queuedDatasetItemsRef.current = savedEntries;
+      setQueuedDatasetItems(savedEntries);
+      setActiveDatasetId(created.id);
+      setNewDatasetName('');
+      setNewDatasetDescription('');
+      setShowCreateDatasetForm(false);
+      setStatusNotice(
+        `Nuovo dataset "${created.name}" (${created.itemCount} foto) creato nell’app e selezionato per i test!`
+      );
+    } catch (err) {
+      if (isMountedRef.current) {
+        setGlobalError(
+          err instanceof Error
+            ? err.message
+            : 'Errore durante il salvataggio del dataset.'
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsSavingDataset(false);
+      }
+    }
+  };
+
+  const handleDeleteDataset = async (datasetId: string) => {
+    setIsDeletingDataset(true);
+    setGlobalError(null);
+    try {
+      const token = await getAuthTokenRef.current();
+      await client.deleteDataset(datasetId, token);
+      if (!isMountedRef.current) return;
+
+      setDatasets((prev) => prev.filter((d) => d.id !== datasetId));
+      const remainingQueue = queuedDatasetItemsRef.current.filter(
+        (entry) => entry.datasetId !== datasetId
+      );
+      queuedDatasetItemsRef.current = remainingQueue;
+      setQueuedDatasetItems(remainingQueue);
+      if (activeDatasetId === datasetId) {
+        setActiveDatasetId(null);
+      }
+      setConfirmDeleteDatasetId(null);
+      setStatusNotice('Dataset eliminato.');
+    } catch (err) {
+      if (isMountedRef.current) {
+        setGlobalError(
+          err instanceof Error
+            ? err.message
+            : 'Impossibile eliminare il dataset.'
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsDeletingDataset(false);
+      }
+    }
+  };
+
+  const handleDownloadDatasetZip = async (dataset: PromptEvalDatasetSummary) => {
+    setExportingDatasetId(dataset.id);
+    setGlobalError(null);
+    try {
+      const token = await getAuthTokenRef.current();
+      const { blob, filename } = await client.exportDatasetArchive(
+        dataset.id,
+        token
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch (err) {
+      setGlobalError(
+        err instanceof Error
+          ? err.message
+          : 'Impossibile scaricare l’archivio ZIP del dataset.'
+      );
+    } finally {
+      if (isMountedRef.current) {
+        setExportingDatasetId(null);
+      }
+    }
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -1190,9 +1503,12 @@ export function PromptEvalWorkbench({
       ? (resolvedPrompt?.promptText ?? '')
       : customPromptText;
 
+  const activeImageQueueCount =
+    queuedDatasetItems.length + queuedImages.length;
+
   const activeItemCount =
     modality === 'image'
-      ? queuedImages.length
+      ? activeImageQueueCount
       : queuedTexts.filter((t) => t.text.trim().length > 0).length;
 
   const estimatedStandardTotal =
@@ -1221,8 +1537,10 @@ export function PromptEvalWorkbench({
     setGlobalError(null);
     setStatusNotice(null);
 
-    if (modality === 'image' && queuedImages.length === 0) {
-      setGlobalError('Carica almeno un’immagine prima di avviare il test.');
+    if (modality === 'image' && activeImageQueueCount === 0) {
+      setGlobalError(
+        'Seleziona un dataset oppure carica almeno un’immagine prima di avviare il test.'
+      );
       return;
     }
     if (modality === 'text' && activeItemCount === 0) {
@@ -1254,8 +1572,15 @@ export function PromptEvalWorkbench({
           customPromptText:
             promptSource === 'custom' ? customPromptText : undefined,
           notifyEmail: effectiveNotifyEmail,
+          datasetItems:
+            modality === 'image' && queuedDatasetItems.length > 0
+              ? queuedDatasetItems.map((entry) => ({
+                  datasetId: entry.datasetId,
+                  itemId: entry.itemId,
+                }))
+              : undefined,
           files:
-            modality === 'image'
+            modality === 'image' && queuedImages.length > 0
               ? queuedImages.map((entry) => entry.file)
               : undefined,
           textInputs:
@@ -1817,8 +2142,8 @@ export function PromptEvalWorkbench({
           </div>
         </div>
 
-        {/* STEP 2: UPLOAD MULTIPLE IMAGES OR TEXT INPUTS */}
-        <div className="rounded-[12px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-sky,#e4f3ff)]/45 p-4 space-y-3">
+        {/* STEP 2: SELECT REPO/APP DATASET OR UPLOAD PHOTOS & CREATE NEW DATASET */}
+        <div className="rounded-[12px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-sky,#e4f3ff)]/45 p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-sm font-bold text-[var(--cs-ink,#24284f)] flex items-center gap-2">
               <span className="inline-grid place-items-center h-6 w-6 rounded-full border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-lavender,#d9ccff)] text-xs">
@@ -1826,24 +2151,304 @@ export function PromptEvalWorkbench({
               </span>
               <span>
                 {modality === 'image'
-                  ? `Carica più immagini (${queuedImages.length}/${config?.limits.maxImagesPerRun ?? 20})`
+                  ? `Dataset & Immagini di test (${activeImageQueueCount}/${config?.limits.maxImagesPerRun ?? 20})`
                   : `Inserisci gli input testuali (${activeItemCount}/${config?.limits.maxTextInputsPerRun ?? 50})`}
               </span>
             </h4>
 
-            {modality === 'image' && queuedImages.length > 0 ? (
-              <button
-                type="button"
-                onClick={clearQueuedImages}
-                className="text-xs font-bold underline decoration-2 text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer"
-              >
-                Rimuovi tutte
-              </button>
+            {modality === 'image' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateDatasetForm((prev) => !prev)}
+                  className={`inline-flex items-center gap-1 rounded-[8px] border-2 border-[var(--cs-border,#24284f)] px-2.5 py-1 text-xs font-bold cursor-pointer ${
+                    showCreateDatasetForm
+                      ? 'bg-[var(--cs-lavender,#d9ccff)]'
+                      : 'bg-white hover:bg-[var(--cs-yellow,#ffe680)]'
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>
+                    {showCreateDatasetForm
+                      ? 'Chiudi creazione dataset'
+                      : 'Crea dataset dall’app'}
+                  </span>
+                </button>
+
+                {activeImageQueueCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={clearQueuedImages}
+                    className="text-xs font-bold underline decoration-2 text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer"
+                  >
+                    Svuota coda
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
           {modality === 'image' ? (
             <>
+              {/* SAVED DATASETS: REPO + APP */}
+              <div className="rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-white p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen
+                      className="h-4 w-4 text-[var(--cs-ink,#24284f)]"
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--cs-ink,#24284f)]">
+                      Dataset disponibili ({datasets.length})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isLoadingDatasets}
+                    onClick={() => void loadDatasetsList()}
+                    aria-label="Aggiorna elenco dataset"
+                    className="inline-flex items-center gap-1 rounded-[6px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-bg,#fff8d9)] px-2 py-0.5 text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`h-3 w-3 ${isLoadingDatasets ? 'animate-spin' : ''}`}
+                      aria-hidden="true"
+                    />
+                    <span>Aggiorna</span>
+                  </button>
+                </div>
+
+                {datasets.length === 0 ? (
+                  <p className="text-xs text-[var(--cs-ink-muted,#4b5075)]">
+                    Nessun dataset salvato. Aggiungi una cartella{' '}
+                    <code className="font-mono-num font-bold">
+                      dataset/&lt;nome&gt;/input/
+                    </code>{' '}
+                    nel repository oppure carica delle foto qui sotto e clicca{' '}
+                    <strong>Crea dataset dall’app</strong>.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {datasets.map((ds) => {
+                      const isSelectedDataset = activeDatasetId === ds.id;
+                      const isLoadingThis = loadingDatasetId === ds.id;
+                      return (
+                        <div
+                          key={ds.id}
+                          className={`rounded-[10px] border-2 border-[var(--cs-border,#24284f)] p-3 flex flex-col justify-between gap-2.5 transition-colors ${
+                            isSelectedDataset
+                              ? 'bg-[var(--cs-mint,#b4f0cb)]/35'
+                              : 'bg-[var(--cs-bg,#fff8d9)]/40'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={`rounded-[6px] border border-[var(--cs-border,#24284f)] px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                                    ds.source === 'repo'
+                                      ? 'bg-[var(--cs-blue,#9acfff)]'
+                                      : 'bg-[var(--cs-lavender,#d9ccff)]'
+                                  }`}
+                                >
+                                  {ds.source === 'repo'
+                                    ? `REPO · dataset/${ds.slug}`
+                                    : 'APP'}
+                                </span>
+                                <span className="text-[11px] font-mono-num font-bold text-[var(--cs-ink-muted,#4b5075)]">
+                                  {ds.itemCount}{' '}
+                                  {ds.itemCount === 1 ? 'foto' : 'foto'}
+                                </span>
+                              </div>
+                              <p className="text-sm font-bold text-[var(--cs-ink,#24284f)] truncate">
+                                {ds.name}
+                              </p>
+                              {ds.description ? (
+                                <p className="text-[11px] text-[var(--cs-ink-muted,#4b5075)] line-clamp-2">
+                                  {ds.description}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            {ds.previewThumbnails.length > 0 ? (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {ds.previewThumbnails.slice(0, 3).map((thumb, idx) => (
+                                  <img
+                                    key={`${ds.id}-thumb-${idx}`}
+                                    src={thumb}
+                                    alt=""
+                                    aria-hidden="true"
+                                    className="h-10 w-8 rounded-[5px] border border-[var(--cs-border,#24284f)] object-cover bg-white"
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 pt-0.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isLoadingThis}
+                                onClick={() =>
+                                  void handleSelectDataset(ds.id, 'replace')
+                                }
+                                className="inline-flex items-center gap-1 rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-mint,#b4f0cb)] px-2.5 py-1 text-xs font-bold cursor-pointer disabled:opacity-50"
+                              >
+                                <span>
+                                  {isLoadingThis
+                                    ? 'Carico…'
+                                    : isSelectedDataset
+                                      ? 'Ricarica dataset'
+                                      : 'Usa dataset'}
+                                </span>
+                              </button>
+
+                              {activeImageQueueCount > 0 && !isSelectedDataset ? (
+                                <button
+                                  type="button"
+                                  disabled={isLoadingThis}
+                                  onClick={() =>
+                                    void handleSelectDataset(ds.id, 'append')
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2 py-1 text-xs font-bold cursor-pointer disabled:opacity-50"
+                                >
+                                  <Plus className="h-3 w-3" aria-hidden="true" />
+                                  <span>Aggiungi</span>
+                                </button>
+                              ) : null}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={exportingDatasetId === ds.id}
+                                onClick={() => void handleDownloadDatasetZip(ds)}
+                                title="Scarica dataset in formato .zip (struttura pronta per dataset/<nome>/input/)"
+                                className="inline-flex items-center gap-1 rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2 py-1 text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                              >
+                                <Download className="h-3 w-3" aria-hidden="true" />
+                                <span>
+                                  {exportingDatasetId === ds.id ? '…' : 'ZIP'}
+                                </span>
+                              </button>
+
+                              {!ds.readOnly ? (
+                                confirmDeleteDatasetId === ds.id ? (
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      disabled={isDeletingDataset}
+                                      onClick={() =>
+                                        void handleDeleteDataset(ds.id)
+                                      }
+                                      className="rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-danger-bg,#ffe4e8)] px-2 py-1 text-[11px] font-bold text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer disabled:opacity-50"
+                                    >
+                                      {isDeletingDataset ? '…' : 'Conferma'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isDeletingDataset}
+                                      onClick={() =>
+                                        setConfirmDeleteDatasetId(null)
+                                      }
+                                      className="rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-white px-1.5 py-1 text-[11px] font-bold cursor-pointer"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    aria-label={`Elimina dataset ${ds.name}`}
+                                    onClick={() =>
+                                      setConfirmDeleteDatasetId(ds.id)
+                                    }
+                                    className="rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-danger-bg,#ffe4e8)] p-1 text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer"
+                                  >
+                                    <Trash2
+                                      className="h-3 w-3"
+                                      aria-hidden="true"
+                                    />
+                                  </button>
+                                )
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-[11px] text-[var(--cs-ink-muted,#4b5075)]">
+                  Puoi creare nuovi dataset sia <strong>dal repository</strong>{' '}
+                  (cartella <code className="font-mono-num">dataset/&lt;nome&gt;/input/</code>)
+                  sia <strong>direttamente dall’app</strong> caricando le foto qui sotto e salvandole.
+                </p>
+              </div>
+
+              {/* CREATE NEW APP DATASET PANEL (shown on toggle OR whenever local uploaded files are queued) */}
+              {showCreateDatasetForm || queuedImages.length > 0 ? (
+                <div className="rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-lavender,#d9ccff)]/45 p-3.5 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-[var(--cs-ink,#24284f)]">
+                      Salva le foto in coda come nuovo dataset riutilizzabile nell’app (
+                      {activeImageQueueCount}{' '}
+                      {activeImageQueueCount === 1 ? 'foto' : 'foto'})
+                    </span>
+                    {activeImageQueueCount === 0 ? (
+                      <button
+                        type="button"
+                        disabled={isReadingFiles}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-1 rounded-[7px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2.5 py-1 text-xs font-bold cursor-pointer"
+                      >
+                        <Upload className="h-3 w-3" aria-hidden="true" />
+                        <span>Scegli foto per il nuovo dataset</span>
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                    <input
+                      type="text"
+                      aria-label="Nome del nuovo dataset"
+                      placeholder="Nome dataset (es. Giocattoli Set 2)"
+                      value={newDatasetName}
+                      onChange={(e) => setNewDatasetName(e.target.value)}
+                      className="rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2.5 py-1.5 text-xs font-bold"
+                    />
+                    <input
+                      type="text"
+                      aria-label="Descrizione opzionale del dataset"
+                      placeholder="Descrizione opzionale (es. foto indoor)"
+                      value={newDatasetDescription}
+                      onChange={(e) => setNewDatasetDescription(e.target.value)}
+                      className="rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2.5 py-1.5 text-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={
+                        isSavingDataset ||
+                        isReadingFiles ||
+                        activeImageQueueCount === 0 ||
+                        !newDatasetName.trim()
+                      }
+                      onClick={() => void handleCreateDatasetFromQueue()}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-mint,#b4f0cb)] px-3.5 py-1.5 text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>
+                        {isSavingDataset
+                          ? 'Salvataggio…'
+                          : `Salva dataset (${activeImageQueueCount})`}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* UPLOAD / ADD LOCAL PHOTOS */}
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -1859,7 +2464,7 @@ export function PromptEvalWorkbench({
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  aria-label="Seleziona immagini da valutare"
+                  aria-label="Seleziona immagini da valutare o salvare in un dataset"
                   accept={(
                     config?.limits.acceptedMimeTypes ?? [
                       'image/jpeg',
@@ -1880,11 +2485,11 @@ export function PromptEvalWorkbench({
                 <div className="flex flex-col items-center gap-2">
                   <Upload className="h-6 w-6 text-[var(--cs-ink,#24284f)]" aria-hidden="true" />
                   <p className="text-sm font-bold text-[var(--cs-ink,#24284f)]">
-                    Trascina qui più foto oppure selezionale dal dispositivo
+                    Oppure carica foto dal dispositivo (per un test rapido o per creare un nuovo dataset)
                   </p>
                   <p className="text-xs text-[var(--cs-ink-muted,#4b5075)]">
                     Formati: {config?.limits.acceptedExtensionsLabel ?? 'JPG, PNG, WebP o AVIF'} · max{' '}
-                    {config?.limits.maxFileSizeMb ?? 12} MB ciascuna · elaborazione singola per ogni immagine
+                    {config?.limits.maxFileSizeMb ?? 12} MB ciascuna · puoi combinare dataset e nuove foto
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <button
@@ -1895,7 +2500,7 @@ export function PromptEvalWorkbench({
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
                       <span>
-                        {isReadingFiles ? 'Lettura file…' : 'Seleziona immagini'}
+                        {isReadingFiles ? 'Lettura file…' : 'Carica foto dal dispositivo'}
                       </span>
                     </button>
 
@@ -1919,36 +2524,88 @@ export function PromptEvalWorkbench({
                 </div>
               </div>
 
-              {queuedImages.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-                  {queuedImages.map((img, idx) => (
-                    <div
-                      key={img.id}
-                      className="relative rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-white p-1.5 space-y-1"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => removeQueuedImage(img.id)}
-                        aria-label={`Rimuovi ${img.file.name}`}
-                        className="absolute right-2 top-2 z-10 rounded-[6px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-danger-bg,#ffe4e8)] p-0.5 text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer"
+              {activeImageQueueCount > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-[var(--cs-ink,#24284f)]">
+                    Coda attiva per il prossimo test ({activeImageQueueCount}{' '}
+                    {activeImageQueueCount === 1 ? 'immagine' : 'immagini'})
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                    {queuedDatasetItems.map((item, idx) => (
+                      <div
+                        key={item.queueKey}
+                        className="relative rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-white p-1.5 space-y-1"
                       >
-                        <X className="h-3 w-3" aria-hidden="true" />
-                      </button>
-                      <div className="aspect-[3/4] rounded-[6px] overflow-hidden bg-[var(--cs-bg,#fff8d9)]">
-                        <img
-                          src={img.previewUrl}
-                          alt={img.file.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => removeQueuedDatasetItem(item.queueKey)}
+                          aria-label={`Rimuovi ${item.name}`}
+                          className="absolute right-2 top-2 z-10 rounded-[6px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-danger-bg,#ffe4e8)] p-0.5 text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer"
+                        >
+                          <X className="h-3 w-3" aria-hidden="true" />
+                        </button>
+                        <div className="aspect-[3/4] rounded-[6px] overflow-hidden bg-[var(--cs-bg,#fff8d9)] flex items-center justify-center">
+                          {item.thumbnailUrl ? (
+                            <img
+                              src={item.thumbnailUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon
+                              className="h-6 w-6 text-[var(--cs-ink-muted,#4b5075)]"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </div>
+                        <p className="text-[11px] font-bold truncate">
+                          #{idx + 1} {item.name}
+                        </p>
+                        <div className="flex items-center justify-between gap-1 text-[10px] font-mono-num text-[var(--cs-ink-muted,#4b5075)]">
+                          <span className="truncate font-bold text-[var(--cs-ink,#24284f)]">
+                            {item.datasetSource === 'repo' ? 'REPO' : 'APP'} ·{' '}
+                            {item.datasetName}
+                          </span>
+                          <span className="shrink-0">{item.sizeKb} KB</span>
+                        </div>
                       </div>
-                      <p className="text-[11px] font-bold truncate">
-                        #{idx + 1} {img.file.name}
-                      </p>
-                      <p className="text-[10px] font-mono-num text-[var(--cs-ink-muted,#4b5075)]">
-                        {img.sizeKb} KB
-                      </p>
-                    </div>
-                  ))}
+                    ))}
+
+                    {queuedImages.map((img, idx) => {
+                      const displayIndex = queuedDatasetItems.length + idx + 1;
+                      return (
+                        <div
+                          key={img.id}
+                          className="relative rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-white p-1.5 space-y-1"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => removeQueuedImage(img.id)}
+                            aria-label={`Rimuovi ${img.file.name}`}
+                            className="absolute right-2 top-2 z-10 rounded-[6px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-danger-bg,#ffe4e8)] p-0.5 text-[var(--cs-danger-ink,#8f1d2c)] cursor-pointer"
+                          >
+                            <X className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                          <div className="aspect-[3/4] rounded-[6px] overflow-hidden bg-[var(--cs-bg,#fff8d9)]">
+                            <img
+                              src={img.previewUrl}
+                              alt={img.file.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <p className="text-[11px] font-bold truncate">
+                            #{displayIndex} {img.file.name}
+                          </p>
+                          <div className="flex items-center justify-between gap-1 text-[10px] font-mono-num text-[var(--cs-ink-muted,#4b5075)]">
+                            <span className="font-bold text-[var(--cs-ink,#24284f)]">
+                              LOCALE
+                            </span>
+                            <span>{img.sizeKb} KB</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : null}
             </>

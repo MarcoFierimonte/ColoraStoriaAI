@@ -9,6 +9,7 @@ export {
   downloadItemOutput,
   downloadRunReportJson,
   downloadRunZipArchive,
+  type CreatePromptEvalDatasetPayload,
   type CreatePromptEvalRunPayload,
   type PromptEvalApiClient,
 } from './client.ts';

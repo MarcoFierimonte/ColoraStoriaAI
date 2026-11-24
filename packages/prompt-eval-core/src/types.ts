@@ -34,6 +34,52 @@ export const PROMPT_EVAL_NOTIFICATION_STATUSES = [
 export type PromptEvalNotificationStatus =
   (typeof PROMPT_EVAL_NOTIFICATION_STATUSES)[number];
 
+export const PROMPT_EVAL_DATASET_SOURCES = ['repo', 'app'] as const;
+export type PromptEvalDatasetSource =
+  (typeof PROMPT_EVAL_DATASET_SOURCES)[number];
+
+export interface PromptEvalDatasetItemSummary {
+  id: string;
+  index: number;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  thumbnailDataUrl?: string;
+}
+
+export interface PromptEvalDatasetSummary {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  source: PromptEvalDatasetSource;
+  readOnly: boolean;
+  itemCount: number;
+  previewThumbnails: string[];
+  createdAtMs: number;
+  updatedAtMs: number;
+  createdByEmail?: string;
+}
+
+export interface PromptEvalDatasetDetail extends PromptEvalDatasetSummary {
+  items: PromptEvalDatasetItemSummary[];
+}
+
+export interface PromptEvalDatasetItemRef {
+  datasetId: string;
+  itemId: string;
+}
+
+export interface PromptEvalDatasetsListResponse {
+  datasets: PromptEvalDatasetSummary[];
+}
+
+export interface PromptEvalDatasetResponse {
+  dataset: PromptEvalDatasetDetail;
+}
+
 export function isPromptEvalModality(
   value: string
 ): value is PromptEvalModality {

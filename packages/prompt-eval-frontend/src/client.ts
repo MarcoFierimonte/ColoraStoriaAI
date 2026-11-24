@@ -1,6 +1,7 @@
 export { FetchPromptEvalClient } from './implementations/fetchPromptEvalClient.ts';
 export {
   PromptEvalClientError,
+  type CreatePromptEvalDatasetPayload,
   type CreatePromptEvalRunPayload,
   type PromptEvalApiClient,
 } from './promptEvalClient.interface.ts';

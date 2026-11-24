@@ -6,13 +6,18 @@ import {
   createPromptEvalRouter,
   DefaultPromptEvalService,
   DefaultPromptProviderRegistry,
+  FilesystemPromptEvalDatasetRepository,
+  FirestorePromptEvalDatasetStore,
   FirestorePromptEvalStore,
   GeminiPromptEvalProvider,
+  InMemoryPromptEvalDatasetStore,
   InMemoryPromptEvalStore,
   NoopEmailSender,
   OpenAIPromptEvalProvider,
   ResendEmailSender,
   type EmailNotificationSender,
+  type PromptEvalDatasetRepository,
+  type PromptEvalDatasetStore,
   type PromptEvalService,
   type PromptEvalStore,
 } from '../../../../packages/prompt-eval-backend/src/index.ts';
@@ -39,6 +44,10 @@ const __dirname = path.dirname(__filename);
 const DEFAULT_FIREBASE_CONFIG_PATH = path.resolve(
   __dirname,
   '../../../../firebase-applet-config.json'
+);
+const DEFAULT_REPO_DATASETS_DIR = path.resolve(
+  __dirname,
+  '../../../../dataset'
 );
 
 export {
@@ -70,11 +79,15 @@ export function createColoraStoriaPromptEvalService(params?: {
   prompts?: PromptRepository;
   mediaValidator?: ServerMediaValidator;
   store?: PromptEvalStore;
+  datasetRepository?: PromptEvalDatasetRepository;
+  datasetStore?: PromptEvalDatasetStore;
+  datasetsRootDir?: string;
   emailSender?: EmailNotificationSender;
 }): DefaultPromptEvalService {
   const config = params?.config ?? getServerConfig();
   const prompts = params?.prompts ?? promptRepository;
   const mediaValidator = params?.mediaValidator ?? serverMediaValidator;
+  const mediaPreparer = new SharpPromptEvalMediaPreparer(mediaValidator);
 
   const store: PromptEvalStore =
     params?.store ??
@@ -83,6 +96,21 @@ export function createColoraStoriaPromptEvalService(params?: {
       : new FirestorePromptEvalStore({
           firebaseConfigPath: DEFAULT_FIREBASE_CONFIG_PATH,
         }));
+
+  const datasetStore: PromptEvalDatasetStore =
+    params?.datasetStore ??
+    (config.promptEvalStoreMode === 'memory'
+      ? new InMemoryPromptEvalDatasetStore()
+      : new FirestorePromptEvalDatasetStore({
+          firebaseConfigPath: DEFAULT_FIREBASE_CONFIG_PATH,
+        }));
+
+  const datasetRepository: PromptEvalDatasetRepository =
+    params?.datasetRepository ??
+    new FilesystemPromptEvalDatasetRepository({
+      rootDir: params?.datasetsRootDir ?? DEFAULT_REPO_DATASETS_DIR,
+      mediaPreparer,
+    });
 
   const emailSender =
     params?.emailSender ?? createEmailSenderFromConfig(config);
@@ -105,8 +133,10 @@ export function createColoraStoriaPromptEvalService(params?: {
   return new DefaultPromptEvalService({
     providers: providerRegistry,
     store,
+    datasetRepository,
+    datasetStore,
     catalogResolver: new ColoraStoriaPromptCatalogResolver(prompts),
-    mediaPreparer: new SharpPromptEvalMediaPreparer(mediaValidator),
+    mediaPreparer,
     emailSender,
     appBaseUrl: config.appBaseUrl || undefined,
     limits: {

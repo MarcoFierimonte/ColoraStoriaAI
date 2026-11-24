@@ -1,11 +1,16 @@
 import crypto from 'node:crypto';
 import {
+  createZipArchive,
   isPromptEvalModality,
   isPromptEvalVerdict,
   isPromptExecutionMode,
   isTerminalRunStatus,
   type PollPendingRunsResponse,
   type PromptEvalConfigResponse,
+  type PromptEvalDatasetDetail,
+  type PromptEvalDatasetItemRef,
+  type PromptEvalDatasetItemSummary,
+  type PromptEvalDatasetSummary,
   type PromptEvalItem,
   type PromptEvalItemEvaluation,
   type PromptEvalLimits,
@@ -19,18 +24,23 @@ import {
 } from '../../../prompt-eval-core/src/index.ts';
 import {
   PromptEvalError,
+  type CreatePromptEvalDatasetInput,
   type CreatePromptEvalRunInput,
   type EmailNotificationSender,
   type PromptCatalogResolver,
+  type PromptEvalDatasetRepository,
+  type PromptEvalDatasetStore,
   type PromptEvalImageInput,
   type PromptEvalMediaPreparer,
   type PromptEvalService,
   type PromptEvalStore,
+  type PromptEvalStoredDatasetItem,
   type PromptEvalTextInput,
   type PromptProviderRegistry,
   type ProviderItemResult,
 } from '../promptEval.interface.ts';
 import { buildRunResultEmailMessage, NoopEmailSender } from './emailSenders.ts';
+import { InMemoryPromptEvalDatasetStore } from './inMemoryPromptEvalDatasetStore.ts';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SAFE_DOC_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
@@ -131,9 +141,51 @@ function resolveFinalStatus(
   return 'completed';
 }
 
+const MAX_DATASET_DATA_URL_CHARS = 650_000;
+
+function slugifyDatasetName(raw: string): string {
+  const slug = raw
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return slug || 'dataset';
+}
+
+function extensionForMime(mimeType: string): string {
+  const lower = mimeType.toLowerCase();
+  if (lower.includes('png')) return '.png';
+  if (lower.includes('webp')) return '.webp';
+  if (lower.includes('avif')) return '.avif';
+  return '.jpg';
+}
+
+function alignFilenameExtension(originalName: string, mimeType: string): string {
+  const trimmed = originalName.trim() || 'image.jpg';
+  const lastDot = trimmed.lastIndexOf('.');
+  const base = lastDot > 0 ? trimmed.slice(0, lastDot) : trimmed;
+  return `${base}${extensionForMime(mimeType)}`;
+}
+
+function parseDataUrlToBytes(
+  dataUrl: string,
+  fallbackMime: string
+): { mimeType: string; bytes: Uint8Array } | null {
+  const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl.trim());
+  if (!match) return null;
+  return {
+    mimeType: match[1].toLowerCase() || fallbackMime,
+    bytes: new Uint8Array(Buffer.from(match[2], 'base64')),
+  };
+}
+
 export interface DefaultPromptEvalServiceOptions {
   providers: PromptProviderRegistry;
   store: PromptEvalStore;
+  datasetRepository?: PromptEvalDatasetRepository;
+  datasetStore?: PromptEvalDatasetStore;
   catalogResolver?: PromptCatalogResolver;
   mediaPreparer?: PromptEvalMediaPreparer;
   emailSender?: EmailNotificationSender;
@@ -146,6 +198,8 @@ export interface DefaultPromptEvalServiceOptions {
 export class DefaultPromptEvalService implements PromptEvalService {
   private readonly providers: PromptProviderRegistry;
   private readonly store: PromptEvalStore;
+  private readonly datasetRepository?: PromptEvalDatasetRepository;
+  private readonly datasetStore: PromptEvalDatasetStore;
   private readonly catalogResolver?: PromptCatalogResolver;
   private readonly mediaPreparer?: PromptEvalMediaPreparer;
   private readonly emailSender: EmailNotificationSender;
@@ -161,6 +215,9 @@ export class DefaultPromptEvalService implements PromptEvalService {
   constructor(options: DefaultPromptEvalServiceOptions) {
     this.providers = options.providers;
     this.store = options.store;
+    this.datasetRepository = options.datasetRepository;
+    this.datasetStore =
+      options.datasetStore ?? new InMemoryPromptEvalDatasetStore();
     this.catalogResolver = options.catalogResolver;
     this.mediaPreparer = options.mediaPreparer;
     this.emailSender = options.emailSender ?? new NoopEmailSender();
@@ -201,6 +258,303 @@ export class DefaultPromptEvalService implements PromptEvalService {
       );
     }
     return this.catalogResolver.resolvePrompt(catalogId, params);
+  }
+
+  async listDatasets(): Promise<PromptEvalDatasetSummary[]> {
+    const [repoDatasets, appDatasets] = await Promise.all([
+      this.datasetRepository
+        ? this.datasetRepository.listDatasets()
+        : Promise.resolve([]),
+      this.datasetStore.listDatasets(100),
+    ]);
+    return [...repoDatasets, ...appDatasets];
+  }
+
+  async getDataset(datasetId: string): Promise<PromptEvalDatasetDetail> {
+    const validId = assertValidEntityId(datasetId, 'dataset');
+    if (this.datasetRepository) {
+      const repoDataset = await this.datasetRepository.getDataset(validId);
+      if (repoDataset) return repoDataset;
+    }
+    const appDataset = await this.datasetStore.getDataset(validId);
+    if (appDataset) return appDataset;
+
+    throw new PromptEvalError(
+      `Dataset "${validId}" non trovato.`,
+      404,
+      'dataset_not_found'
+    );
+  }
+
+  private async loadDatasetItemOrThrow(
+    ref: PromptEvalDatasetItemRef
+  ): Promise<PromptEvalStoredDatasetItem> {
+    const validDatasetId = assertValidEntityId(ref.datasetId, 'dataset');
+    const validItemId = assertValidEntityId(ref.itemId, 'elemento dataset');
+
+    if (this.datasetRepository) {
+      const fromRepo = await this.datasetRepository.loadDatasetItemBytes(
+        validDatasetId,
+        validItemId
+      );
+      if (fromRepo) return fromRepo;
+    }
+
+    const fromStore = await this.datasetStore.loadDatasetItemBytes(
+      validDatasetId,
+      validItemId
+    );
+    if (fromStore) return fromStore;
+
+    throw new PromptEvalError(
+      `Immagine "${validItemId}" del dataset "${validDatasetId}" non trovata.`,
+      404,
+      'dataset_item_not_found'
+    );
+  }
+
+  private async collectDatasetItemRefs(params: {
+    datasetId?: string;
+    datasetItems?: PromptEvalDatasetItemRef[];
+  }): Promise<PromptEvalDatasetItemRef[]> {
+    const refs: PromptEvalDatasetItemRef[] = [];
+    const seen = new Set<string>();
+
+    if (params.datasetId?.trim()) {
+      const ds = await this.getDataset(params.datasetId);
+      for (const item of ds.items) {
+        const key = `${ds.id}::${item.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          refs.push({ datasetId: ds.id, itemId: item.id });
+        }
+      }
+    }
+
+    for (const entry of params.datasetItems ?? []) {
+      if (!entry?.datasetId || !entry?.itemId) continue;
+      const dId = assertValidEntityId(entry.datasetId, 'dataset');
+      const iId = assertValidEntityId(entry.itemId, 'elemento dataset');
+      const key = `${dId}::${iId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        refs.push({ datasetId: dId, itemId: iId });
+      }
+    }
+
+    return refs;
+  }
+
+  async createDataset(
+    input: CreatePromptEvalDatasetInput
+  ): Promise<PromptEvalDatasetDetail> {
+    const name = input.name?.trim() ?? '';
+    if (!name) {
+      throw new PromptEvalError(
+        'Inserisci un nome per il nuovo dataset.',
+        400,
+        'missing_dataset_name'
+      );
+    }
+    if (name.length > 80) {
+      throw new PromptEvalError(
+        'Il nome del dataset non può superare 80 caratteri.',
+        400,
+        'dataset_name_too_long'
+      );
+    }
+
+    const description = input.description?.trim()
+      ? input.description.trim().slice(0, 240)
+      : undefined;
+
+    const sourceRefs = await this.collectDatasetItemRefs({
+      datasetItems: input.sourceItems,
+    });
+    const uploadedFiles = input.files ?? [];
+    const totalCount = sourceRefs.length + uploadedFiles.length;
+
+    if (totalCount === 0) {
+      throw new PromptEvalError(
+        'Seleziona o carica almeno un’immagine per creare il dataset.',
+        400,
+        'missing_files'
+      );
+    }
+    if (totalCount > this.limits.maxImagesPerRun) {
+      throw new PromptEvalError(
+        `Un dataset può contenere al massimo ${this.limits.maxImagesPerRun} immagini.`,
+        400,
+        'too_many_files'
+      );
+    }
+
+    const rawCandidates: Array<{
+      originalName: string;
+      mimeType: string;
+      bytes: Uint8Array;
+    }> = [];
+
+    for (const ref of sourceRefs) {
+      const loaded = await this.loadDatasetItemOrThrow(ref);
+      rawCandidates.push({
+        originalName: loaded.name,
+        mimeType: loaded.mimeType,
+        bytes: loaded.bytes,
+      });
+    }
+    for (const file of uploadedFiles) {
+      rawCandidates.push(file);
+    }
+
+    const storedItems: PromptEvalStoredDatasetItem[] = [];
+    const summaries: PromptEvalDatasetItemSummary[] = [];
+
+    for (let i = 0; i < rawCandidates.length; i++) {
+      const candidate = rawCandidates[i];
+      const prepared = this.mediaPreparer
+        ? await this.mediaPreparer.prepareInputImage(
+            candidate.bytes,
+            candidate.mimeType
+          )
+        : {
+            bytes: candidate.bytes,
+            mimeType: candidate.mimeType,
+            width: 0,
+            height: 0,
+            thumbnailDataUrl: undefined,
+          };
+
+      let finalBytes = prepared.bytes;
+      let finalMime = prepared.mimeType;
+      const encodedDataUrl = `data:${finalMime};base64,${Buffer.from(
+        finalBytes
+      ).toString('base64')}`;
+
+      if (
+        encodedDataUrl.length > MAX_DATASET_DATA_URL_CHARS &&
+        this.mediaPreparer?.prepareOutputForStorage
+      ) {
+        const compressedUrl =
+          await this.mediaPreparer.prepareOutputForStorage(encodedDataUrl);
+        const decoded = parseDataUrlToBytes(compressedUrl, finalMime);
+        if (decoded) {
+          finalBytes = decoded.bytes;
+          finalMime = decoded.mimeType;
+        }
+      }
+
+      const itemId = `item_${String(i + 1).padStart(2, '0')}_${crypto
+        .randomBytes(3)
+        .toString('hex')}`;
+      const cleanName = alignFilenameExtension(
+        candidate.originalName || `image-${i + 1}.jpg`,
+        finalMime
+      );
+
+      const itemSummary: PromptEvalDatasetItemSummary = {
+        id: itemId,
+        index: i,
+        name: cleanName,
+        mimeType: finalMime,
+        sizeBytes: finalBytes.byteLength,
+        width: prepared.width || undefined,
+        height: prepared.height || undefined,
+        thumbnailDataUrl: prepared.thumbnailDataUrl,
+      };
+      summaries.push(itemSummary);
+      storedItems.push({
+        ...itemSummary,
+        bytes: finalBytes,
+      });
+    }
+
+    const nowMs = this.now();
+    const slug = slugifyDatasetName(name);
+    const datasetId = `ds_${nowMs.toString(36)}_${crypto
+      .randomBytes(4)
+      .toString('hex')}`;
+
+    const detail: PromptEvalDatasetDetail = {
+      id: datasetId,
+      slug,
+      name,
+      description,
+      source: 'app',
+      readOnly: false,
+      itemCount: summaries.length,
+      previewThumbnails: summaries
+        .map((item) => item.thumbnailDataUrl)
+        .filter((thumb): thumb is string => Boolean(thumb))
+        .slice(0, 4),
+      createdAtMs: nowMs,
+      updatedAtMs: nowMs,
+      createdByEmail: extractValidEmailOrNull(input.actorEmail) ?? input.actorEmail,
+      items: summaries,
+    };
+
+    return this.datasetStore.createDataset(detail, storedItems);
+  }
+
+  async deleteDataset(datasetId: string): Promise<void> {
+    const validId = assertValidEntityId(datasetId, 'dataset');
+    if (this.datasetRepository) {
+      const repoFound = await this.datasetRepository.getDataset(validId);
+      if (repoFound) {
+        throw new PromptEvalError(
+          'I dataset presenti nel repository Git sono in sola lettura e non possono essere eliminati dall’app.',
+          400,
+          'dataset_read_only'
+        );
+      }
+    }
+
+    const deleted = await this.datasetStore.deleteDataset(validId);
+    if (!deleted) {
+      throw new PromptEvalError(
+        `Dataset "${validId}" non trovato.`,
+        404,
+        'dataset_not_found'
+      );
+    }
+  }
+
+  async exportDatasetZip(
+    datasetId: string
+  ): Promise<{ filename: string; bytes: Uint8Array }> {
+    const detail = await this.getDataset(datasetId);
+    const encoder = new TextEncoder();
+    const manifestJson = JSON.stringify(
+      {
+        name: detail.name,
+        ...(detail.description ? { description: detail.description } : {}),
+      },
+      null,
+      2
+    );
+
+    const entries: Array<{ name: string; data: Uint8Array }> = [
+      {
+        name: `${detail.slug}/dataset.json`,
+        data: encoder.encode(`${manifestJson}\n`),
+      },
+    ];
+
+    for (const item of detail.items) {
+      const loaded = await this.loadDatasetItemOrThrow({
+        datasetId: detail.id,
+        itemId: item.id,
+      });
+      entries.push({
+        name: `${detail.slug}/input/${loaded.name}`,
+        data: loaded.bytes,
+      });
+    }
+
+    return {
+      filename: `${detail.slug}.zip`,
+      bytes: createZipArchive(entries),
+    };
   }
 
   async createRun(input: CreatePromptEvalRunInput): Promise<PromptEvalRunDetail> {
@@ -311,24 +665,48 @@ export class DefaultPromptEvalService implements PromptEvalService {
     const initialItems: PromptEvalItem[] = [];
 
     if (input.modality === 'image') {
-      const files = input.files ?? [];
-      if (files.length === 0) {
+      const datasetRefs = await this.collectDatasetItemRefs({
+        datasetId: input.datasetId,
+        datasetItems: input.datasetItems,
+      });
+      const uploadedFiles = input.files ?? [];
+      const totalImageCount = datasetRefs.length + uploadedFiles.length;
+
+      if (totalImageCount === 0) {
         throw new PromptEvalError(
-          'Carica almeno un’immagine per avviare la valutazione.',
+          'Seleziona un dataset oppure carica almeno un’immagine per avviare la valutazione.',
           400,
           'missing_files'
         );
       }
-      if (files.length > this.limits.maxImagesPerRun) {
+      if (totalImageCount > this.limits.maxImagesPerRun) {
         throw new PromptEvalError(
-          `Puoi caricare al massimo ${this.limits.maxImagesPerRun} immagini per esecuzione.`,
+          `Puoi valutare al massimo ${this.limits.maxImagesPerRun} immagini per esecuzione.`,
           400,
           'too_many_files'
         );
       }
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const combinedFiles: Array<{
+        originalName: string;
+        mimeType: string;
+        bytes: Uint8Array;
+      }> = [];
+
+      for (const ref of datasetRefs) {
+        const storedItem = await this.loadDatasetItemOrThrow(ref);
+        combinedFiles.push({
+          originalName: storedItem.name,
+          mimeType: storedItem.mimeType,
+          bytes: storedItem.bytes,
+        });
+      }
+      for (const uploaded of uploadedFiles) {
+        combinedFiles.push(uploaded);
+      }
+
+      for (let i = 0; i < combinedFiles.length; i++) {
+        const file = combinedFiles[i];
         const itemId = `item_${String(i + 1).padStart(2, '0')}_${crypto
           .randomBytes(3)
           .toString('hex')}`;

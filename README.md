@@ -6,7 +6,7 @@ Currently operating in **Phase 1 (Private Beta)** for instant single-page genera
 
 ## Repository Layout
 - `AGENTS.md` — Engineering guidelines enforcing Interface vs. Implementation module separation and mandatory Wiki/Requirements maintenance.
-- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.4.0`: Phase 1 active specs, `prompts/v3`, Admin `/admin` console & Prompt/Batch Lab, non-functional security/cost rules, Phase 2 roadmap, and changelog).
+- `docs/REQUIREMENTS.md` — Versioned Product Requirements Wiki in Italian (`v1.5.0`: Phase 1 active specs, `prompts/v3`, Admin `/admin` console, Repo & App Datasets, Prompt/Batch Lab, non-functional security/cost rules, Phase 2 roadmap, and changelog).
 - `docs/WIKI.md` — Plain-language Italian technical wiki explaining all tools, libraries, security controls, and architectural choices.
 - `shared/` — Cross-stack TypeScript domain contracts (`shared/types/`) and single-source-of-truth limits/modes/themes/ages (`shared/config/`) shared by `backend/` and `web-app/`.
 - `packages/` — Generic, host-app agnostic reusable packages for multi-input Prompt & Batch API evaluation (`packages/prompt-eval-core/`, `packages/prompt-eval-backend/`, `packages/prompt-eval-frontend/`).
@@ -17,6 +17,7 @@ Currently operating in **Phase 1 (Private Beta)** for instant single-page genera
 - `.github/workflows/ci.yml` — Automated CI running `lint`, `test`, `build`, and `npm audit --audit-level=high`.
 - `eslint.config.mjs` — Enforces module boundaries (`no-restricted-imports`) and Firestore security rules checks.
 - `prompts/` — Versioned prompt library (`v3` active multi-mode/age + `v2`/`v1` baselines) and `config.json` version selector (`prompts/README.md`).
+- `dataset/` — Repository-backed evaluation image datasets (`dataset/<slug>/input/`, e.g. `dataset/v1`) selectable directly in `/admin` alongside app-created Firestore datasets (`dataset/README.md`).
 - `pricing/` — AI model cost estimates for Standard and Batch APIs (`pricing/ai/image-generation-costs.md`).
 - `infra/` — Infrastructure as Code (Terraform) to automatically provision Cloud Run, Artifact Registry, Secret Manager, Firestore, and Firebase Auth (`infra/README.md`).
 - `scripts/` — One-time admin utilities (`set-admin-claim.ts`, `manage-invites.ts`).

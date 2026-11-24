@@ -216,7 +216,7 @@ function extractDirectAllowStatements(blockBody: string): string[] {
   );
 }
 
-test('firestore.rules explicitly keeps beta_invites and prompt_eval_runs (+ items subcollection) server-only', () => {
+test('firestore.rules explicitly keeps beta_invites, prompt_eval_runs, and prompt_eval_datasets (+ items subcollections) server-only', () => {
   const rules = fs.readFileSync(path.join(ROOT_DIR, 'firestore.rules'), 'utf8');
 
   const betaInvitesBody = extractMatchBlockBody(
@@ -247,5 +247,25 @@ test('firestore.rules explicitly keeps beta_invites and prompt_eval_runs (+ item
     extractDirectAllowStatements(promptEvalItemsBody),
     ['allow read, write: if false;'],
     'prompt_eval_runs/{runId}/items must deny all client read/write access'
+  );
+
+  const promptEvalDatasetsBody = extractMatchBlockBody(
+    rules,
+    /match\s+\/prompt_eval_datasets\/\{[^}]+\}\s*\{/
+  );
+  assert.deepEqual(
+    extractDirectAllowStatements(promptEvalDatasetsBody),
+    ['allow read, write: if false;'],
+    'prompt_eval_datasets must deny all client read/write access'
+  );
+
+  const promptEvalDatasetItemsBody = extractMatchBlockBody(
+    promptEvalDatasetsBody,
+    /match\s+\/items\/\{[^}]+\}\s*\{/
+  );
+  assert.deepEqual(
+    extractDirectAllowStatements(promptEvalDatasetItemsBody),
+    ['allow read, write: if false;'],
+    'prompt_eval_datasets/{datasetId}/items must deny all client read/write access'
   );
 });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import http from 'node:http';
+import path from 'node:path';
 import test from 'node:test';
 import express from 'express';
 import type { Firestore } from 'firebase-admin/firestore';
@@ -16,8 +17,11 @@ import {
   createPromptEvalRouter,
   DefaultPromptEvalService,
   DefaultPromptProviderRegistry,
+  FilesystemPromptEvalDatasetRepository,
+  FirestorePromptEvalDatasetStore,
   FirestorePromptEvalStore,
   GeminiPromptEvalProvider,
+  InMemoryPromptEvalDatasetStore,
   InMemoryPromptEvalStore,
   NoopEmailSender,
   OpenAIPromptEvalProvider,
@@ -1758,6 +1762,61 @@ test('FirestorePromptEvalStore chunks >500 ops, queries active statuses efficien
   const deleted = await store.deleteRun('eval_big_510');
   assert.equal(deleted, true);
   assert.equal(await store.getRun('eval_big_510'), null);
+
+  // FirestorePromptEvalDatasetStore persists, lists, loads bytes, and deletes app datasets cleanly
+  const datasetStore = new FirestorePromptEvalDatasetStore({ db: mockFirestore });
+  const sampleBytes = await makeValidPngBuffer(420, 420, { r: 90, g: 180, b: 120 });
+  const createdDs = await datasetStore.createDataset(
+    {
+      id: 'ds_firestore_1',
+      slug: 'animali-casa',
+      name: 'Animali Casa',
+      description: 'Test dataset su Firestore',
+      source: 'app',
+      readOnly: false,
+      itemCount: 1,
+      previewThumbnails: ['data:image/jpeg;base64,dGh1bWI='],
+      createdAtMs: 2000,
+      updatedAtMs: 2000,
+      createdByEmail: 'admin@example.com',
+      items: [
+        {
+          id: 'item_01_cane',
+          index: 0,
+          name: 'cane.png',
+          mimeType: 'image/png',
+          sizeBytes: sampleBytes.byteLength,
+          width: 420,
+          height: 420,
+          thumbnailDataUrl: 'data:image/jpeg;base64,dGh1bWI=',
+        },
+      ],
+    },
+    [
+      {
+        id: 'item_01_cane',
+        index: 0,
+        name: 'cane.png',
+        mimeType: 'image/png',
+        sizeBytes: sampleBytes.byteLength,
+        width: 420,
+        height: 420,
+        thumbnailDataUrl: 'data:image/jpeg;base64,dGh1bWI=',
+        bytes: new Uint8Array(sampleBytes),
+      },
+    ]
+  );
+  assert.equal(createdDs.id, 'ds_firestore_1');
+  const dsSummaries = await datasetStore.listDatasets();
+  assert.equal(dsSummaries.length, 1);
+  assert.equal(dsSummaries[0].name, 'Animali Casa');
+  const dsLoadedBytes = await datasetStore.loadDatasetItemBytes(
+    'ds_firestore_1',
+    'item_01_cane'
+  );
+  assert.equal(dsLoadedBytes?.bytes.byteLength, sampleBytes.byteLength);
+  assert.equal(await datasetStore.deleteDataset('ds_firestore_1'), true);
+  assert.equal(await datasetStore.getDataset('ds_firestore_1'), null);
 });
 
 test('SharpPromptEvalMediaPreparer compresses high-entropy >700KB outputs below Firestore 650KB safety threshold', async () => {
@@ -2176,4 +2235,214 @@ test('DefaultPromptEvalService isolates cleanup store errors, cleans unfinished 
       err.code === 'network_error' &&
       err.message.includes('spostati/rinominati')
   );
+});
+
+test('Datasets end-to-end: repo dataset discovery (including WebP) + app dataset creation/export/deletion + running evaluations from repo & app datasets', async () => {
+  const pngNew = await makeValidPngBuffer(440, 440, { r: 230, g: 150, b: 90 });
+  const outPng = await makeValidPngBuffer(400, 400, { r: 255, g: 255, b: 255 });
+  const outPngBase64 = outPng.toString('base64');
+
+  const receivedImageNames: string[] = [];
+  const mockGeminiClient: GeminiClientLike = {
+    models: {
+      generateContent: (async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/png',
+                    data: outPngBase64,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 400,
+          candidatesTokenCount: 1120,
+          candidatesTokensDetails: [{ modality: 'IMAGE', tokenCount: 1120 }],
+        },
+      })) as unknown as GeminiClientLike['models']['generateContent'],
+    },
+    batches: {
+      create: (async () => ({
+        name: 'batches/ds-batch-1',
+        state: 'JOB_STATE_QUEUED',
+      })) as unknown as GeminiClientLike['batches']['create'],
+      get: (async () => ({
+        name: 'batches/ds-batch-1',
+        state: 'JOB_STATE_RUNNING',
+      })) as unknown as GeminiClientLike['batches']['get'],
+      cancel: (async () => undefined) as unknown as GeminiClientLike['batches']['cancel'],
+    },
+    files: {
+      upload: (async () => ({
+        name: 'files/mock',
+      })) as unknown as GeminiClientLike['files']['upload'],
+    },
+  };
+
+  const mediaPreparer = new SharpPromptEvalMediaPreparer(serverMediaValidator);
+  const datasetRepository = new FilesystemPromptEvalDatasetRepository({
+    rootDir: path.resolve(import.meta.dirname, '..', 'dataset'),
+    mediaPreparer,
+  });
+  const datasetStore = new InMemoryPromptEvalDatasetStore();
+
+  const service = new DefaultPromptEvalService({
+    providers: new DefaultPromptProviderRegistry({
+      providers: [
+        new GeminiPromptEvalProvider({
+          apiKey: 'fake-key',
+          defaultModel: 'gemini-nano-banana-2.1',
+          clientFactory: () => mockGeminiClient,
+        }),
+      ],
+      defaultProviderId: 'gemini',
+    }),
+    store: new InMemoryPromptEvalStore(),
+    datasetRepository,
+    datasetStore,
+    catalogResolver: new ColoraStoriaPromptCatalogResolver(
+      new FilesystemPromptRepository()
+    ),
+    mediaPreparer,
+    emailSender: new NoopEmailSender(),
+  });
+
+  const app = express();
+  app.use(express.json({ limit: '12mb' }));
+  app.use(
+    '/api/admin/prompt-eval',
+    createPromptEvalRouter({
+      service,
+      authorizeAdmin: async (req) => ({
+        isAdmin: req.headers.authorization === 'Bearer admin-ok',
+        uid: 'admin-1',
+        email: 'admin@example.com',
+      }),
+    })
+  );
+
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const client = new FetchPromptEvalClient(
+    `http://127.0.0.1:${address.port}/api/admin/prompt-eval`
+  );
+
+  try {
+    // 1. Lists repository dataset v1 (9 real photos, readOnly=true, source='repo')
+    const initialList = await client.listDatasets('admin-ok');
+    const repoV1 = initialList.find((d) => d.id === 'repo_v1');
+    assert.ok(repoV1, 'Expected repository dataset repo_v1 to be discovered');
+    assert.equal(repoV1.source, 'repo');
+    assert.equal(repoV1.readOnly, true);
+    assert.equal(repoV1.itemCount, 9);
+    assert.ok(repoV1.previewThumbnails.length > 0);
+
+    // 2. Repo datasets cannot be deleted via app API
+    await assert.rejects(
+      () => client.deleteDataset('repo_v1', 'admin-ok'),
+      (err: unknown) =>
+        err instanceof PromptEvalClientError &&
+        err.statusCode === 400 &&
+        err.code === 'dataset_read_only'
+    );
+
+    // 3. Load repo_v1 details and verify fish1.webp + bambola.jpg can run directly without re-uploading files
+    const repoV1Detail = await client.getDataset('repo_v1', 'admin-ok');
+    const webpItem = repoV1Detail.items.find((i) => i.name === 'fish1.webp');
+    const jpgItem = repoV1Detail.items.find((i) => i.name === 'bambola.jpg');
+    assert.ok(webpItem, 'Expected fish1.webp in repo_v1');
+    assert.ok(jpgItem, 'Expected bambola.jpg in repo_v1');
+
+    const runFromRepo = await client.createRun(
+      {
+        title: 'Run da repo dataset v1',
+        modality: 'image',
+        executionMode: 'standard',
+        promptSource: 'catalog',
+        catalogId: COLORASTORIA_CATALOG_ID,
+        promptParams: { version: 'v3', mode: 'fedele' },
+        datasetItems: [
+          { datasetId: 'repo_v1', itemId: webpItem.id },
+          { datasetId: 'repo_v1', itemId: jpgItem.id },
+        ],
+      },
+      'admin-ok'
+    );
+    assert.equal(runFromRepo.status, 'completed');
+    assert.equal(runFromRepo.completedItems, 2);
+    receivedImageNames.push(...runFromRepo.items.map((i) => i.inputName));
+    assert.deepEqual(receivedImageNames, ['fish1.webp', 'bambola.jpg']);
+
+    // 4. Create a new dataset from the app combining 1 repo item + 1 newly uploaded photo
+    const createdAppDataset = await client.createDataset(
+      {
+        name: 'Nuovo Set App',
+        description: 'Creato dalla console admin',
+        sourceItems: [{ datasetId: 'repo_v1', itemId: webpItem.id }],
+        files: [
+          new File([new Uint8Array(pngNew)], 'nuova-foto.png', {
+            type: 'image/png',
+          }),
+        ],
+      },
+      'admin-ok'
+    );
+    assert.equal(createdAppDataset.source, 'app');
+    assert.equal(createdAppDataset.readOnly, false);
+    assert.equal(createdAppDataset.itemCount, 2);
+    assert.equal(createdAppDataset.slug, 'nuovo-set-app');
+
+    // 5. Export app dataset as .zip ready for dataset/<slug>/input/
+    const exported = await client.exportDatasetArchive(
+      createdAppDataset.id,
+      'admin-ok'
+    );
+    assert.equal(exported.filename, 'nuovo-set-app.zip');
+    const zipBytes = new Uint8Array(await exported.blob.arrayBuffer());
+    const zipLatin1 = Buffer.from(zipBytes).toString('latin1');
+    assert.ok(zipLatin1.includes('nuovo-set-app/dataset.json'));
+    assert.ok(zipLatin1.includes('nuovo-set-app/input/'));
+
+    // 6. Run evaluation using the newly created app dataset
+    const runFromAppDataset = await client.createRun(
+      {
+        title: 'Batch da App Dataset',
+        modality: 'image',
+        executionMode: 'batch',
+        promptSource: 'catalog',
+        catalogId: COLORASTORIA_CATALOG_ID,
+        promptParams: {
+          version: 'v3',
+          mode: 'creativa',
+          themeId: 'dinosauri',
+          ageGroup: '3-4',
+        },
+        datasetItems: createdAppDataset.items.map((item) => ({
+          datasetId: createdAppDataset.id,
+          itemId: item.id,
+        })),
+      },
+      'admin-ok'
+    );
+    assert.equal(runFromAppDataset.status, 'queued');
+    assert.equal(runFromAppDataset.totalItems, 2);
+
+    // 7. Delete the app dataset cleanly
+    await client.deleteDataset(createdAppDataset.id, 'admin-ok');
+    await assert.rejects(
+      () => client.getDataset(createdAppDataset.id, 'admin-ok'),
+      (err: unknown) =>
+        err instanceof PromptEvalClientError && err.statusCode === 404
+    );
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

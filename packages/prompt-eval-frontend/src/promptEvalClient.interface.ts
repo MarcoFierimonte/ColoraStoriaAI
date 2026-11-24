@@ -2,6 +2,9 @@ import type {
   NotifyRunEmailRequest,
   PollPendingRunsResponse,
   PromptEvalConfigResponse,
+  PromptEvalDatasetDetail,
+  PromptEvalDatasetItemRef,
+  PromptEvalDatasetSummary,
   PromptEvalModality,
   PromptEvalRunDetail,
   PromptEvalRunSummary,
@@ -30,6 +33,13 @@ export class PromptEvalClientError extends Error {
   }
 }
 
+export interface CreatePromptEvalDatasetPayload {
+  name: string;
+  description?: string;
+  files?: File[];
+  sourceItems?: PromptEvalDatasetItemRef[];
+}
+
 export interface CreatePromptEvalRunPayload {
   title?: string;
   modality: PromptEvalModality;
@@ -41,6 +51,8 @@ export interface CreatePromptEvalRunPayload {
   promptParams?: Record<string, string>;
   customPromptText?: string;
   notifyEmail?: string;
+  datasetId?: string;
+  datasetItems?: PromptEvalDatasetItemRef[];
   files?: File[];
   textInputs?: Array<{ name?: string; text: string }>;
 }
@@ -52,6 +64,20 @@ export interface PromptEvalApiClient {
     params: Record<string, string>,
     idToken: string | null
   ): Promise<ResolvedPromptPreview>;
+  listDatasets(idToken: string | null): Promise<PromptEvalDatasetSummary[]>;
+  getDataset(
+    datasetId: string,
+    idToken: string | null
+  ): Promise<PromptEvalDatasetDetail>;
+  createDataset(
+    payload: CreatePromptEvalDatasetPayload,
+    idToken: string | null
+  ): Promise<PromptEvalDatasetDetail>;
+  deleteDataset(datasetId: string, idToken: string | null): Promise<void>;
+  exportDatasetArchive(
+    datasetId: string,
+    idToken: string | null
+  ): Promise<{ blob: Blob; filename: string }>;
   listRuns(
     idToken: string | null,
     limit?: number

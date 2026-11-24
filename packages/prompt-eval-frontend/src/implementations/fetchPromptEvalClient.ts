@@ -2,6 +2,10 @@ import type {
   NotifyRunEmailRequest,
   PollPendingRunsResponse,
   PromptEvalConfigResponse,
+  PromptEvalDatasetDetail,
+  PromptEvalDatasetResponse,
+  PromptEvalDatasetsListResponse,
+  PromptEvalDatasetSummary,
   PromptEvalRunDetail,
   PromptEvalRunResponse,
   PromptEvalRunsListResponse,
@@ -12,6 +16,7 @@ import type {
 } from '../../../prompt-eval-core/src/index.ts';
 import {
   PromptEvalClientError,
+  type CreatePromptEvalDatasetPayload,
   type CreatePromptEvalRunPayload,
   type PromptEvalApiClient,
 } from '../promptEvalClient.interface.ts';
@@ -114,6 +119,124 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     return readJsonOrThrow<ResolvedPromptPreview>(response);
   }
 
+  async listDatasets(
+    idToken: string | null
+  ): Promise<PromptEvalDatasetSummary[]> {
+    const response = await this.performFetch(`${this.baseUrl}/datasets`, {
+      method: 'GET',
+      headers: buildAuthHeaders(idToken),
+      credentials: 'same-origin',
+    });
+    const data = await readJsonOrThrow<PromptEvalDatasetsListResponse>(
+      response
+    );
+    return data.datasets;
+  }
+
+  async getDataset(
+    datasetId: string,
+    idToken: string | null
+  ): Promise<PromptEvalDatasetDetail> {
+    const response = await this.performFetch(
+      `${this.baseUrl}/datasets/${encodeURIComponent(datasetId)}`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(idToken),
+        credentials: 'same-origin',
+      }
+    );
+    const data = await readJsonOrThrow<PromptEvalDatasetResponse>(response);
+    return data.dataset;
+  }
+
+  async createDataset(
+    payload: CreatePromptEvalDatasetPayload,
+    idToken: string | null
+  ): Promise<PromptEvalDatasetDetail> {
+    const files = payload.files ?? [];
+    if (files.length > 0) {
+      const formData = new FormData();
+      formData.append('name', payload.name);
+      if (payload.description) {
+        formData.append('description', payload.description);
+      }
+      if (payload.sourceItems && payload.sourceItems.length > 0) {
+        formData.append('sourceItems', JSON.stringify(payload.sourceItems));
+      }
+      for (const file of files) {
+        formData.append('files', file, file.name);
+      }
+
+      const response = await this.performFetch(
+        `${this.baseUrl}/datasets`,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(idToken),
+          credentials: 'same-origin',
+          body: formData,
+        },
+        true
+      );
+      const data = await readJsonOrThrow<PromptEvalDatasetResponse>(response);
+      return data.dataset;
+    }
+
+    const response = await this.performFetch(`${this.baseUrl}/datasets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildAuthHeaders(idToken),
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        sourceItems: payload.sourceItems,
+      }),
+    });
+    const data = await readJsonOrThrow<PromptEvalDatasetResponse>(response);
+    return data.dataset;
+  }
+
+  async deleteDataset(
+    datasetId: string,
+    idToken: string | null
+  ): Promise<void> {
+    const response = await this.performFetch(
+      `${this.baseUrl}/datasets/${encodeURIComponent(datasetId)}`,
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(idToken),
+        credentials: 'same-origin',
+      }
+    );
+    await readJsonOrThrow<{ ok: boolean }>(response);
+  }
+
+  async exportDatasetArchive(
+    datasetId: string,
+    idToken: string | null
+  ): Promise<{ blob: Blob; filename: string }> {
+    const response = await this.performFetch(
+      `${this.baseUrl}/datasets/${encodeURIComponent(datasetId)}/archive`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(idToken),
+        credentials: 'same-origin',
+      }
+    );
+
+    if (!response.ok) {
+      await readJsonOrThrow(response);
+    }
+
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const match = /filename="?([^";]+)"?/i.exec(disposition);
+    const filename = match?.[1]?.trim() || `${datasetId}.zip`;
+    const blob = await response.blob();
+    return { blob, filename };
+  }
+
   async listRuns(
     idToken: string | null,
     limit = 50
@@ -150,7 +273,8 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
     payload: CreatePromptEvalRunPayload,
     idToken: string | null
   ): Promise<PromptEvalRunDetail> {
-    if (payload.modality === 'image') {
+    const files = payload.files ?? [];
+    if (payload.modality === 'image' && files.length > 0) {
       const formData = new FormData();
       formData.append('modality', payload.modality);
       formData.append('executionMode', payload.executionMode);
@@ -168,7 +292,13 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
       if (payload.notifyEmail) {
         formData.append('notifyEmail', payload.notifyEmail);
       }
-      for (const file of payload.files ?? []) {
+      if (payload.datasetId) {
+        formData.append('datasetId', payload.datasetId);
+      }
+      if (payload.datasetItems && payload.datasetItems.length > 0) {
+        formData.append('datasetItems', JSON.stringify(payload.datasetItems));
+      }
+      for (const file of files) {
         formData.append('files', file, file.name);
       }
 
@@ -204,6 +334,8 @@ export class FetchPromptEvalClient implements PromptEvalApiClient {
         promptParams: payload.promptParams,
         customPromptText: payload.customPromptText,
         notifyEmail: payload.notifyEmail,
+        datasetId: payload.datasetId,
+        datasetItems: payload.datasetItems,
         textInputs: payload.textInputs,
       }),
     });

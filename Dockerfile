@@ -13,6 +13,7 @@ COPY packages ./packages
 COPY backend ./backend
 COPY web-app ./web-app
 COPY prompts ./prompts
+COPY dataset ./dataset
 COPY firebase-applet-config.json ./
 
 ARG VITE_TURNSTILE_SITE_KEY=""
@@ -35,6 +36,7 @@ COPY shared ./shared
 COPY packages ./packages
 COPY backend ./backend
 COPY prompts ./prompts
+COPY dataset ./dataset
 COPY firebase-applet-config.json ./
 
 RUN chown -R node:node /app

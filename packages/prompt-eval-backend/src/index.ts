@@ -1,15 +1,19 @@
 export {
   PromptEvalError,
+  type CreatePromptEvalDatasetInput,
   type CreatePromptEvalRunInput,
   type EmailAttachment,
   type EmailMessage,
   type EmailNotificationSender,
   type PreparedImagePayload,
   type PromptCatalogResolver,
+  type PromptEvalDatasetRepository,
+  type PromptEvalDatasetStore,
   type PromptEvalImageInput,
   type PromptEvalMediaPreparer,
   type PromptEvalService,
   type PromptEvalStore,
+  type PromptEvalStoredDatasetItem,
   type PromptEvalTextInput,
   type PromptExecutionProvider,
   type PromptProviderRegistry,
@@ -33,6 +37,14 @@ export {
   ResendEmailSender,
 } from './implementations/emailSenders.ts';
 export {
+  FilesystemPromptEvalDatasetRepository,
+  type FilesystemPromptEvalDatasetRepositoryOptions,
+} from './implementations/filesystemPromptEvalDatasetRepository.ts';
+export {
+  FirestorePromptEvalDatasetStore,
+  type FirestorePromptEvalDatasetStoreOptions,
+} from './implementations/firestorePromptEvalDatasetStore.ts';
+export {
   FirestorePromptEvalStore,
   type FirestorePromptEvalStoreOptions,
 } from './implementations/firestorePromptEvalStore.ts';
@@ -41,6 +53,7 @@ export {
   type GeminiClientLike,
   type GeminiPromptEvalProviderOptions,
 } from './implementations/geminiPromptEvalProvider.ts';
+export { InMemoryPromptEvalDatasetStore } from './implementations/inMemoryPromptEvalDatasetStore.ts';
 export { InMemoryPromptEvalStore } from './implementations/inMemoryPromptEvalStore.ts';
 export {
   OpenAIPromptEvalProvider,

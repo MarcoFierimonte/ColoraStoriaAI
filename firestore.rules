@@ -104,5 +104,14 @@ service cloud.firestore {
         allow read, write: if false;
       }
     }
+
+    // Admin prompt evaluation datasets & per-item images are strictly managed server-side via firebase-admin
+    match /prompt_eval_datasets/{datasetId} {
+      allow read, write: if false;
+
+      match /items/{itemId} {
+        allow read, write: if false;
+      }
+    }
   }
 }

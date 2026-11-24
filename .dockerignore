@@ -8,5 +8,6 @@ bun.lock
 *.log
 .DS_Store
 infra/
-dataset/
+dataset/**/*eval_*/
+dataset/**/outputs/
 *.tfvars
