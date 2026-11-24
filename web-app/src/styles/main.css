@@ -172,6 +172,77 @@
     max-width: none;
   }
 
+  .cs-carousel-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cs-carousel-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cs-carousel-slide {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    padding: 0 6px 6px 0;
+  }
+
+  .cs-carousel-nav {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    display: inline-grid;
+    place-items: center;
+    border: var(--cs-border-width) solid var(--cs-border);
+    border-radius: var(--cs-radius-btn);
+    background: var(--cs-surface);
+    color: var(--cs-ink);
+    box-shadow: var(--cs-shadow-sm);
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.08s ease;
+  }
+
+  .cs-carousel-nav:hover {
+    background: var(--cs-yellow);
+  }
+
+  .cs-carousel-nav:active {
+    transform: translate(3px, 3px);
+    box-shadow: none;
+  }
+
+  .cs-carousel-nav:focus-visible {
+    outline: 3px solid var(--cs-pink-strong);
+    outline-offset: 3px;
+  }
+
+  .cs-carousel-dot {
+    height: 12px;
+    width: 12px;
+    padding: 0;
+    border: 2px solid var(--cs-border);
+    border-radius: 999px;
+    background: var(--cs-surface);
+    cursor: pointer;
+    transition: width 0.16s ease, background-color 0.16s ease;
+  }
+
+  .cs-carousel-dot[aria-current='true'] {
+    width: 28px;
+    background: var(--cs-pink);
+  }
+
+  .cs-carousel-dot:focus-visible {
+    outline: 3px solid var(--cs-pink-strong);
+    outline-offset: 2px;
+  }
+
   .cs-tile {
     position: relative;
     border: var(--cs-border-width) solid var(--cs-border);
@@ -405,6 +476,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   html {
+    scroll-behavior: auto;
+  }
+
+  .cs-carousel-track {
     scroll-behavior: auto;
   }
 

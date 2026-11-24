@@ -62,7 +62,7 @@ Delivery layer (`backend/src/routes/coloringRoutes.ts`):
 | `media-validation` | `mediaValidation.interface.ts` (`MediaValidator`, `PhotoValidationResult`) | `browserPhotoValidator.ts` | Client-side MIME, file size, and dimension validation |
 
 UI template & configuration layer (`web-app/src/`):
-- `styles/theme.css` (`--cs-*` CSS tokens), `config/siteTemplate.ts` (editable landing/creator copy & example slots), `config/sampleScenes.ts` (2× procedural canvas examples), `config/generationPayload.ts` (pure UI-to-API request mapping), `components/ui/` (neo-brutalist primitives), `components/sections/` (composable landing blocks including `ExamplesGallerySection`), and `components/` (`CreatorDialog`, `AdminInvitesPanel`, `AdminTelemetryPanel`, `LegalPage`).
+- `styles/theme.css` (`--cs-*` CSS tokens), `config/siteTemplate.ts` (editable landing/creator copy & example slots), `config/sampleScenes.ts` (2× procedural canvas examples), `config/generationPayload.ts` (pure UI-to-API request mapping), `components/ui/` (neo-brutalist primitives), `components/sections/` (composable landing blocks including `ExamplesCarousel`), and `components/` (`CreatorDialog`, `AdminInvitesPanel`, `AdminTelemetryPanel`, `LegalPage`).
 
 ---
 

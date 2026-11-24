@@ -1,6 +1,6 @@
 # ColoraStoria — Wiki dei Requisiti (Funzionali, Non-Funzionali & Roadmap)
 
-> **Versione:** `1.1.0`  
+> **Versione:** `1.2.0`  
 > **Data:** `2026-11-23`  
 > **Stato attuale del prodotto:** **Fase 1 — Beta Privata su Invito (Pagine singole istantanee + Stampa A4)**
 
@@ -39,7 +39,7 @@ ColoraStoria trasforma fotografie personali (animali, giocattoli, paesaggi, pers
 
 ### `REQ-FN-01` — Landing Page Neo-Brutalist Templetizzabile & Pagine Legali
 - **Interfaccia configurabile:** Design system centralizzato tramite token CSS (`web-app/src/styles/theme.css`), configurazione testi/slot esempi (`web-app/src/config/siteTemplate.ts`), primitive UI riutilizzabili (`web-app/src/components/ui/`) e sezioni componibili (`web-app/src/components/sections/`).
-- **Contenuti landing:** Header (`ColoraStoria` + CTA `Inizia`), Hero con confronto visivo `Foto → Fedele / Creativa`, pulsante *Vedi tutti gli esempi* con scorrimento alla galleria inline `#esempi` (`ExamplesGallerySection`, 6 esempi reali `Foto → Fedele / Creativa` con tutti i 6 temi di `Creativa` e modale di ingrandimento al clic), fascia categorie (*Animali*, *Giocattoli*, *Paesaggi*, *Persone*), 3 passaggi *Come funziona*, CTA finale e footer con *Area riservata*.
+- **Contenuti landing:** Header (`ColoraStoria` + CTA `Inizia`), Hero con uno spazio fisso subito visibile contenente lo slider orizzontale scorrevole (`ExamplesCarousel`, scroll-snap + frecce + pallini + tastiera + anteprima ingrandita al clic) di tutti i 6 esempi reali `Foto → Fedele / Creativa` su tutti i 6 temi di `Creativa`, fascia categorie (*Animali*, *Giocattoli*, *Paesaggi*, *Persone*), 3 passaggi *Come funziona*, CTA finale e footer con *Area riservata*.
 - **Pagine legali con URL reali:** `/contatti`, `/privacy`, `/condizioni` e `/recesso` gestite lato client con sincronizzazione `document.title`, tag `<link rel="canonical">` e focus accessibile sul titolo `<h1>`.
 
 ### `REQ-FN-02` — Accesso Beta su Invito & Quote per Tester (`beta-access`)
@@ -123,5 +123,6 @@ I requisiti seguenti descrivono l’evoluzione prevista dopo la validazione dell
 
 | Versione | Data | Autore / Contesto | Modifiche Principali |
 | :--- | :--- | :--- | :--- |
+| **`1.2.0`** | `2026-11-23` | Carousel esempi fisso in Hero | Aggiornato `REQ-FN-01`: spostati tutti i 6 esempi reali in un singolo spazio fisso subito visibile in apertura nella Hero con slide orizzontale (`ExamplesCarousel`, swipe laterale/frecce/pallini e zoom al clic), sostituendo la sezione verticale espansa `ExamplesGallerySection`. |
 | **`1.1.0`** | `2026-11-23` | Galleria esempi reali inline | Aggiornato `REQ-FN-01`: sostituita la modale `ExamplesDialog` con la sezione inline `#esempi` (`ExamplesGallerySection`) nella landing page, completa di 6 foto reali (`Gattino`, `Cagnolino`, `Giocattolo`, `Bambola`, `Montagna con alberi`, `Bimbo di 2 anni che gioca`) e relative 12 generazioni `Fedele` + `Creativa` su tutti i 6 temi, con anteprima ingrandibile su clic. |
 | **`1.0.0`** | `2026-11-22` | Baseline post-redesign & prompt `v2` | Prima stesura formale del Wiki dei Requisiti: consolidamento Fase 1 (Beta su invito Firestore `beta-access`, pagine singole con modalità `Fedele` vs `Creativa` + temi/età esclusivi di `Creativa`, PDF A4 `1-up`/`2-up`/`4-up`, redesign templetizzabile) e separazione chiara verso la Fase 2 (Libro 10–15 foto e monetizzazione post-beta da validare). |

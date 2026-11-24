@@ -1,9 +1,6 @@
 export { BottomCtaSection, type BottomCtaSectionProps } from './BottomCtaSection';
 export { CategoriesSection } from './CategoriesSection';
-export {
-  ExamplesGallerySection,
-  type ExamplesGallerySectionProps,
-} from './ExamplesGallerySection';
+export { ExamplesCarousel } from './ExamplesCarousel';
 export {
   ExampleTrio,
   type ExampleTilePreview,

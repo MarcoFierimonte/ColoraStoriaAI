@@ -150,9 +150,9 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 - **Cos’è:** Separazione tra token visivi CSS (colori, bordi spessi `3px`, ombre nette neo-brutalist, font e raggio), configurazione dati dei testi/esempi (`siteTemplate.ts` e `sampleScenes.ts`), primitive UI riutilizzabili (`UiButton`, `UiCard`, `UiChip`, `UiBadge`, `ModalDialog`, `UiToast`) e sezioni componibili della landing.
 - **Come e dov’è usato:** `web-app/src/styles/theme.css`, `web-app/src/config/siteTemplate.ts`, `web-app/src/config/sampleScenes.ts`, `web-app/src/components/ui/` e `web-app/src/components/sections/`. Permette di modificare palette, testi, scene di esempio o interi blocchi visivi senza toccare la logica API o le validazioni.
 
-### Finestre Modali Native (`<dialog>` in `CreatorDialog` ed `ExamplesDialog`)
+### Finestre Modali Native (`<dialog>` in `CreatorDialog` e zoom esempi)
 - **Cos’è:** Wrapper accessibile sopra l’elemento HTML nativo `<dialog>` (`.showModal()`, focus trap automatico, backdrop scuro, chiusura con `Esc` e passaggio automatico a schermo intero su smartphone `<= 600px`) dotato di anteprima A4 e conferma anti-smarrimento se ci sono modifiche non salvate.
-- **Come e dov’è usato:** `web-app/src/components/ui/ModalDialog.tsx`, `web-app/src/components/CreatorDialog.tsx` (flusso foto/esempi, stile Fedele/Creativa, temi, età, esportazione PDF A4 `1-up`/`2-up`/`4-up` e PNG) e `web-app/src/components/ExamplesDialog.tsx`.
+- **Come e dov’è usato:** `web-app/src/components/ui/ModalDialog.tsx`, `web-app/src/components/CreatorDialog.tsx` (flusso foto/esempi, stile Fedele/Creativa, temi, età, esportazione PDF A4 `1-up`/`2-up`/`4-up` e PNG) e l’anteprima ingrandita dello slider in `web-app/src/components/sections/ExamplesCarousel.tsx`.
 
 ### Font Self-Hosted (`@fontsource/plus-jakarta-sans` & `DM Mono`)
 - **Cos’è:** Pacchetto npm e font locale che includono i file `.woff2`/`.ttf` direttamente dentro il bundle dell’applicazione, eliminando ogni chiamata ai server di Google Fonts (migliorando la privacy **GDPR**, perché l’IP del visitatore non viene inviato a terzi, e rendendo più stretta la CSP).

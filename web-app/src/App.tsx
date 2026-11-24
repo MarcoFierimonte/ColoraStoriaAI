@@ -12,7 +12,6 @@ import {
 import {
   BottomCtaSection,
   CategoriesSection,
-  ExamplesGallerySection,
   HeroSection,
   HowItWorksSection,
   Navbar,
@@ -218,7 +217,6 @@ export default function App() {
           <>
             <HeroSection onStartClick={openCreator} />
             <CategoriesSection />
-            <ExamplesGallerySection onStartClick={openCreator} />
             <HowItWorksSection />
             <BottomCtaSection onStartClick={openCreator} />
 

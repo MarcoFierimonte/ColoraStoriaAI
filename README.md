@@ -51,7 +51,7 @@ Solid boxes show **Phase 1 (Implemented & Active in Private Beta)**; dashed grey
 flowchart LR
   subgraph Client["Frontend (web-app/)"]
     Landing["Public Neo-Brutalist Landing<br/>theme.css + siteTemplate.ts + Legal Routes<br/>(Implemented)"]:::done
-    Creator["CreatorDialog & ExamplesDialog<br/>Invite Gate, Fedele vs Creativa (6 Themes, 4 Ages)<br/>A4 PDF (1/2/4-up) & PNG Download<br/>(Implemented)"]:::done
+    Creator["CreatorDialog & ExamplesCarousel<br/>6-Example Hero Slider, Invite Gate, Fedele vs Creativa<br/>A4 PDF (1/2/4-up) & PNG Download<br/>(Implemented)"]:::done
     AdminUI["Google Admin Panels<br/>Invites Manager, Prompt/Provider Overrides<br/>& Cost Telemetry<br/>(Implemented)"]:::done
     BookUI["Multi-Page Book UI (10–15 Photos)<br/>Cover Title & Order Flow<br/>(Phase 2 Roadmap)"]:::pending
   end
@@ -93,7 +93,7 @@ flowchart LR
 ```
 
 ### Status Summary
-- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, `ExamplesDialog`, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), Google Admin panel (`AdminInvitesPanel`, cost telemetry, prompt/provider overrides, `generation_logs`), `prompts/v2`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
+- **Implemented (Phase 1 — Private Beta):** Neo-brutalist themeable landing UI (`theme.css`, `siteTemplate.ts`, fixed-position 6-example `ExamplesCarousel` hero slider, `CreatorDialog`, 4 procedural canvas samples), real-URL legal routes, **Fedele alla foto** (faithful outlines with zero theme leakage) vs **Creativa** (6 themes + 4 age groups exclusive to creative mode), single-photo validation (`JPG/PNG/WebP/AVIF`) & EXIF/resize (`<=1280px`), print-ready A4 PDF (`1-up`/`2-up`/`4-up` grayscale at 300 DPI) & PNG download, personal Firestore invite access & atomic quotas (`beta-access`), Google Admin panel (`AdminInvitesPanel`, cost telemetry, prompt/provider overrides, `generation_logs`), `prompts/v2`, active `gemini-nano-banana-2.1` provider (`OpenAIColoringProvider` ready via env), and full Terraform IaC (`infra/`).
 - **Planned for Phase 2 (Future Roadmap):** Multi-page coloring book composition (`10–15` photos + cover), post-beta monetization model to be validated after beta feedback (credit packs / pay-per-page / subscription), async job queue & automated email delivery, and final commercial/legal copy alignment.
 
 ## Scripts

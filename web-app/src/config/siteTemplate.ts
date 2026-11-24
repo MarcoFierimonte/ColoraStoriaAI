@@ -86,26 +86,6 @@ export const SITE_TEMPLATE = {
     titleHighlight: 'da colorare',
     subtitle: 'Carichi una foto, scegli come la vuoi e scarichi il PDF da stampare.',
     primaryCtaLabel: 'Inizia ora',
-    examplesCtaLabel: 'Vedi tutti gli esempi',
-    showcase: {
-      id: 'hero-cute-cat-showcase',
-      title: 'Gattino',
-      ariaLabel: 'Esempio di trasformazione da foto di gattino a pagina da colorare',
-      photoLabel: 'Foto',
-      faithfulLabel: 'Fedele',
-      creativeLabel: 'Creativa · Unicorni',
-      creativeThemeLabel: 'Unicorni',
-      photoSrc: cuteCatPhoto,
-      photoAlt: 'Foto reale di un piccolo gattino tigrato che guarda verso la fotocamera',
-      faithfulSrc: cuteCatFaithful,
-      faithfulAlt: 'Versione fedele: il piccolo gattino tigrato in linee nere su fondo bianco',
-      creativeSrc: cuteCatCreative,
-      creativeAlt: 'Versione creativa tema Unicorni: il gattino in un prato incantato con un unicorno e arcobaleno',
-      photoWidth: 960,
-      photoHeight: 720,
-      drawingWidth: 720,
-      drawingHeight: 960,
-    } satisfies ExampleTrioSlot,
   },
   categories: {
     title: 'Se lo vedi, lo puoi colorare.',
@@ -120,10 +100,10 @@ export const SITE_TEMPLATE = {
   examplesGallery: {
     id: 'esempi',
     title: 'Esempi reali',
-    subtitle:
-      'Scorri per vedere come una stessa foto diventa una pagina fedele all’originale oppure un’avventura creativa pronta da stampare.',
-    ctaLabel: 'Crea la tua pagina',
-    zoomHint: 'Tocca un’immagine per ingrandirla',
+    carouselAriaLabel: 'Galleria scorrevole di 6 esempi reali',
+    prevLabel: 'Esempio precedente',
+    nextLabel: 'Esempio successivo',
+    sliderHint: 'Scorri di lato per tutti i 6 esempi · Tocca per ingrandire',
     zoomCloseLabel: 'Chiudi anteprima',
     items: [
       {

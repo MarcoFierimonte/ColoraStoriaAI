@@ -1,13 +1,13 @@
 import { SITE_TEMPLATE } from '../../config/siteTemplate';
 import { UiButton } from '../ui';
-import { ExampleTrio } from './ExampleTrio';
+import { ExamplesCarousel } from './ExamplesCarousel';
 
 export interface HeroSectionProps {
   onStartClick: () => void;
 }
 
 export function HeroSection({ onStartClick }: HeroSectionProps) {
-  const { hero, examplesGallery } = SITE_TEMPLATE;
+  const { hero } = SITE_TEMPLATE;
 
   return (
     <div className="cs-wrap">
@@ -28,18 +28,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
           </UiButton>
         </div>
 
-        <ExampleTrio
-          item={hero.showcase}
-          loading="eager"
-          footerSlot={
-            <a
-              href={`#${examplesGallery.id}`}
-              className="cs-btn cs-btn-secondary mt-[10px]"
-            >
-              {hero.examplesCtaLabel}
-            </a>
-          }
-        />
+        <ExamplesCarousel />
       </section>
     </div>
   );
