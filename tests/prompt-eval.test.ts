@@ -34,6 +34,7 @@ import { serverMediaValidator } from '../backend/src/modules/media-validation/in
 import {
   COLORASTORIA_CATALOG_ID,
   ColoraStoriaPromptCatalogResolver,
+  createColoraStoriaPromptEvalService,
   SharpPromptEvalMediaPreparer,
 } from '../backend/src/modules/prompt-eval/index.ts';
 import { FilesystemPromptRepository } from '../backend/src/modules/prompts/index.ts';
@@ -140,13 +141,18 @@ test('createZipArchive produces valid ZIP headers, valid DOS dates, sanitizes pa
   assert.ok(asLatin1.includes('hello world'));
 });
 
-test('ColoraStoriaPromptCatalogResolver resolves fedele/creativa combinations and isolates fedele from themes', () => {
+test('ColoraStoriaPromptCatalogResolver resolves fedele/creativa combinations, isolates fedele from themes, and omits SVG vector options', () => {
   const repo = new FilesystemPromptRepository();
   const resolver = new ColoraStoriaPromptCatalogResolver(repo);
 
   const catalogs = resolver.listCatalogs();
   assert.equal(catalogs.length, 1);
   assert.equal(catalogs[0].id, COLORASTORIA_CATALOG_ID);
+  assert.equal(
+    catalogs[0].fields.find((f) => f.id === 'outputFormat'),
+    undefined,
+    'Admin Prompt Lab must not expose vector SVG adapter selector'
+  );
 
   const themeField = catalogs[0].fields.find((f) => f.id === 'themeId');
   const ageField = catalogs[0].fields.find((f) => f.id === 'ageGroup');
@@ -159,17 +165,20 @@ test('ColoraStoriaPromptCatalogResolver resolves fedele/creativa combinations an
     values: ['creativa'],
   });
 
-  // Even if stray themeId/ageGroup are passed in fedele mode, they must be stripped
+  // Even if stray themeId/ageGroup/outputFormat are passed in fedele mode, they must be stripped/ignored
   const faithful = resolver.resolvePrompt(COLORASTORIA_CATALOG_ID, {
     version: 'v2',
     mode: 'fedele',
     themeId: 'pirati',
     ageGroup: '8+',
-    outputFormat: 'raster',
+    outputFormat: 'svg',
   });
   assert.equal(faithful.params.mode, 'fedele');
   assert.equal(faithful.params.themeId, undefined);
   assert.equal(faithful.params.ageGroup, undefined);
+  assert.equal(faithful.params.outputFormat, undefined);
+  assert.equal(faithful.metadata.outputFormat, 'raster');
+  assert.ok(!faithful.promptText.includes('VECTOR SVG OUTPUT FORMAT'));
   assert.ok(faithful.promptText.length > 50);
   assert.ok(faithful.estimatedTokens > 10);
 
@@ -183,8 +192,25 @@ test('ColoraStoriaPromptCatalogResolver resolves fedele/creativa combinations an
   assert.equal(creative.params.mode, 'creativa');
   assert.equal(creative.params.themeId, 'dinosauri');
   assert.equal(creative.params.ageGroup, '5-7');
+  assert.equal(creative.params.outputFormat, undefined);
   assert.match(creative.label, /Dinosauri/);
   assert.match(creative.label, /5-7/);
+
+  const hostService = createColoraStoriaPromptEvalService({
+    config: parseServerConfig(
+      { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+      []
+    ),
+    store: new InMemoryPromptEvalStore(),
+  });
+  const hostProviders = hostService.getConfig().providers;
+  for (const provider of hostProviders) {
+    assert.deepEqual(
+      provider.models.filter((m) => m.outputFormat === 'svg'),
+      [],
+      `Host provider ${provider.id} must not expose SVG vector models`
+    );
+  }
 
   assert.throws(
     () => resolver.resolvePrompt('unknown-catalog', {}),

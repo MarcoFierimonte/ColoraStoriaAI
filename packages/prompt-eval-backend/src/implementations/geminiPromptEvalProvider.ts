@@ -443,6 +443,7 @@ export interface GeminiPromptEvalProviderOptions {
   apiKey: string;
   defaultModel?: string;
   models?: PromptEvalModelInfo[];
+  includeSvgModels?: boolean;
   clientFactory?: (apiKey: string) => GeminiClientLike;
   fetchImpl?: typeof fetch;
 }
@@ -461,7 +462,11 @@ export class GeminiPromptEvalProvider implements PromptExecutionProvider {
     this.apiKey = options.apiKey.trim();
     this.defaultModel =
       options.defaultModel?.trim() || 'gemini-nano-banana-2.1';
-    const baseModels = options.models ?? [...DEFAULT_GEMINI_MODELS];
+    const baseModels = options.models
+      ? [...options.models]
+      : DEFAULT_GEMINI_MODELS.filter(
+          (m) => options.includeSvgModels !== false || m.outputFormat !== 'svg'
+        );
     if (!baseModels.some((m) => m.id === this.defaultModel)) {
       const isRaster = isGeminiRasterModel(this.defaultModel);
       baseModels.unshift({

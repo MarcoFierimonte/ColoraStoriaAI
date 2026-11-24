@@ -116,17 +116,6 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
               values: ['creativa'],
             },
           },
-          {
-            id: 'outputFormat',
-            label: 'Adattatore output',
-            type: 'select',
-            required: false,
-            defaultValue: 'raster',
-            options: [
-              { value: 'raster', label: 'Immagine Raster (PNG)' },
-              { value: 'svg', label: 'Vettoriale (SVG adapter)' },
-            ],
-          },
         ],
       },
     ];
@@ -154,7 +143,6 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
     }
 
     const versionOverride = params.version?.trim() || undefined;
-    const outputFormat = params.outputFormat === 'svg' ? 'svg' : 'raster';
 
     let themeId: ThemeId | undefined;
     let ageGroup: ColoringAgeGroup | undefined;
@@ -182,16 +170,12 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
 
     let built: { prompt: string; version: string };
     try {
-      const buildOptions = {
+      built = this.promptRepository.buildRasterPrompt({
         mode: rawMode,
         themeId,
         ageGroup,
         versionOverride,
-      };
-      built =
-        outputFormat === 'svg'
-          ? this.promptRepository.buildSvgPrompt(buildOptions)
-          : this.promptRepository.buildRasterPrompt(buildOptions);
+      });
     } catch (error) {
       throw new PromptEvalError(
         error instanceof Error
@@ -207,22 +191,18 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
         ? {
             version: built.version,
             mode: 'fedele',
-            outputFormat,
           }
         : {
             version: built.version,
             mode: 'creativa',
             themeId: themeId!,
             ageGroup: ageGroup!,
-            outputFormat,
           };
 
     const label =
       rawMode === 'fedele'
-        ? `${built.version} · Fedele${outputFormat === 'svg' ? ' (SVG)' : ''}`
-        : `${built.version} · Creativa · ${THEME_LABELS[themeId!]} · ${ageGroup}${
-            outputFormat === 'svg' ? ' (SVG)' : ''
-          }`;
+        ? `${built.version} · Fedele`
+        : `${built.version} · Creativa · ${THEME_LABELS[themeId!]} · ${ageGroup}`;
 
     return {
       catalogId,
@@ -234,7 +214,7 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
         mode: rawMode,
         ...(themeId ? { themeId } : {}),
         ...(ageGroup ? { ageGroup } : {}),
-        outputFormat,
+        outputFormat: 'raster',
       },
       charCount: built.prompt.length,
       estimatedTokens: estimateTextTokenCount(built.prompt),

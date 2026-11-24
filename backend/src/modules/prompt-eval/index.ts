@@ -93,6 +93,7 @@ export function createColoraStoriaPromptEvalService(params?: {
       new GeminiPromptEvalProvider({
         apiKey: config.geminiApiKey,
         defaultModel: config.geminiModel,
+        includeSvgModels: false,
       }),
       new OpenAIPromptEvalProvider({
         apiKey: config.openaiApiKey,

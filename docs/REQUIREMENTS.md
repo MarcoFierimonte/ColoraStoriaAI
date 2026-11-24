@@ -1,6 +1,6 @@
 # ColoraStoria — Wiki dei Requisiti (Funzionali, Non-Funzionali & Roadmap)
 
-> **Versione:** `1.3.0`  
+> **Versione:** `1.3.1`  
 > **Data:** `2026-11-24`  
 > **Stato attuale del prodotto:** **Fase 1 — Beta Privata su Invito (Pagine singole istantanee + Stampa A4 + Console Admin & Laboratorio Prompt Batch)**
 
@@ -78,7 +78,7 @@ La generazione AI supporta due modalità rigorosamente isolate sia lato UI (`web
 - **Accesso tramite Burger Menu & pagina dedicata `/admin`:** Dal menu hamburger nella navbar dell’app principale l’amministratore (e la voce *Area Admin*) raggiunge la pagina dedicata `/admin` strettamente riservata agli Admin (`isAdmin === true`, con gate di autenticazione Google per chi non è autorizzato). Le sezioni admin esistenti (**Inviti Beta** e **Telemetria & Costi**) sono spostate dalla landing pubblica in schede dedicate di questa console multi-servizio (`?tab=prompt-lab|invites|telemetry`).
 - **Laboratorio Prompt & Batch API (`packages/prompt-eval-*`):** Pacchetti generici e riutilizzabili (`prompt-eval-core`, `prompt-eval-backend`, `prompt-eval-frontend`) per testare sistematicamente prompt su più immagini (o input testuali):
   - **Upload multi-immagine:** Caricamento multiplo in RAM (fino a 20 foto per run, max 12 MB ciascuna, validazione magic bytes/dimensioni) con opzione rapida per caricare anche le 6 foto esempio dell’app.
-  - **Selezione e copia prompt completo:** Selezione guidata da tutte le combinazioni dell’app (`v1`/`v2`, `fedele` o `creativa` con tema ed età, adattatore raster/SVG) oppure prompt personalizzato, con visualizzazione del testo completo integrale, stima token e pulsante di copia immediata.
+  - **Selezione e copia prompt completo:** Selezione guidata da tutte le combinazioni dell’app (`v1`/`v2`, `fedele` o `creativa` con tema ed età, solo immagini raster) oppure prompt personalizzato, con visualizzazione del testo completo integrale, stima token e pulsante di copia immediata.
   - **Scelta API Normali (Standard) vs Batch API (-50%):** Per le immagini, selezione esplicita tra elaborazione sincrona (risultato immediato, singola elaborazione per immagine) e Batch API asincrona (`-50%` costo AI su Gemini e OpenAI compatibili).
   - **Salvataggio su dispositivo & notifica email Free Tier:** Download singola immagine o archivio `.zip` completo (`outputs/` + `prompt.txt` + `evaluation-report.json`); per i job batch asincroni, invio automatico dell’email con riepilogo e allegato ZIP tramite provider con piano gratuito (**Resend** 3.000/mese o **Brevo** 300/giorno) e endpoint `/api/admin/prompt-eval/poll-pending` compatibile con Google Cloud Scheduler (piano gratuito).
   - **Persistenza esecuzioni, voti e note:** Ogni esecuzione e ogni singolo output (con miniatura di confronto) sono salvati su Firestore (`prompt_eval_runs/{runId}/items/{itemId}`, free tier, server-only), con valutazione in stelle (`1–5`), esito (`Promosso`/`Da migliorare`/`Scartato`), tag e note testuali modificabili nel tempo.
@@ -130,6 +130,7 @@ I requisiti seguenti descrivono l’evoluzione prevista dopo la validazione dell
 
 | Versione | Data | Autore / Contesto | Modifiche Principali |
 | :--- | :--- | :--- | :--- |
+| **`1.3.1`** | `2026-11-24` | Rimozione opzione vettoriale/SVG nel Prompt Lab | Aggiornato `REQ-FN-06`: rimosso il selettore «Adattatore output» (`raster`/`svg`) dal catalogo ColoraStoria e il modello vettoriale `gemini-4-hydrogen` dai modelli del Laboratorio Prompt Admin, limitando i test immagine ai soli modelli raster. |
 | **`1.3.0`** | `2026-11-24` | Console Admin `/admin`, Burger Menu & Pacchetti Prompt Eval Batch | Aggiornati `REQ-FN-06` e `REQ-NFR-03`: creati pacchetti riutilizzabili `packages/prompt-eval-core`, `packages/prompt-eval-backend` e `packages/prompt-eval-frontend` per test prompt multi-immagine (API Standard vs Batch `-50%`), anteprima/copia prompt completo, download singolo/ZIP, notifiche email free-tier (Resend/Brevo) e valutazioni/note persistenti su Firestore (`prompt_eval_runs`). Aggiunta pagina Admin-Only `/admin` accessibile da burger menu con spostamento delle sezioni *Inviti Beta* e *Telemetria & Costi*. |
 | **`1.2.0`** | `2026-11-23` | Carousel esempi fisso in Hero | Aggiornato `REQ-FN-01`: spostati tutti i 6 esempi reali in un singolo spazio fisso subito visibile in apertura nella Hero con slide orizzontale (`ExamplesCarousel`, swipe laterale/frecce/pallini e zoom al clic), sostituendo la sezione verticale espansa `ExamplesGallerySection`. |
 | **`1.1.0`** | `2026-11-23` | Galleria esempi reali inline | Aggiornato `REQ-FN-01`: sostituita la modale `ExamplesDialog` con la sezione inline `#esempi` (`ExamplesGallerySection`) nella landing page, completa di 6 foto reali (`Gattino`, `Cagnolino`, `Giocattolo`, `Bambola`, `Montagna con alberi`, `Bimbo di 2 anni che gioca`) e relative 12 generazioni `Fedele` + `Creativa` su tutti i 6 temi, con anteprima ingrandibile su clic. |
