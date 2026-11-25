@@ -15,6 +15,7 @@ export interface ExampleTrioProps {
   footerSlot?: ReactNode;
   className?: string;
   loading?: 'eager' | 'lazy';
+  priority?: 'lcp' | 'hidden-slide' | 'default';
   fullWidth?: boolean;
   onTileClick?: (tile: ExampleTilePreview) => void;
 }
@@ -24,7 +25,8 @@ interface TrioTileProps {
   badgeTone: 'yellow' | 'mint' | 'pink';
   aspectClass: 'aspect-[4/3]' | 'aspect-[3/4]';
   fitClass: 'object-cover' | 'object-contain bg-white';
-  loading: 'eager' | 'lazy';
+  loading?: 'eager' | 'lazy';
+  fetchPriority?: 'high' | 'low';
   src?: string;
   alt?: string;
   placeholderText?: string;
@@ -39,6 +41,7 @@ function TrioTile({
   aspectClass,
   fitClass,
   loading,
+  fetchPriority,
   src,
   alt,
   placeholderText = 'Spazio per l’immagine',
@@ -65,6 +68,7 @@ function TrioTile({
       width={width}
       height={height}
       loading={loading}
+      fetchPriority={fetchPriority}
       decoding="async"
       className={`block w-full ${aspectClass} ${fitClass}`}
     />
@@ -103,6 +107,7 @@ export function ExampleTrio({
   footerSlot,
   className = '',
   loading = 'lazy',
+  priority = 'default',
   fullWidth = false,
   onTileClick,
 }: ExampleTrioProps) {
@@ -114,6 +119,21 @@ export function ExampleTrio({
     .filter(Boolean)
     .join(' ');
 
+  const resolvedLoading: 'eager' | 'lazy' | undefined =
+    priority === 'lcp'
+      ? undefined
+      : priority === 'hidden-slide'
+        ? 'lazy'
+        : loading;
+  const primaryFetchPriority: 'high' | 'low' | undefined =
+    priority === 'lcp'
+      ? 'high'
+      : priority === 'hidden-slide'
+        ? 'low'
+        : undefined;
+  const secondaryFetchPriority: 'low' | undefined =
+    priority === 'hidden-slide' ? 'low' : undefined;
+
   return (
     <figure className={figureClassName} aria-label={item.ariaLabel}>
       <TrioTile
@@ -121,7 +141,8 @@ export function ExampleTrio({
         badgeTone="yellow"
         aspectClass="aspect-[4/3]"
         fitClass="object-cover"
-        loading={loading}
+        loading={resolvedLoading}
+        fetchPriority={primaryFetchPriority}
         src={item.photoSrc}
         alt={item.photoAlt}
         placeholderText={item.placeholderText}
@@ -141,7 +162,8 @@ export function ExampleTrio({
           badgeTone="mint"
           aspectClass="aspect-[3/4]"
           fitClass="object-contain bg-white"
-          loading={loading}
+          loading={resolvedLoading}
+          fetchPriority={secondaryFetchPriority}
           src={item.faithfulSrc}
           alt={item.faithfulAlt}
           placeholderText={item.placeholderText}
@@ -154,7 +176,8 @@ export function ExampleTrio({
           badgeTone="pink"
           aspectClass="aspect-[3/4]"
           fitClass="object-contain bg-white"
-          loading={loading}
+          loading={resolvedLoading}
+          fetchPriority={secondaryFetchPriority}
           src={item.creativeSrc}
           alt={item.creativeAlt}
           placeholderText={item.placeholderText}

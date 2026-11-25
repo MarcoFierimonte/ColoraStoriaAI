@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  accent-color: var(--cs-ink);
 
   /* Brand & surface palette */
   --cs-bg: #fff8d9;

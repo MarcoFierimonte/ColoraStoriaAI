@@ -1,5 +1,5 @@
 import { SITE_TEMPLATE } from '../../config/siteTemplate';
-import { LEGAL_ROUTES, type LegalRouteSlug } from '../LegalPage';
+import { LEGAL_ROUTES, type LegalRouteSlug } from '../../config/legalRoutes';
 
 export interface SiteFooterProps {
   isSigningIn?: boolean;

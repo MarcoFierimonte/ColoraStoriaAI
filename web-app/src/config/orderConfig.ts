@@ -12,9 +12,6 @@ import {
   RECOMMENDED_PHOTO_MIN_DIMENSION_PX,
   SUPPORT_EMAIL,
 } from '../../../shared/config/index.ts';
-import heroOriginalImg from '../assets/images/hero_foto_originale_1794739093633.jpg';
-import heroColoringImg from '../assets/images/hero_pagina_colorare_1794739094382.jpg';
-import openBookShowcaseImg from '../assets/images/libro_colorare_tavolo_1794739094767.jpg';
 
 export interface OrderConfiguration {
   minPhotos: number;
@@ -46,27 +43,6 @@ export const ORDER_CONFIG: OrderConfiguration = {
   priceEur: ORDER_PRICE_EUR,
   estimatedDelivery: ORDER_ESTIMATED_DELIVERY,
   supportEmail: SUPPORT_EMAIL,
-};
-
-/**
- * Segnaposto visivi centralizzati e facilmente sostituibili.
- */
-export const VISUAL_PLACEHOLDERS = {
-  heroOriginalPhoto: {
-    src: heroOriginalImg,
-    alt: 'Fotografia originale di un bambino sorridente in giardino alla luce naturale',
-    label: 'Foto originale',
-  },
-  heroColoringPage: {
-    src: heroColoringImg,
-    alt: 'Pagina da colorare in bianco e nero con linee pulite tratta dalla foto',
-    label: 'Pagina da colorare',
-  },
-  openBookShowcase: {
-    src: openBookShowcaseImg,
-    alt: 'Libro da colorare stampato e aperto su un tavolo chiaro accanto a matite colorate',
-    label: 'PDF pronto da stampare in formato A4',
-  },
 };
 
 export function formatPriceEur(amount: number): string {

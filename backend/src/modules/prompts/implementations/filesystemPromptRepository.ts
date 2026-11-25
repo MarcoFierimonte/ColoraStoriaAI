@@ -67,7 +67,7 @@ export class FilesystemPromptRepository implements PromptRepository {
 
   listVersions(): string[] {
     const { availableVersions } = this.readPromptsConfig();
-    return [...availableVersions].sort(
+    return availableVersions.toSorted(
       (a, b) => extractVersionNumber(a) - extractVersionNumber(b)
     );
   }
@@ -86,7 +86,7 @@ export class FilesystemPromptRepository implements PromptRepository {
       return requested;
     }
 
-    const sorted = [...availableVersions].sort(
+    const sorted = availableVersions.toSorted(
       (a, b) => extractVersionNumber(a) - extractVersionNumber(b)
     );
     return sorted[sorted.length - 1];

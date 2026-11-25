@@ -4,23 +4,23 @@ import type { ColoringAgeGroup, ColoringStyleMode, PrintPdfLayout } from '../mod
 // - CC BY-SA 4.0: doll-girl-photo.jpg (Nina Veiga — Boneca Waldorf)
 // - CC BY 4.0: mountain-landscape-photo.jpg (Ergaki, Artists' Lake and pine trees, Sayan Mountains)
 // - CC0: toy-boy-photo.jpg, cute-dog-photo.jpg, cute-cat-photo.jpg, toddler-playing-photo.jpg
-import cuteCatCreative from '../assets/images/examples/cute-cat-creative.png';
-import cuteCatFaithful from '../assets/images/examples/cute-cat-faithful.png';
+import cuteCatCreative from '../assets/images/examples/cute-cat-creative.webp';
+import cuteCatFaithful from '../assets/images/examples/cute-cat-faithful.webp';
 import cuteCatPhoto from '../assets/images/examples/cute-cat-photo.jpg';
-import cuteDogCreative from '../assets/images/examples/cute-dog-creative.png';
-import cuteDogFaithful from '../assets/images/examples/cute-dog-faithful.png';
+import cuteDogCreative from '../assets/images/examples/cute-dog-creative.webp';
+import cuteDogFaithful from '../assets/images/examples/cute-dog-faithful.webp';
 import cuteDogPhoto from '../assets/images/examples/cute-dog-photo.jpg';
-import dollGirlCreative from '../assets/images/examples/doll-girl-creative.png';
-import dollGirlFaithful from '../assets/images/examples/doll-girl-faithful.png';
+import dollGirlCreative from '../assets/images/examples/doll-girl-creative.webp';
+import dollGirlFaithful from '../assets/images/examples/doll-girl-faithful.webp';
 import dollGirlPhoto from '../assets/images/examples/doll-girl-photo.jpg';
-import mountainLandscapeCreative from '../assets/images/examples/mountain-landscape-creative.png';
-import mountainLandscapeFaithful from '../assets/images/examples/mountain-landscape-faithful.png';
+import mountainLandscapeCreative from '../assets/images/examples/mountain-landscape-creative.webp';
+import mountainLandscapeFaithful from '../assets/images/examples/mountain-landscape-faithful.webp';
 import mountainLandscapePhoto from '../assets/images/examples/mountain-landscape-photo.jpg';
-import toddlerPlayingCreative from '../assets/images/examples/toddler-playing-creative.png';
-import toddlerPlayingFaithful from '../assets/images/examples/toddler-playing-faithful.png';
+import toddlerPlayingCreative from '../assets/images/examples/toddler-playing-creative.webp';
+import toddlerPlayingFaithful from '../assets/images/examples/toddler-playing-faithful.webp';
 import toddlerPlayingPhoto from '../assets/images/examples/toddler-playing-photo.jpg';
-import toyBoyCreative from '../assets/images/examples/toy-boy-creative.png';
-import toyBoyFaithful from '../assets/images/examples/toy-boy-faithful.png';
+import toyBoyCreative from '../assets/images/examples/toy-boy-creative.webp';
+import toyBoyFaithful from '../assets/images/examples/toy-boy-faithful.webp';
 import toyBoyPhoto from '../assets/images/examples/toy-boy-photo.jpg';
 
 export interface ExampleTrioSlot {

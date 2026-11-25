@@ -26,7 +26,7 @@ test('ALLOWED_THEME_IDS matches every prompts/v*/themes.json', () => {
     'prompts/config.json must list at least one version'
   );
 
-  const expectedThemes = [...ALLOWED_THEME_IDS].sort();
+  const expectedThemes = ALLOWED_THEME_IDS.toSorted();
 
   for (const version of promptConfig.versions) {
     const themesPath = path.join(ROOT_DIR, 'prompts', version, 'themes.json');
@@ -74,7 +74,7 @@ test('ALLOWED_THEME_IDS and SUPPORTED_PROVIDER_IDS match firestore.rules', () =>
 
   assert.deepEqual(
     ruleProviders,
-    [...SUPPORTED_PROVIDER_IDS].sort(),
+    SUPPORTED_PROVIDER_IDS.toSorted(),
     'firestore.rules provider whitelist is out of sync with shared/config'
   );
 });
@@ -88,7 +88,7 @@ test('prompts/v2 and prompts/v3 modes.json and ages.json match shared/config con
     >;
     assert.deepEqual(
       Object.keys(modesObj).sort(),
-      [...ALLOWED_COLORING_MODES].sort(),
+      ALLOWED_COLORING_MODES.toSorted(),
       `prompts/${version}/modes.json keys must match ALLOWED_COLORING_MODES`
     );
 
@@ -99,7 +99,7 @@ test('prompts/v2 and prompts/v3 modes.json and ages.json match shared/config con
     >;
     assert.deepEqual(
       Object.keys(agesObj).sort(),
-      [...ALLOWED_AGE_GROUPS].sort(),
+      ALLOWED_AGE_GROUPS.toSorted(),
       `prompts/${version}/ages.json keys must match ALLOWED_AGE_GROUPS`
     );
   }
@@ -136,17 +136,15 @@ test('all 6 real example trios exist with valid magic bytes and cover all ALLOWE
     );
 
     for (const suffix of ['faithful', 'creative'] as const) {
-      const pngPath = path.join(examplesDir, `${slug}-${suffix}.png`);
-      assert.ok(fs.existsSync(pngPath), `Missing ${pngPath}`);
-      const pngBuf = fs.readFileSync(pngPath);
-      assert.ok(pngBuf.length > 0, `${pngPath} must be non-empty`);
+      const webpPath = path.join(examplesDir, `${slug}-${suffix}.webp`);
+      assert.ok(fs.existsSync(webpPath), `Missing ${webpPath}`);
+      const webpBuf = fs.readFileSync(webpPath);
+      assert.ok(webpBuf.length >= 12, `${webpPath} must be non-empty`);
       assert.equal(
-        pngBuf[0] === 0x89 &&
-          pngBuf[1] === 0x50 &&
-          pngBuf[2] === 0x4e &&
-          pngBuf[3] === 0x47,
+        webpBuf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+          webpBuf.subarray(8, 12).toString('ascii') === 'WEBP',
         true,
-        `${pngPath} must have PNG magic bytes`
+        `${webpPath} must have WebP magic bytes`
       );
     }
   }
@@ -267,5 +265,34 @@ test('firestore.rules explicitly keeps beta_invites, prompt_eval_runs, and promp
     extractDirectAllowStatements(promptEvalDatasetItemsBody),
     ['allow read, write: if false;'],
     'prompt_eval_datasets/{datasetId}/items must deny all client read/write access'
+  );
+});
+
+test('modernized assets and ES2023 TypeScript baseline stay intact', () => {
+  const tsconfig = JSON.parse(
+    fs.readFileSync(path.join(ROOT_DIR, 'tsconfig.json'), 'utf8')
+  ) as { compilerOptions?: { target?: string; lib?: string[] } };
+  assert.equal(tsconfig.compilerOptions?.target, 'ES2023');
+  assert.ok(
+    tsconfig.compilerOptions?.lib?.includes('ES2023'),
+    'tsconfig.json lib must include ES2023'
+  );
+
+  assert.equal(
+    fs.existsSync(
+      path.join(ROOT_DIR, 'web-app', 'public', 'assets', 'fonts', 'DMMono-Regular.ttf')
+    ),
+    false,
+    'Legacy DMMono-Regular.ttf must stay removed in favor of @fontsource/dm-mono'
+  );
+
+  const orderConfigSrc = fs.readFileSync(
+    path.join(ROOT_DIR, 'web-app', 'src', 'config', 'orderConfig.ts'),
+    'utf8'
+  );
+  assert.equal(
+    orderConfigSrc.includes('VISUAL_PLACEHOLDERS'),
+    false,
+    'Unused VISUAL_PLACEHOLDERS must stay removed from orderConfig.ts'
   );
 });

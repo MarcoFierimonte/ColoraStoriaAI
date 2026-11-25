@@ -1,4 +1,10 @@
-import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 
 export interface ModalDialogProps {
   open: boolean;
@@ -6,9 +12,23 @@ export interface ModalDialogProps {
   closeLabel?: string;
   size?: 'default' | 'examples';
   titleAs?: 'h1' | 'h2';
+  closedByMode?: 'any' | 'closerequest' | 'none';
   scrollTopKey?: string | number;
   onRequestClose: () => void;
   children: ReactNode;
+}
+
+function isPointerOutsideDialog(
+  event: PointerEvent<HTMLDialogElement>,
+  dialog: HTMLDialogElement
+): boolean {
+  const rect = dialog.getBoundingClientRect();
+  return (
+    event.clientX < rect.left ||
+    event.clientX > rect.right ||
+    event.clientY < rect.top ||
+    event.clientY > rect.bottom
+  );
 }
 
 export function ModalDialog({
@@ -17,11 +37,15 @@ export function ModalDialog({
   closeLabel = 'Chiudi',
   size = 'default',
   titleAs = 'h2',
+  closedByMode = 'any',
   scrollTopKey,
   onRequestClose,
   children,
 }: ModalDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const pressedOutsideRef = useRef(false);
+  const openRef = useRef(open);
+  openRef.current = open;
   const titleId = useId();
 
   useEffect(() => {
@@ -41,8 +65,29 @@ export function ModalDialog({
     }
   }, [open, scrollTopKey]);
 
-  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === dialogRef.current) {
+  const supportsClosedBy =
+    typeof HTMLDialogElement !== 'undefined' &&
+    'closedBy' in HTMLDialogElement.prototype;
+
+  const handlePointerDown = (event: PointerEvent<HTMLDialogElement>) => {
+    if (closedByMode !== 'any' || supportsClosedBy) {
+      pressedOutsideRef.current = false;
+      return;
+    }
+    const dialog = dialogRef.current;
+    pressedOutsideRef.current = dialog
+      ? isPointerOutsideDialog(event, dialog)
+      : false;
+  };
+
+  const handlePointerUp = (event: PointerEvent<HTMLDialogElement>) => {
+    const wasPressedOutside = pressedOutsideRef.current;
+    pressedOutsideRef.current = false;
+    if (closedByMode !== 'any' || supportsClosedBy || !wasPressedOutside) {
+      return;
+    }
+    const dialog = dialogRef.current;
+    if (dialog && isPointerOutsideDialog(event, dialog)) {
       onRequestClose();
     }
   };
@@ -58,13 +103,26 @@ export function ModalDialog({
   return (
     <dialog
       ref={dialogRef}
+      closedby={closedByMode}
       className={dialogClassName}
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
-        onRequestClose();
+        if (closedByMode !== 'none') {
+          onRequestClose();
+        }
       }}
-      onClick={handleBackdropClick}
+      onClose={() => {
+        if (dialogRef.current) {
+          dialogRef.current.returnValue = '';
+        }
+        // Keep React state in sync when native closedby="any" or uncancelable Esc dismisses the modal.
+        if (openRef.current) {
+          onRequestClose();
+        }
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
     >
       <div className="min-h-full">
         <div className="cs-dialog-head">

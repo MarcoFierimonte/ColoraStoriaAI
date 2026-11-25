@@ -403,19 +403,46 @@ export function AdminTelemetryPanel({
                 Nessun log presente per questo filtro. Avvia un test dall’app principale o dal Laboratorio Prompt per registrare costi e token.
               </UiCard>
             ) : (
-              <div className="overflow-x-auto border-t-2 border-[var(--cs-border)]">
-                <table className="w-full text-left text-xs">
+              <div
+                tabIndex={0}
+                role="region"
+                aria-labelledby="telemetry-table-caption"
+                className="cs-table-wrap border-t-2 border-[var(--cs-border)] focus-visible:outline-[3px] focus-visible:outline-[var(--cs-pink-strong)] focus-visible:outline-offset-[-3px]"
+              >
+                <table className="cs-responsive-table text-left text-xs">
+                  <caption id="telemetry-table-caption" className="sr-only">
+                    Storico generazioni, token e costi AI
+                  </caption>
                   <thead className="bg-[var(--cs-sky)] text-[var(--cs-ink)] border-b-2 border-[var(--cs-border)]">
                     <tr>
-                      <th className="py-2.5 px-4 font-bold">Data</th>
-                      <th className="py-2.5 px-3 font-bold">Origine</th>
-                      <th className="py-2.5 px-3 font-bold">Tema</th>
-                      <th className="py-2.5 px-3 font-bold">Modello</th>
-                      <th className="py-2.5 px-3 font-bold">Prompt</th>
-                      <th className="py-2.5 px-3 font-bold">Token (in/out)</th>
-                      <th className="py-2.5 px-3 font-bold">Latenza</th>
-                      <th className="py-2.5 px-3 font-bold">Costo</th>
-                      <th className="py-2.5 px-4 font-bold text-right">
+                      <th scope="col" className="py-2.5 px-4 font-bold">
+                        Data
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Origine
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Tema
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Modello
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Prompt
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Token (in/out)
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Latenza
+                      </th>
+                      <th scope="col" className="py-2.5 px-3 font-bold">
+                        Costo
+                      </th>
+                      <th
+                        scope="col"
+                        className="py-2.5 px-4 font-bold text-right"
+                      >
                         Azioni
                       </th>
                     </tr>
@@ -423,9 +450,12 @@ export function AdminTelemetryPanel({
                   <tbody className="divide-y-2 divide-[var(--cs-border)]/20">
                     {filteredLogs.map((item) => (
                       <tr key={item.id} className="hover:bg-[var(--cs-bg)]/50">
-                        <td className="py-2.5 px-4 font-mono-num text-[var(--cs-ink-muted)] whitespace-nowrap">
+                        <th
+                          scope="row"
+                          className="py-2.5 px-4 font-mono-num font-bold text-[var(--cs-ink)] whitespace-nowrap text-left"
+                        >
                           {formatDateTime(item.createdAtMs)}
-                        </td>
+                        </th>
                         <td className="py-2.5 px-3">
                           <div className="flex flex-col gap-0.5">
                             <div>

@@ -40,7 +40,6 @@ import {
   UiCard,
   UiChip,
   UiFileButton,
-  UiToast,
 } from './ui';
 
 export interface CreatorDialogProps {
@@ -131,7 +130,7 @@ export function CreatorDialog({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileResetCounter, setTurnstileResetCounter] = useState(0);
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [statusBanner, setStatusBanner] = useState<string | null>(null);
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [isRedeemingInvite, setIsRedeemingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -139,7 +138,7 @@ export function CreatorDialog({
   const photoRef = useRef<ValidatedPhoto | null>(null);
   photoRef.current = photo;
   const runCounterRef = useRef(0);
-  const toastTimerRef = useRef<number | null>(null);
+  const statusTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -168,26 +167,30 @@ export function CreatorDialog({
       if (photoRef.current) {
         URL.revokeObjectURL(photoRef.current.previewUrl);
       }
-      if (toastTimerRef.current !== null) {
-        window.clearTimeout(toastTimerRef.current);
+      if (statusTimerRef.current !== null) {
+        window.clearTimeout(statusTimerRef.current);
       }
     };
   }, []);
 
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    if (toastTimerRef.current !== null) {
-      window.clearTimeout(toastTimerRef.current);
+  const showStatusNotice = (message: string) => {
+    setStatusBanner(message);
+    if (statusTimerRef.current !== null) {
+      window.clearTimeout(statusTimerRef.current);
     }
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
+    statusTimerRef.current = window.setTimeout(() => {
+      setStatusBanner(null);
+    }, 3500);
   };
 
   const resetCreator = () => {
     runCounterRef.current += 1;
     if (photoRef.current) {
       URL.revokeObjectURL(photoRef.current.previewUrl);
+    }
+    if (statusTimerRef.current !== null) {
+      window.clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = null;
     }
     setPhoto(null);
     setMode('fedele');
@@ -203,6 +206,7 @@ export function CreatorDialog({
     setPdfError(null);
     setErrorBanner(null);
     setErrorDetails(null);
+    setStatusBanner(null);
     setCopiedError(false);
   };
 
@@ -214,12 +218,12 @@ export function CreatorDialog({
     setErrorBanner(null);
     setErrorDetails(null);
     setPdfError(null);
+    setStatusBanner(null);
 
     try {
       const { accepted, rejected } = await validateSinglePhotoFile(file);
       if (rejected) {
         setErrorBanner(rejected.reason);
-        showToast(rejected.reason);
         return;
       }
 
@@ -240,7 +244,6 @@ export function CreatorDialog({
           ? err.message
           : 'Impossibile leggere questa immagine.';
       setErrorBanner(message);
-      showToast(message);
     } finally {
       setIsValidatingPhoto(false);
     }
@@ -249,6 +252,7 @@ export function CreatorDialog({
   const handleSampleClick = async (sceneId: string) => {
     setIsValidatingPhoto(true);
     setErrorBanner(null);
+    setStatusBanner(null);
     try {
       const { file, scene } = await renderSampleSceneToFile(sceneId);
       await acceptValidatedFile(file, scene.suggestedThemeId);
@@ -258,7 +262,6 @@ export function CreatorDialog({
           ? err.message
           : 'Impossibile caricare l’esempio selezionato.';
       setErrorBanner(message);
-      showToast(message);
       setIsValidatingPhoto(false);
     }
   };
@@ -288,7 +291,6 @@ export function CreatorDialog({
       const securityMsg =
         'Completa la verifica di sicurezza prima di generare.';
       setErrorBanner(securityMsg);
-      showToast(securityMsg);
       return;
     }
 
@@ -297,6 +299,7 @@ export function CreatorDialog({
     setErrorDetails(null);
     setCopiedError(false);
     setPdfError(null);
+    setStatusBanner(null);
     setAskConfirmClose(false);
     setIsGenerating(true);
 
@@ -339,7 +342,6 @@ export function CreatorDialog({
       if (err instanceof ColoringApiError) {
         setErrorBanner(err.message);
         setErrorDetails(err.adminDebugInfo ?? null);
-        showToast(err.message);
       } else {
         const message =
           err instanceof Error
@@ -351,7 +353,6 @@ export function CreatorDialog({
             ? { rawBodySnippet: `${err.name}: ${err.message}` }
             : { rawBodySnippet: String(err) }
         );
-        showToast(message);
       }
     } finally {
       if (runCounterRef.current === currentRun) {
@@ -367,6 +368,7 @@ export function CreatorDialog({
     if (!result || isExportingPdf) return;
     setIsExportingPdf(true);
     setPdfError(null);
+    setStatusBanner(null);
 
     try {
       const freshToken = isAdmin && user ? await refreshIdToken() : idToken;
@@ -383,14 +385,13 @@ export function CreatorDialog({
       link.download = `colorastoria-stampa-${pdfLayout}.pdf`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-      showToast('PDF pronto per la stampa!');
+      showStatusNotice('PDF pronto per la stampa!');
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
           : 'Impossibile generare il PDF per la stampa. Riprova.';
       setPdfError(message);
-      showToast(message);
     } finally {
       setIsExportingPdf(false);
     }
@@ -398,15 +399,17 @@ export function CreatorDialog({
 
   const handleDownloadPng = async () => {
     if (!result) return;
+    setPdfError(null);
+    setStatusBanner(null);
     try {
       await downloadColoringResultAsPng(result);
-      showToast('Immagine PNG scaricata!');
+      showStatusNotice('Immagine PNG scaricata!');
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
           : 'Impossibile esportare l’immagine PNG.';
-      showToast(message);
+      setPdfError(message);
     }
   };
 
@@ -456,7 +459,7 @@ export function CreatorDialog({
       setInviteCodeInput('');
       onAccessSessionChange?.(session);
       if (session.invite) {
-        showToast(
+        showStatusNotice(
           `Invito attivo! Hai ${session.invite.remainingGenerations} generazioni disponibili.`
         );
       }
@@ -499,6 +502,7 @@ export function CreatorDialog({
   return (
     <ModalDialog
       open={open}
+      closedByMode={isGenerating ? 'none' : photo || result ? 'closerequest' : 'any'}
       title={
         isInviteGated
           ? creator.inviteGateTitle
@@ -595,6 +599,12 @@ export function CreatorDialog({
         className="px-4 pb-[calc(20px+env(safe-area-inset-bottom,0px))]"
         aria-live="polite"
       >
+        {statusBanner ? (
+          <UiCard tone="mint" className="mb-3 !p-2.5 text-xs font-bold" role="status">
+            {statusBanner}
+          </UiCard>
+        ) : null}
+
         {isInviteGated ? (
           <UiCard className="space-y-3">
             {accessSession?.invite && accessSession.invite.remainingGenerations === 0 ? (
@@ -707,6 +717,7 @@ export function CreatorDialog({
                   onClick={() => {
                     setResult(null);
                     setPdfError(null);
+                    setStatusBanner(null);
                     setErrorBanner(null);
                     setErrorDetails(null);
                   }}
@@ -982,8 +993,6 @@ export function CreatorDialog({
           </div>
         )}
       </div>
-
-      <UiToast message={toastMessage} />
     </ModalDialog>
   );
 }

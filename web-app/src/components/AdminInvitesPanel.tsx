@@ -299,7 +299,7 @@ export function AdminInvitesPanel() {
         </p>
       ) : (
         <div className="space-y-2.5">
-          {invites.map((invite) => {
+          {invites.map((invite, idx) => {
             const status = getInviteStatus(invite);
             const isBusy = busyCode === invite.code;
             const isCopied = copiedCode === invite.code;
@@ -307,7 +307,9 @@ export function AdminInvitesPanel() {
             return (
               <div
                 key={invite.code}
-                className="flex flex-col gap-3 rounded-[12px] border-2 border-[var(--cs-border)] bg-white p-3.5 sm:flex-row sm:items-center sm:justify-between"
+                className={`flex flex-col gap-3 rounded-[12px] border-2 border-[var(--cs-border)] bg-white p-3.5 sm:flex-row sm:items-center sm:justify-between ${
+                  idx >= 6 ? 'cs-deferred-card' : ''
+                }`}
               >
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">

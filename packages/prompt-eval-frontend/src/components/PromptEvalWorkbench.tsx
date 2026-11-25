@@ -1,10 +1,12 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type DragEvent,
+  type PointerEvent,
 } from 'react';
 import {
   AlertCircle,
@@ -301,7 +303,7 @@ function ItemEvaluationCard({
   };
 
   return (
-    <article className="rounded-[12px] border-[3px] border-[var(--cs-border,#24284f)] bg-white p-3.5 shadow-[4px_4px_0_var(--cs-border,#24284f)] flex flex-col gap-3">
+    <article className="rounded-[12px] border-[3px] border-[var(--cs-border,#24284f)] bg-white p-3.5 shadow-[4px_4px_0_var(--cs-border,#24284f)] flex flex-col gap-3 [content-visibility:auto] [contain-intrinsic-size:auto_none_auto_420px]">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-mono-num font-bold text-[var(--cs-ink-muted,#4b5075)]">
@@ -514,7 +516,7 @@ function ItemEvaluationCard({
               ? 'Note su questo output (es. accuratezza, chiarezza, aderenza al prompt…)'
               : 'Note su questa immagine (es. aderenza al prompt, qualità visiva, dettagli…)'
           }
-          className="w-full rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-bg,#fff8d9)]/50 px-2.5 py-1.5 text-xs focus:bg-white focus:outline-none"
+          className="h-auto w-full min-h-[3lh] max-h-[10lh] [field-sizing:content] rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-bg,#fff8d9)]/50 px-2.5 py-1.5 text-xs focus:bg-white focus:outline-none"
         />
 
         <div className="flex items-center justify-between gap-2">
@@ -545,6 +547,112 @@ function ItemEvaluationCard({
         </div>
       </div>
     </article>
+  );
+}
+
+interface ZoomLightboxDialogProps {
+  media: { url: string; label: string } | null;
+  onClose: () => void;
+}
+
+function isPointerOutsideLightbox(
+  event: PointerEvent<HTMLDialogElement>,
+  dialog: HTMLDialogElement
+): boolean {
+  const rect = dialog.getBoundingClientRect();
+  return (
+    event.clientX < rect.left ||
+    event.clientX > rect.right ||
+    event.clientY < rect.top ||
+    event.clientY > rect.bottom
+  );
+}
+
+function ZoomLightboxDialog({ media, onClose }: ZoomLightboxDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const pressedOutsideRef = useRef(false);
+  const openRef = useRef(media !== null);
+  openRef.current = media !== null;
+  const titleId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (media && !dialog.open) {
+      dialog.showModal();
+    } else if (!media && dialog.open) {
+      dialog.close();
+    }
+  }, [media]);
+
+  const supportsClosedBy =
+    typeof HTMLDialogElement !== 'undefined' &&
+    'closedBy' in HTMLDialogElement.prototype;
+
+  const handlePointerDown = (event: PointerEvent<HTMLDialogElement>) => {
+    if (supportsClosedBy) {
+      pressedOutsideRef.current = false;
+      return;
+    }
+    const dialog = dialogRef.current;
+    pressedOutsideRef.current = dialog
+      ? isPointerOutsideLightbox(event, dialog)
+      : false;
+  };
+
+  const handlePointerUp = (event: PointerEvent<HTMLDialogElement>) => {
+    const wasPressedOutside = pressedOutsideRef.current;
+    pressedOutsideRef.current = false;
+    if (supportsClosedBy || !wasPressedOutside) return;
+    const dialog = dialogRef.current;
+    if (dialog && isPointerOutsideLightbox(event, dialog)) {
+      onClose();
+    }
+  };
+
+  return (
+    <dialog
+      ref={dialogRef}
+      closedby="any"
+      aria-labelledby={titleId}
+      onClose={() => {
+        if (dialogRef.current) {
+          dialogRef.current.returnValue = '';
+        }
+        if (openRef.current) {
+          onClose();
+        }
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      className="m-auto w-[min(48rem,calc(100%-2rem))] max-h-[90dvh] rounded-[14px] border-[3px] border-[var(--cs-border,#24284f)] bg-white p-0 text-[var(--cs-ink,#24284f)] shadow-[6px_6px_0_var(--cs-border,#24284f)] overflow-y-auto [overscroll-behavior:contain] backdrop:bg-black/70 backdrop:overflow-hidden backdrop:[overscroll-behavior:contain]"
+    >
+      {media ? (
+        <div className="p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h1 id={titleId} className="text-sm font-bold truncate">
+              {media.label}
+            </h1>
+            <button
+              type="button"
+              autoFocus
+              onClick={onClose}
+              aria-label="Chiudi anteprima ingrandita"
+              className="rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-bg,#fff8d9)] p-1.5 cursor-pointer"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="overflow-auto flex items-center justify-center bg-[var(--cs-bg,#fff8d9)]/40 rounded-[10px] border-2 border-[var(--cs-border,#24284f)] p-2">
+            <img
+              src={media.url}
+              alt={media.label}
+              className="max-h-[75dvh] w-auto object-contain bg-white"
+            />
+          </div>
+        </div>
+      ) : null}
+    </dialog>
   );
 }
 
@@ -706,18 +814,6 @@ export function PromptEvalWorkbench({
       setNotifyEmail(defaultNotifyEmail);
     }
   }, [defaultNotifyEmail]);
-
-  // Close lightbox on Escape key
-  useEffect(() => {
-    if (!zoomedMedia) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setZoomedMedia(null);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomedMedia]);
 
   const modalityCatalogs = useMemo(
     () =>
@@ -2136,7 +2232,7 @@ export function PromptEvalWorkbench({
                     ? 'Scrivi o incolla il prompt completo da testare su ogni immagine…'
                     : 'Scrivi o incolla il prompt completo da testare su ogni input testuale…'
                 }
-                className="w-full rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-white p-3 text-xs font-mono-num leading-relaxed text-[var(--cs-ink,#24284f)]"
+                className="h-auto w-full min-h-[7lh] max-h-[18lh] [field-sizing:content] rounded-[10px] border-2 border-[var(--cs-border,#24284f)] bg-white p-3 text-xs font-mono-num leading-relaxed text-[var(--cs-ink,#24284f)]"
               />
             )}
           </div>
@@ -2659,7 +2755,7 @@ export function PromptEvalWorkbench({
                         )
                       )
                     }
-                    className="w-full rounded-[8px] border-2 border-[var(--cs-border,#24284f)] px-2.5 py-1.5 text-xs"
+                    className="h-auto w-full min-h-[3lh] max-h-[10lh] [field-sizing:content] rounded-[8px] border-2 border-[var(--cs-border,#24284f)] px-2.5 py-1.5 text-xs"
                   />
                 </div>
               ))}
@@ -3025,7 +3121,7 @@ export function PromptEvalWorkbench({
             </p>
           ) : (
             <div className="space-y-2 max-h-[620px] overflow-y-auto pr-0.5">
-              {filteredRuns.map((run) => {
+              {filteredRuns.map((run, idx) => {
                 const isSelected = selectedRun?.id === run.id;
                 const statusMeta = RUN_STATUS_META[run.status];
                 return (
@@ -3034,6 +3130,10 @@ export function PromptEvalWorkbench({
                     type="button"
                     onClick={() => void selectRun(run.id)}
                     className={`w-full text-left rounded-[10px] border-2 border-[var(--cs-border,#24284f)] p-2.5 space-y-1.5 cursor-pointer transition-colors ${
+                      idx >= 8
+                        ? '[content-visibility:auto] [contain-intrinsic-size:auto_none_auto_84px] '
+                        : ''
+                    }${
                       isSelected
                         ? 'bg-[var(--cs-sky,#e4f3ff)]'
                         : 'bg-white hover:bg-[var(--cs-bg,#fff8d9)]/60'
@@ -3342,7 +3442,7 @@ export function PromptEvalWorkbench({
                     value={runNotes}
                     onChange={(e) => setRunNotes(e.target.value)}
                     placeholder="Annota osservazioni generali su questo prompt (es. casi che riescono meglio, difetti ricorrenti, prossime modifiche…)"
-                    className="w-full rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2.5 py-1.5 text-xs"
+                    className="h-auto w-full min-h-[3lh] max-h-[10lh] [field-sizing:content] rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-white px-2.5 py-1.5 text-xs"
                   />
                   <div className="space-y-2">
                     <input
@@ -3400,40 +3500,11 @@ export function PromptEvalWorkbench({
         </section>
       </div>
 
-      {/* Simple accessible lightbox zoom overlay */}
-      {zoomedMedia ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={zoomedMedia.label}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setZoomedMedia(null)}
-        >
-          <div
-            className="max-w-3xl max-h-[90dvh] w-full rounded-[14px] border-[3px] border-[var(--cs-border,#24284f)] bg-white p-4 shadow-[6px_6px_0_var(--cs-border,#24284f)] flex flex-col gap-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h5 className="text-sm font-bold truncate">{zoomedMedia.label}</h5>
-              <button
-                type="button"
-                onClick={() => setZoomedMedia(null)}
-                aria-label="Chiudi anteprima ingrandita"
-                className="rounded-[8px] border-2 border-[var(--cs-border,#24284f)] bg-[var(--cs-bg,#fff8d9)] p-1.5 cursor-pointer"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-            <div className="overflow-auto flex items-center justify-center bg-[var(--cs-bg,#fff8d9)]/40 rounded-[10px] border-2 border-[var(--cs-border,#24284f)] p-2">
-              <img
-                src={zoomedMedia.url}
-                alt={zoomedMedia.label}
-                className="max-h-[75dvh] w-auto object-contain bg-white"
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Native <dialog> lightbox zoom overlay */}
+      <ZoomLightboxDialog
+        media={zoomedMedia}
+        onClose={() => setZoomedMedia(null)}
+      />
     </div>
   );
 }

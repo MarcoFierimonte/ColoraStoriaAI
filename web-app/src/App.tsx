@@ -1,21 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   ADMIN_BASE_PATH,
-  AdminPage,
   buildAdminUrl,
   isAdminPath,
   parseAdminRunIdFromSearch,
   parseAdminTabFromSearch,
   type AdminServiceTab,
-} from './components/AdminPage';
+} from './config/adminRoutes';
 import { CreatorDialog } from './components/CreatorDialog';
 import {
   LEGAL_ROUTES,
-  LegalPage,
   parseLegalSlugFromPathname,
   type LegalRouteSlug,
-} from './components/LegalPage';
+} from './config/legalRoutes';
+
+const AdminPage = lazy(() =>
+  import('./components/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
+const LegalPage = lazy(() =>
+  import('./components/LegalPage').then((m) => ({ default: m.LegalPage }))
+);
 import {
   BottomCtaSection,
   CategoriesSection,
@@ -285,20 +290,40 @@ export default function App() {
 
       <main className="flex-1">
         {route.kind === 'admin' ? (
-          <AdminPage
-            activeTab={route.adminTab}
-            selectedRunId={route.adminRunId}
-            latestTelemetry={latestTelemetry}
-            onSelectTab={(tab) => navigateToAdmin(tab)}
-            onSelectRunId={handleAdminRunSelected}
-            onNavigateHome={() => navigateToPath('/')}
-          />
+          <Suspense
+            fallback={
+              <div className="cs-wrap py-12">
+                <UiCard className="p-6 text-center text-sm font-bold">
+                  Caricamento…
+                </UiCard>
+              </div>
+            }
+          >
+            <AdminPage
+              activeTab={route.adminTab}
+              selectedRunId={route.adminRunId}
+              latestTelemetry={latestTelemetry}
+              onSelectTab={(tab) => navigateToAdmin(tab)}
+              onSelectRunId={handleAdminRunSelected}
+              onNavigateHome={() => navigateToPath('/')}
+            />
+          </Suspense>
         ) : route.kind === 'legal' && route.legalSlug ? (
-          <LegalPage
-            slug={route.legalSlug}
-            onNavigateHome={() => navigateToPath('/')}
-            onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
-          />
+          <Suspense
+            fallback={
+              <div className="cs-wrap py-12">
+                <UiCard className="p-6 text-center text-sm font-bold">
+                  Caricamento…
+                </UiCard>
+              </div>
+            }
+          >
+            <LegalPage
+              slug={route.legalSlug}
+              onNavigateHome={() => navigateToPath('/')}
+              onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
+            />
+          </Suspense>
         ) : (
           <>
             <HeroSection onStartClick={openCreator} />
