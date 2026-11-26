@@ -8,6 +8,10 @@ import {
   ALLOWED_THEME_IDS,
   SUPPORTED_PROVIDER_IDS,
 } from '../shared/config/index.ts';
+import {
+  DESIGN_V2_PATH,
+  isDesignV2Path,
+} from '../web-app/src/config/designRoutes.ts';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 
@@ -295,4 +299,31 @@ test('modernized assets and ES2023 TypeScript baseline stay intact', () => {
     false,
     'Unused VISUAL_PLACEHOLDERS must stay removed from orderConfig.ts'
   );
+});
+
+test('parallel /v2 design route matches accurately and preserves existing SITE_TEMPLATE copy', () => {
+  assert.equal(DESIGN_V2_PATH, '/v2');
+  assert.equal(isDesignV2Path('/v2'), true);
+  assert.equal(isDesignV2Path('/v2/'), true);
+  assert.equal(isDesignV2Path('/V2'), true);
+  assert.equal(isDesignV2Path('/'), false);
+  assert.equal(isDesignV2Path('/admin'), false);
+
+  const templateSrc = fs.readFileSync(
+    path.join(ROOT_DIR, 'web-app', 'src', 'config', 'siteTemplate.ts'),
+    'utf8'
+  );
+  for (const preservedCopy of [
+    "'Una foto, una pagina '",
+    "'da colorare'",
+    "'Inizia ora'",
+    "'Se lo vedi, lo puoi colorare.'",
+    "'Come funziona'",
+    "'Pronto a provare?'",
+  ]) {
+    assert.ok(
+      templateSrc.includes(preservedCopy),
+      `siteTemplate.ts must preserve existing copy ${preservedCopy}`
+    );
+  }
 });

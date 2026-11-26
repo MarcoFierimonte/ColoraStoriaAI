@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import {
+  ArrowLeftRight,
   BarChart3,
   FlaskConical,
   Home,
@@ -11,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import type { AdminServiceTab } from '../../config/adminRoutes';
+import { DESIGN_V2_PATH } from '../../config/designRoutes';
 import { LEGAL_ROUTES, type LegalRouteSlug } from '../../config/legalRoutes';
 import { SITE_TEMPLATE } from '../../config/siteTemplate';
 import { UiButton } from '../ui';
@@ -19,8 +21,10 @@ export interface NavbarProps {
   isAdmin?: boolean;
   userEmail?: string | null;
   isOnAdminPage?: boolean;
+  isDesignV2?: boolean;
   onLogoClick: () => void;
   onStartClick: () => void;
+  onToggleDesignVersion?: () => void;
   onNavigateAdmin?: (tab?: AdminServiceTab) => void;
   onNavigateLegal?: (slug: LegalRouteSlug) => void;
   onSignOut?: () => void;
@@ -30,8 +34,10 @@ export function Navbar({
   isAdmin = false,
   userEmail = null,
   isOnAdminPage = false,
+  isDesignV2 = false,
   onLogoClick,
   onStartClick,
+  onToggleDesignVersion,
   onNavigateAdmin,
   onNavigateLegal,
   onSignOut,
@@ -86,7 +92,11 @@ export function Navbar({
     <header
       style={
         {
-          '--cs-header-max': isOnAdminPage ? '1220px' : '980px',
+          '--cs-header-max': isOnAdminPage
+            ? '1220px'
+            : isDesignV2
+              ? '1120px'
+              : '980px',
         } as CSSProperties
       }
       className={
@@ -100,7 +110,7 @@ export function Navbar({
         aria-label="Principale"
       >
         <a
-          href="/"
+          href={isDesignV2 ? DESIGN_V2_PATH : '/'}
           className="cs-logo"
           onClick={(event) => {
             event.preventDefault();
@@ -178,6 +188,23 @@ export function Navbar({
                 <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>Crea pagina da colorare</span>
               </button>
+              {onToggleDesignVersion ? (
+                <button
+                  type="button"
+                  onClick={() => closeAndRun(onToggleDesignVersion)}
+                  className="w-full flex items-center gap-2.5 rounded-[8px] border-2 border-transparent px-2.5 py-2 text-left text-sm font-bold hover:border-[var(--cs-border)] hover:bg-[var(--cs-bg)] cursor-pointer"
+                >
+                  <ArrowLeftRight
+                    className="h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {isDesignV2
+                      ? 'Versione attuale (v1)'
+                      : 'Prova Design UX (v2)'}
+                  </span>
+                </button>
+              ) : null}
             </div>
 
             {onNavigateAdmin ? (

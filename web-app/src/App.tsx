@@ -8,6 +8,7 @@ import {
   parseAdminTabFromSearch,
   type AdminServiceTab,
 } from './config/adminRoutes';
+import { DESIGN_V2_PATH, isDesignV2Path } from './config/designRoutes';
 import { CreatorDialog } from './components/CreatorDialog';
 import {
   LEGAL_ROUTES,
@@ -20,6 +21,12 @@ const AdminPage = lazy(() =>
 );
 const LegalPage = lazy(() =>
   import('./components/LegalPage').then((m) => ({ default: m.LegalPage }))
+);
+const HomeV2 = lazy(() =>
+  import('./components/v2').then((m) => ({ default: m.HomeV2 }))
+);
+const CreatorDialogV2 = lazy(() =>
+  import('./components/v2').then((m) => ({ default: m.CreatorDialogV2 }))
 );
 import {
   BottomCtaSection,
@@ -47,7 +54,7 @@ interface InviteBanner {
 }
 
 interface RouteState {
-  kind: 'home' | 'legal' | 'admin';
+  kind: 'home' | 'home-v2' | 'legal' | 'admin';
   legalSlug: LegalRouteSlug | null;
   adminTab: AdminServiceTab;
   adminRunId: string | null;
@@ -69,6 +76,14 @@ function readCurrentRoute(): RouteState {
       legalSlug: null,
       adminTab: parseAdminTabFromSearch(search),
       adminRunId: parseAdminRunIdFromSearch(search),
+    };
+  }
+  if (isDesignV2Path(pathname)) {
+    return {
+      kind: 'home-v2',
+      legalSlug: null,
+      adminTab: 'prompt-lab',
+      adminRunId: null,
     };
   }
   const legalSlug = parseLegalSlugFromPathname(pathname);
@@ -133,9 +148,11 @@ export default function App() {
       const targetPath =
         route.kind === 'admin'
           ? ADMIN_BASE_PATH
-          : route.kind === 'legal' && route.legalSlug
-            ? LEGAL_ROUTES[route.legalSlug].path
-            : '/';
+          : route.kind === 'home-v2'
+            ? DESIGN_V2_PATH
+            : route.kind === 'legal' && route.legalSlug
+              ? LEGAL_ROUTES[route.legalSlug].path
+              : '/';
       canonical.setAttribute('href', `${window.location.origin}${targetPath}`);
     }
   }, [route]);
@@ -237,14 +254,24 @@ export default function App() {
     }));
   };
 
+  const isDesignV2 = route.kind === 'home-v2';
+
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--cs-bg)] text-[var(--cs-ink)]">
+    <div
+      className={`min-h-screen flex flex-col bg-[var(--cs-bg)] text-[var(--cs-ink)]${
+        isDesignV2 ? ' cs-v2-scope' : ''
+      }`}
+    >
       <Navbar
         isAdmin={isAdmin}
         userEmail={user?.email ?? null}
         isOnAdminPage={route.kind === 'admin'}
-        onLogoClick={() => navigateToPath('/')}
+        isDesignV2={isDesignV2}
+        onLogoClick={() => navigateToPath(isDesignV2 ? DESIGN_V2_PATH : '/')}
         onStartClick={openCreator}
+        onToggleDesignVersion={() =>
+          navigateToPath(isDesignV2 ? '/' : DESIGN_V2_PATH)
+        }
         onNavigateAdmin={(tab) => navigateToAdmin(tab ?? 'prompt-lab')}
         onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
         onSignOut={() => void signOutUser()}
@@ -324,6 +351,24 @@ export default function App() {
               onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
             />
           </Suspense>
+        ) : route.kind === 'home-v2' ? (
+          <Suspense
+            fallback={
+              <div className="cs-wrap py-12">
+                <UiCard className="p-6 text-center text-sm font-bold">
+                  Caricamento…
+                </UiCard>
+              </div>
+            }
+          >
+            <HomeV2
+              isAdmin={isAdmin}
+              accessSession={accessSession}
+              creatorOpen={creatorOpen}
+              onStartClick={openCreator}
+              onSwitchToV1={() => navigateToPath('/')}
+            />
+          </Suspense>
         ) : (
           <>
             <HeroSection onStartClick={openCreator} />
@@ -337,20 +382,33 @@ export default function App() {
       <SiteFooter
         isAdmin={isAdmin}
         userEmail={user?.email ?? null}
-        onNavigateHome={() => navigateToPath('/')}
+        onNavigateHome={() => navigateToPath(isDesignV2 ? DESIGN_V2_PATH : '/')}
         onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
         onNavigateAdmin={() => navigateToAdmin('prompt-lab')}
         onSignOut={() => void signOutUser()}
       />
 
-      <CreatorDialog
-        open={creatorOpen}
-        onClose={() => setCreatorOpen(false)}
-        accessSession={accessSession}
-        onAccessSessionChange={handleAccessSessionChange}
-        onInviteQuotaUpdate={handleInviteQuotaUpdate}
-        onTelemetryGenerated={setLatestTelemetry}
-      />
+      {isDesignV2 ? (
+        <Suspense fallback={null}>
+          <CreatorDialogV2
+            open={creatorOpen}
+            onClose={() => setCreatorOpen(false)}
+            accessSession={accessSession}
+            onAccessSessionChange={handleAccessSessionChange}
+            onInviteQuotaUpdate={handleInviteQuotaUpdate}
+            onTelemetryGenerated={setLatestTelemetry}
+          />
+        </Suspense>
+      ) : (
+        <CreatorDialog
+          open={creatorOpen}
+          onClose={() => setCreatorOpen(false)}
+          accessSession={accessSession}
+          onAccessSessionChange={handleAccessSessionChange}
+          onInviteQuotaUpdate={handleInviteQuotaUpdate}
+          onTelemetryGenerated={setLatestTelemetry}
+        />
+      )}
     </div>
   );
 }

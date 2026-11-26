@@ -10,7 +10,7 @@ export interface ModalDialogProps {
   open: boolean;
   title: string;
   closeLabel?: string;
-  size?: 'default' | 'examples';
+  size?: 'default' | 'examples' | 'wide';
   titleAs?: 'h1' | 'h2';
   closedByMode?: 'any' | 'closerequest' | 'none';
   scrollTopKey?: string | number;
@@ -96,6 +96,7 @@ export function ModalDialog({
   const dialogClassName = [
     'cs-dialog',
     size === 'examples' ? 'cs-dialog-examples' : '',
+    size === 'wide' ? 'cs-dialog-wide' : '',
   ]
     .filter(Boolean)
     .join(' ');

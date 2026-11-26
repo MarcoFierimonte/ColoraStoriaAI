@@ -441,6 +441,10 @@
     width: min(520px, calc(100% - 32px));
   }
 
+  .cs-dialog-wide {
+    width: min(820px, calc(100% - 32px));
+  }
+
   /* overflow: hidden turns ::backdrop into a scroll container so overscroll-behavior applies. */
   .cs-dialog::backdrop {
     background: rgba(36, 40, 79, 0.45);
@@ -450,7 +454,8 @@
 
   @media (max-width: 600px) {
     .cs-dialog,
-    .cs-dialog-examples {
+    .cs-dialog-examples,
+    .cs-dialog-wide {
       width: 100%;
       max-width: none;
       height: 100%;
@@ -698,6 +703,157 @@
       content: var(--label-9);
     }
   }
+
+  /* Parallel UX v2 comparison layout, dropzone, and styled native progress bar */
+  .cs-v2-scope {
+    --cs-container-max: 1120px;
+  }
+
+  .cs-v2-hero {
+    display: grid;
+    gap: 18px;
+    padding: 10px 0 28px;
+  }
+
+  @media (min-width: 900px) {
+    .cs-v2-hero {
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      align-items: center;
+      gap: 40px;
+      padding: 34px 0 56px;
+    }
+  }
+
+  .cs-v2-cat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    border: var(--cs-border-width) solid var(--cs-border);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font: inherit;
+    font-weight: 700;
+    color: var(--cs-ink);
+    cursor: pointer;
+    box-shadow: var(--cs-shadow-sm);
+    translate: 0 0;
+    touch-action: manipulation;
+    transition: translate 0.08s ease, box-shadow 0.08s ease, background-color 0.08s ease;
+  }
+
+  .cs-v2-cat-btn[aria-pressed='true'] {
+    translate: 3px 3px;
+    box-shadow: none;
+  }
+
+  .cs-v2-cat-btn:focus-visible {
+    outline: 3px solid var(--cs-pink-strong);
+    outline-offset: 3px;
+  }
+
+  .cs-v2-dropzone {
+    display: grid;
+    place-items: center;
+    border: var(--cs-border-width) solid var(--cs-border);
+    border-radius: var(--cs-radius-card);
+    background: var(--cs-surface);
+    box-shadow: var(--cs-shadow-card);
+    padding: 12px;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+  }
+
+  .cs-v2-dropzone-inner {
+    width: 100%;
+    border: var(--cs-border-width) dashed var(--cs-border);
+    border-radius: var(--cs-radius-btn);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .cs-v2-dropzone:hover,
+  .cs-v2-dropzone[data-dragging='true'] {
+    background: var(--cs-mint);
+  }
+
+  .cs-v2-dropzone:focus-within {
+    outline: 3px solid var(--cs-pink-strong);
+    outline-offset: 3px;
+  }
+
+  .cs-v2-mobile-dock {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 25;
+    border-top: var(--cs-border-width) solid var(--cs-border);
+    background: var(--cs-surface);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 12px rgba(36, 40, 79, 0.08);
+  }
+
+  progress.cs-progress {
+    appearance: none;
+    border: var(--cs-border-width) solid var(--cs-border);
+    border-radius: 999px;
+    overflow: clip;
+    width: 100%;
+    height: 14px;
+    background: var(--cs-surface);
+    container-type: inline-size;
+    --progress-bar-indeterminate-size: 32%;
+    --progress-bar-indeterminate-animation-duration: 1.4s;
+  }
+
+  progress.cs-progress:dir(rtl) {
+    --progress-bar-indeterminate-animation: cs-progress-indeterminate
+      var(--progress-bar-indeterminate-animation-duration) infinite linear reverse;
+  }
+
+  progress.cs-progress:indeterminate {
+    --progress-bar-animation: var(
+      --progress-bar-indeterminate-animation,
+      cs-progress-indeterminate var(--progress-bar-indeterminate-animation-duration)
+        infinite linear
+    );
+  }
+
+  progress.cs-progress::-webkit-progress-bar {
+    background: transparent;
+  }
+
+  /* Keep WebKit and Gecko pseudo-element rules separate so neither engine discards them. */
+  progress.cs-progress::-webkit-progress-value {
+    background: var(--cs-mint);
+    border-radius: 999px;
+    animation: var(--progress-bar-animation, revert-rule);
+  }
+
+  progress.cs-progress::-moz-progress-bar {
+    background: var(--cs-mint);
+    border-radius: 999px;
+    animation: var(--progress-bar-animation, revert-rule);
+  }
+}
+
+@keyframes cs-progress-indeterminate {
+  from,
+  to {
+    inline-size: var(--progress-bar-indeterminate-size);
+    margin-right: auto;
+  }
+  from {
+    translate: -100%;
+  }
+  to {
+    translate: 100cqi;
+  }
 }
 
 @keyframes cs-pulse {
@@ -720,5 +876,10 @@
   .cs-sheet-loading img,
   .cs-sheet-loading .cs-sheet-media {
     animation: none;
+  }
+
+  /* Slow down rather than disabling so indeterminate progress stays visible. */
+  progress.cs-progress {
+    --progress-bar-indeterminate-animation-duration: 10s;
   }
 }
