@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type RefObject,
 } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { SITE_TEMPLATE } from '../../config/siteTemplate';
@@ -15,22 +16,34 @@ interface PendingScrollTarget {
   startLeft: number;
 }
 
-export function ExamplesCarousel() {
+export interface ExamplesCarouselProps {
+  activeIndex: number;
+  scrollRequest?: { index: number; seq: number } | null;
+  sectionRef?: RefObject<HTMLElement | null>;
+  onActiveIndexChange: (index: number) => void;
+}
+
+export function ExamplesCarousel({
+  activeIndex,
+  scrollRequest = null,
+  sectionRef,
+  onActiveIndexChange,
+}: ExamplesCarouselProps) {
   const { examplesGallery } = SITE_TEMPLATE;
   const items = examplesGallery.items;
 
-  const [activeIndex, setActiveIndex] = useState(0);
   const [settledAnnouncement, setSettledAnnouncement] = useState('');
   const [zoomedTile, setZoomedTile] = useState<ExampleTilePreview | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const rafIdRef = useRef<number | null>(null);
   const pendingScrollRef = useRef<PendingScrollTarget | null>(null);
   const lastSettledIndexRef = useRef(0);
+  const lastHandledRequestSeqRef = useRef(0);
 
   const commitSettledSlide = useCallback(
     (settledIdx: number) => {
       pendingScrollRef.current = null;
-      setActiveIndex((prev) => (prev === settledIdx ? prev : settledIdx));
+      onActiveIndexChange(settledIdx);
       if (settledIdx !== lastSettledIndexRef.current) {
         lastSettledIndexRef.current = settledIdx;
         const settledItem = items[settledIdx];
@@ -39,8 +52,49 @@ export function ExamplesCarousel() {
         );
       }
     },
-    [items]
+    [items, onActiveIndexChange]
   );
+
+  const scrollToIndex = useCallback(
+    (nextIndex: number) => {
+      const wrapped = ((nextIndex % items.length) + items.length) % items.length;
+      onActiveIndexChange(wrapped);
+
+      const track = trackRef.current;
+      if (!track || track.clientWidth <= 0) return;
+
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const targetLeft = wrapped * track.clientWidth;
+
+      if (prefersReducedMotion || Math.abs(track.scrollLeft - targetLeft) < 2) {
+        if (Math.abs(track.scrollLeft - targetLeft) >= 2) {
+          track.scrollTo({ left: targetLeft, behavior: 'auto' });
+        }
+        commitSettledSlide(wrapped);
+        return;
+      }
+
+      pendingScrollRef.current = { index: wrapped, startLeft: track.scrollLeft };
+      track.scrollTo({
+        left: targetLeft,
+        behavior: 'smooth',
+      });
+    },
+    [commitSettledSlide, items.length, onActiveIndexChange]
+  );
+
+  useEffect(() => {
+    if (
+      !scrollRequest ||
+      scrollRequest.seq === lastHandledRequestSeqRef.current
+    ) {
+      return;
+    }
+    lastHandledRequestSeqRef.current = scrollRequest.seq;
+    scrollToIndex(scrollRequest.index);
+  }, [scrollRequest, scrollToIndex]);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -53,7 +107,6 @@ export function ExamplesCarousel() {
       const rawIdx = Math.round(track.scrollLeft / track.clientWidth);
       const clampedIdx = Math.max(0, Math.min(items.length - 1, rawIdx));
 
-      // Ignore an obsolete settle emitted before a newly requested scroll moves off startLeft.
       if (
         pending &&
         Math.abs(track.scrollLeft - pending.startLeft) < 2 &&
@@ -98,40 +151,12 @@ export function ExamplesCarousel() {
     };
   }, []);
 
-  const scrollToIndex = (nextIndex: number) => {
-    const wrapped = ((nextIndex % items.length) + items.length) % items.length;
-    setActiveIndex(wrapped);
-
-    const track = trackRef.current;
-    if (!track || track.clientWidth <= 0) return;
-
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const targetLeft = wrapped * track.clientWidth;
-
-    if (prefersReducedMotion || Math.abs(track.scrollLeft - targetLeft) < 2) {
-      if (Math.abs(track.scrollLeft - targetLeft) >= 2) {
-        track.scrollTo({ left: targetLeft, behavior: 'auto' });
-      }
-      commitSettledSlide(wrapped);
-      return;
-    }
-
-    pendingScrollRef.current = { index: wrapped, startLeft: track.scrollLeft };
-    track.scrollTo({
-      left: targetLeft,
-      behavior: 'smooth',
-    });
-  };
-
   const stepSlide = (delta: number) => {
     const baseIndex = pendingScrollRef.current?.index ?? activeIndex;
     scrollToIndex(baseIndex + delta);
   };
 
   const handleScroll = () => {
-    // Skip frame reads during programmatic smooth scrolling so rapid updates do not stutter.
     if (pendingScrollRef.current !== null) return;
 
     if (rafIdRef.current !== null) {
@@ -145,7 +170,9 @@ export function ExamplesCarousel() {
 
       const rawIdx = Math.round(track.scrollLeft / track.clientWidth);
       const clampedIdx = Math.max(0, Math.min(items.length - 1, rawIdx));
-      setActiveIndex((prev) => (prev === clampedIdx ? prev : clampedIdx));
+      if (clampedIdx !== activeIndex) {
+        onActiveIndexChange(clampedIdx);
+      }
     });
   };
 
@@ -164,21 +191,16 @@ export function ExamplesCarousel() {
 
   return (
     <section
-      className="min-w-0 w-full max-w-[440px] justify-self-center space-y-2.5"
+      ref={sectionRef}
+      id={examplesGallery.id}
+      className="min-w-0 w-full max-w-[540px] justify-self-center space-y-2.5 scroll-mt-20"
       aria-roledescription="carousel"
       aria-label={examplesGallery.title}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[1.05rem] font-bold">
-            {activeItem.title ?? activeItem.ariaLabel}
-          </span>
-          {activeItem.categoryLabel ? (
-            <UiBadge tone={activeItem.categoryTone ?? 'yellow'}>
-              {activeItem.categoryLabel}
-            </UiBadge>
-          ) : null}
-        </div>
+        <span className="text-xs font-bold uppercase tracking-wider text-[var(--cs-ink-muted)]">
+          {examplesGallery.title}
+        </span>
         <span className="font-mono-num shrink-0 text-sm font-bold text-[var(--cs-ink-muted)]">
           {activeIndex + 1} / {items.length}
         </span>
@@ -203,12 +225,11 @@ export function ExamplesCarousel() {
           >
             <ExampleTrio
               item={item}
-              fullWidth
               priority={index === 0 ? 'lcp' : 'hidden-slide'}
               onTileClick={(tile) =>
                 setZoomedTile({
                   ...tile,
-                  title: item.title,
+                  title: item.title ?? activeItem.title,
                 })
               }
             />

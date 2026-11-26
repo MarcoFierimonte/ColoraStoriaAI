@@ -187,7 +187,7 @@
   @supports not (position-area: block-end) {
     .cs-nav-popover {
       position: fixed;
-      inset-block-start: calc(env(safe-area-inset-top, 0px) + 68px);
+      inset-block-start: calc(env(safe-area-inset-top, 0px) + 64px);
       inset-inline-end: max(
         16px,
         calc((100vw - var(--cs-header-max, var(--cs-container-max))) / 2 + 16px)
@@ -201,29 +201,17 @@
 
   .cs-hero {
     display: grid;
-    gap: 28px;
-    padding: 18px 0 40px;
+    gap: 18px;
+    padding: 12px 0 28px;
   }
 
-  @media (min-width: 860px) {
+  @media (min-width: 900px) {
     .cs-hero {
-      grid-template-columns: 1.2fr 1fr;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
       align-items: center;
-      padding: 40px 0 60px;
+      gap: 40px;
+      padding: 34px 0 56px;
     }
-  }
-
-  .cs-trio {
-    margin: 0;
-    display: grid;
-    gap: 6px;
-    width: min(100%, 440px);
-    justify-self: center;
-  }
-
-  .cs-trio-full {
-    width: 100%;
-    max-width: none;
   }
 
   .cs-carousel-track {
@@ -367,14 +355,6 @@
     background: var(--cs-surface);
   }
 
-  .cs-tag-pill {
-    border: var(--cs-border-width) solid var(--cs-border);
-    border-radius: 999px;
-    padding: 6px 16px;
-    font-weight: 700;
-    box-shadow: var(--cs-shadow-sm);
-  }
-
   .cs-sec {
     border-top: var(--cs-border-width) solid var(--cs-border);
     padding: 36px 0;
@@ -499,33 +479,6 @@
   .cs-close-btn:active {
     translate: 3px 3px;
     box-shadow: none;
-  }
-
-  .cs-sheet {
-    position: relative;
-    height: 36dvh;
-    aspect-ratio: 1 / 1.414;
-    margin: 6px auto 14px;
-    background: var(--cs-surface);
-    border: var(--cs-border-width) solid var(--cs-border);
-    box-shadow: var(--cs-shadow-card);
-    overflow: hidden;
-  }
-
-  .cs-sheet-big {
-    height: 50dvh;
-  }
-
-  .cs-sheet-empty {
-    position: absolute;
-    inset: 12px;
-    border: var(--cs-border-width) dashed var(--cs-border);
-    border-radius: 6px;
-    display: grid;
-    place-items: center;
-    text-align: center;
-    padding: 18px;
-    font-weight: 500;
   }
 
   .cs-sheet-loading img,
@@ -704,27 +657,8 @@
     }
   }
 
-  /* Parallel UX v2 comparison layout, dropzone, and styled native progress bar */
-  .cs-v2-scope {
-    --cs-container-max: 1120px;
-  }
-
-  .cs-v2-hero {
-    display: grid;
-    gap: 18px;
-    padding: 10px 0 28px;
-  }
-
-  @media (min-width: 900px) {
-    .cs-v2-hero {
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-      align-items: center;
-      gap: 40px;
-      padding: 34px 0 56px;
-    }
-  }
-
-  .cs-v2-cat-btn {
+  /* Category filter pills, unified A4 dropzone, mobile dock, and native progress bar */
+  .cs-cat-btn {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -742,17 +676,17 @@
     transition: translate 0.08s ease, box-shadow 0.08s ease, background-color 0.08s ease;
   }
 
-  .cs-v2-cat-btn[aria-pressed='true'] {
+  .cs-cat-btn[aria-pressed='true'] {
     translate: 3px 3px;
     box-shadow: none;
   }
 
-  .cs-v2-cat-btn:focus-visible {
+  .cs-cat-btn:focus-visible {
     outline: 3px solid var(--cs-pink-strong);
     outline-offset: 3px;
   }
 
-  .cs-v2-dropzone {
+  .cs-dropzone {
     display: grid;
     place-items: center;
     border: var(--cs-border-width) solid var(--cs-border);
@@ -764,7 +698,7 @@
     transition: background-color 0.12s ease;
   }
 
-  .cs-v2-dropzone-inner {
+  .cs-dropzone-inner {
     width: 100%;
     border: var(--cs-border-width) dashed var(--cs-border);
     border-radius: var(--cs-radius-btn);
@@ -777,17 +711,17 @@
     text-align: center;
   }
 
-  .cs-v2-dropzone:hover,
-  .cs-v2-dropzone[data-dragging='true'] {
+  .cs-dropzone:hover,
+  .cs-dropzone[data-dragging='true'] {
     background: var(--cs-mint);
   }
 
-  .cs-v2-dropzone:focus-within {
+  .cs-dropzone:focus-within {
     outline: 3px solid var(--cs-pink-strong);
     outline-offset: 3px;
   }
 
-  .cs-v2-mobile-dock {
+  .cs-mobile-dock {
     position: fixed;
     inset-inline: 0;
     inset-block-end: 0;

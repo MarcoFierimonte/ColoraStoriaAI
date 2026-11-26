@@ -1,3 +1,4 @@
+import { Mountain, PawPrint, Puzzle, User } from 'lucide-react';
 import { SITE_TEMPLATE, type CategoryTagItem } from '../../config/siteTemplate';
 
 const TAG_BG_CLASSES: Record<CategoryTagItem['tone'], string> = {
@@ -7,7 +8,28 @@ const TAG_BG_CLASSES: Record<CategoryTagItem['tone'], string> = {
   lavender: 'bg-[var(--cs-lavender)]',
 };
 
-export function CategoriesSection() {
+function renderCategoryIcon(tone: CategoryTagItem['tone']) {
+  switch (tone) {
+    case 'yellow':
+      return <PawPrint className="h-4 w-4 shrink-0" aria-hidden="true" />;
+    case 'pink':
+      return <Puzzle className="h-4 w-4 shrink-0" aria-hidden="true" />;
+    case 'mint':
+      return <Mountain className="h-4 w-4 shrink-0" aria-hidden="true" />;
+    case 'lavender':
+      return <User className="h-4 w-4 shrink-0" aria-hidden="true" />;
+  }
+}
+
+export interface CategoriesSectionProps {
+  activeCategoryLabel?: string;
+  onSelectCategory: (label: string) => void;
+}
+
+export function CategoriesSection({
+  activeCategoryLabel,
+  onSelectCategory,
+}: CategoriesSectionProps) {
   const { categories } = SITE_TEMPLATE;
 
   return (
@@ -16,16 +38,27 @@ export function CategoriesSection() {
         <h2 className="text-[1.8rem] font-bold leading-[1.08] tracking-[-0.02em]">
           {categories.title}
         </h2>
-        <ul className="my-[14px] flex list-none flex-wrap gap-[10px] p-0">
-          {categories.tags.map((tag) => (
-            <li
-              key={tag.label}
-              className={`cs-tag-pill ${TAG_BG_CLASSES[tag.tone]}`}
-            >
-              {tag.label}
-            </li>
-          ))}
-        </ul>
+        <div
+          role="group"
+          aria-label={categories.title}
+          className="my-[14px] flex flex-wrap gap-[10px]"
+        >
+          {categories.tags.map((tag) => {
+            const isSelected = activeCategoryLabel === tag.label;
+            return (
+              <button
+                key={tag.label}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => onSelectCategory(tag.label)}
+                className={`cs-cat-btn ${TAG_BG_CLASSES[tag.tone]}`}
+              >
+                {renderCategoryIcon(tag.tone)}
+                <span>{tag.label}</span>
+              </button>
+            );
+          })}
+        </div>
         <p>{categories.note}</p>
       </div>
     </section>

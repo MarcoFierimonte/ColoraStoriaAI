@@ -8,26 +8,13 @@ import {
   parseAdminTabFromSearch,
   type AdminServiceTab,
 } from './config/adminRoutes';
-import { DESIGN_V2_PATH, isDesignV2Path } from './config/designRoutes';
 import { CreatorDialog } from './components/CreatorDialog';
 import {
   LEGAL_ROUTES,
   parseLegalSlugFromPathname,
   type LegalRouteSlug,
 } from './config/legalRoutes';
-
-const AdminPage = lazy(() =>
-  import('./components/AdminPage').then((m) => ({ default: m.AdminPage }))
-);
-const LegalPage = lazy(() =>
-  import('./components/LegalPage').then((m) => ({ default: m.LegalPage }))
-);
-const HomeV2 = lazy(() =>
-  import('./components/v2').then((m) => ({ default: m.HomeV2 }))
-);
-const CreatorDialogV2 = lazy(() =>
-  import('./components/v2').then((m) => ({ default: m.CreatorDialogV2 }))
-);
+import { SITE_TEMPLATE } from './config/siteTemplate';
 import {
   BottomCtaSection,
   CategoriesSection,
@@ -36,7 +23,7 @@ import {
   Navbar,
   SiteFooter,
 } from './components/sections';
-import { UiCard } from './components/ui';
+import { UiButton, UiCard } from './components/ui';
 import { useAuth } from './modules/auth';
 import {
   fetchAccessSessionApi,
@@ -46,6 +33,13 @@ import {
 } from './modules/beta-access';
 import type { AdminTelemetry } from './modules/coloring-api';
 
+const AdminPage = lazy(() =>
+  import('./components/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
+const LegalPage = lazy(() =>
+  import('./components/LegalPage').then((m) => ({ default: m.LegalPage }))
+);
+
 const HOME_TITLE = 'ColoraStoria — da foto a pagina da colorare';
 
 interface InviteBanner {
@@ -54,7 +48,7 @@ interface InviteBanner {
 }
 
 interface RouteState {
-  kind: 'home' | 'home-v2' | 'legal' | 'admin';
+  kind: 'home' | 'legal' | 'admin';
   legalSlug: LegalRouteSlug | null;
   adminTab: AdminServiceTab;
   adminRunId: string | null;
@@ -76,14 +70,6 @@ function readCurrentRoute(): RouteState {
       legalSlug: null,
       adminTab: parseAdminTabFromSearch(search),
       adminRunId: parseAdminRunIdFromSearch(search),
-    };
-  }
-  if (isDesignV2Path(pathname)) {
-    return {
-      kind: 'home-v2',
-      legalSlug: null,
-      adminTab: 'prompt-lab',
-      adminRunId: null,
     };
   }
   const legalSlug = parseLegalSlugFromPathname(pathname);
@@ -123,8 +109,20 @@ export default function App() {
     useState<AccessSessionResponse | null>(null);
   const [inviteBanner, setInviteBanner] = useState<InviteBanner | null>(null);
 
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [scrollRequest, setScrollRequest] = useState<{
+    index: number;
+    seq: number;
+  } | null>(null);
+  const [heroCtaVisible, setHeroCtaVisible] = useState(true);
+  const [bottomCtaVisible, setBottomCtaVisible] = useState(false);
+
   const sessionMutationSeqRef = useRef(0);
   const initialInviteHandledRef = useRef(false);
+  const carouselSectionRef = useRef<HTMLElement | null>(null);
+  const heroCtaSentinelRef = useRef<HTMLDivElement | null>(null);
+  const bottomCtaSentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollSeqRef = useRef(0);
 
   useEffect(() => {
     const onPopState = () => {
@@ -148,14 +146,42 @@ export default function App() {
       const targetPath =
         route.kind === 'admin'
           ? ADMIN_BASE_PATH
-          : route.kind === 'home-v2'
-            ? DESIGN_V2_PATH
-            : route.kind === 'legal' && route.legalSlug
-              ? LEGAL_ROUTES[route.legalSlug].path
-              : '/';
+          : route.kind === 'legal' && route.legalSlug
+            ? LEGAL_ROUTES[route.legalSlug].path
+            : '/';
       canonical.setAttribute('href', `${window.location.origin}${targetPath}`);
     }
   }, [route]);
+
+  useEffect(() => {
+    if (route.kind !== 'home') {
+      setHeroCtaVisible(true);
+      setBottomCtaVisible(false);
+      return;
+    }
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const heroTarget = heroCtaSentinelRef.current;
+    const bottomTarget = bottomCtaSentinelRef.current;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target === heroTarget) {
+            setHeroCtaVisible(entry.isIntersecting);
+          } else if (entry.target === bottomTarget) {
+            setBottomCtaVisible(entry.isIntersecting);
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (heroTarget) observer.observe(heroTarget);
+    if (bottomTarget) observer.observe(bottomTarget);
+
+    return () => observer.disconnect();
+  }, [route.kind]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -234,6 +260,38 @@ export default function App() {
     [navigateToPath]
   );
 
+  const handleSelectCategory = useCallback(
+    (categoryLabel: string) => {
+      const items = SITE_TEMPLATE.examplesGallery.items;
+      const matchingIndices = items.reduce<number[]>((acc, item, index) => {
+        if (item.categoryLabel === categoryLabel) {
+          acc.push(index);
+        }
+        return acc;
+      }, []);
+
+      if (matchingIndices.length === 0) return;
+
+      const currentMatchPos = matchingIndices.indexOf(activeSlideIndex);
+      const nextIndex =
+        currentMatchPos >= 0
+          ? matchingIndices[(currentMatchPos + 1) % matchingIndices.length]
+          : matchingIndices[0];
+
+      scrollSeqRef.current += 1;
+      setScrollRequest({ index: nextIndex, seq: scrollSeqRef.current });
+
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      carouselSectionRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'nearest',
+      });
+    },
+    [activeSlideIndex]
+  );
+
   const openCreator = () => {
     setCreatorOpen(true);
   };
@@ -254,24 +312,20 @@ export default function App() {
     }));
   };
 
-  const isDesignV2 = route.kind === 'home-v2';
+  const activeCategoryLabel =
+    SITE_TEMPLATE.examplesGallery.items[activeSlideIndex]?.categoryLabel;
+  const showMobileDock =
+    route.kind === 'home' && !creatorOpen && !heroCtaVisible && !bottomCtaVisible;
 
   return (
-    <div
-      className={`min-h-screen flex flex-col bg-[var(--cs-bg)] text-[var(--cs-ink)]${
-        isDesignV2 ? ' cs-v2-scope' : ''
-      }`}
-    >
+    <div className="min-h-screen flex flex-col bg-[var(--cs-bg)] text-[var(--cs-ink)]">
       <Navbar
         isAdmin={isAdmin}
         userEmail={user?.email ?? null}
         isOnAdminPage={route.kind === 'admin'}
-        isDesignV2={isDesignV2}
-        onLogoClick={() => navigateToPath(isDesignV2 ? DESIGN_V2_PATH : '/')}
+        isOnHomePage={route.kind === 'home'}
+        onLogoClick={() => navigateToPath('/')}
         onStartClick={openCreator}
-        onToggleDesignVersion={() =>
-          navigateToPath(isDesignV2 ? '/' : DESIGN_V2_PATH)
-        }
         onNavigateAdmin={(tab) => navigateToAdmin(tab ?? 'prompt-lab')}
         onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
         onSignOut={() => void signOutUser()}
@@ -351,64 +405,55 @@ export default function App() {
               onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
             />
           </Suspense>
-        ) : route.kind === 'home-v2' ? (
-          <Suspense
-            fallback={
-              <div className="cs-wrap py-12">
-                <UiCard className="p-6 text-center text-sm font-bold">
-                  Caricamento…
-                </UiCard>
-              </div>
-            }
-          >
-            <HomeV2
+        ) : (
+          <div className={showMobileDock ? 'pb-[84px] md:pb-0' : ''}>
+            <HeroSection
               isAdmin={isAdmin}
               accessSession={accessSession}
-              creatorOpen={creatorOpen}
+              activeSlideIndex={activeSlideIndex}
+              carouselScrollRequest={scrollRequest}
+              carouselSectionRef={carouselSectionRef}
+              ctaSentinelRef={heroCtaSentinelRef}
+              onActiveSlideChange={setActiveSlideIndex}
               onStartClick={openCreator}
-              onSwitchToV1={() => navigateToPath('/')}
             />
-          </Suspense>
-        ) : (
-          <>
-            <HeroSection onStartClick={openCreator} />
-            <CategoriesSection />
+            <CategoriesSection
+              activeCategoryLabel={activeCategoryLabel}
+              onSelectCategory={handleSelectCategory}
+            />
             <HowItWorksSection />
-            <BottomCtaSection onStartClick={openCreator} />
-          </>
+            <div ref={bottomCtaSentinelRef}>
+              <BottomCtaSection onStartClick={openCreator} />
+            </div>
+
+            {showMobileDock ? (
+              <div className="cs-mobile-dock md:hidden">
+                <UiButton onClick={openCreator}>
+                  {SITE_TEMPLATE.hero.primaryCtaLabel}
+                </UiButton>
+              </div>
+            ) : null}
+          </div>
         )}
       </main>
 
       <SiteFooter
         isAdmin={isAdmin}
         userEmail={user?.email ?? null}
-        onNavigateHome={() => navigateToPath(isDesignV2 ? DESIGN_V2_PATH : '/')}
+        onNavigateHome={() => navigateToPath('/')}
         onNavigateLegal={(slug) => navigateToPath(LEGAL_ROUTES[slug].path)}
         onNavigateAdmin={() => navigateToAdmin('prompt-lab')}
         onSignOut={() => void signOutUser()}
       />
 
-      {isDesignV2 ? (
-        <Suspense fallback={null}>
-          <CreatorDialogV2
-            open={creatorOpen}
-            onClose={() => setCreatorOpen(false)}
-            accessSession={accessSession}
-            onAccessSessionChange={handleAccessSessionChange}
-            onInviteQuotaUpdate={handleInviteQuotaUpdate}
-            onTelemetryGenerated={setLatestTelemetry}
-          />
-        </Suspense>
-      ) : (
-        <CreatorDialog
-          open={creatorOpen}
-          onClose={() => setCreatorOpen(false)}
-          accessSession={accessSession}
-          onAccessSessionChange={handleAccessSessionChange}
-          onInviteQuotaUpdate={handleInviteQuotaUpdate}
-          onTelemetryGenerated={setLatestTelemetry}
-        />
-      )}
+      <CreatorDialog
+        open={creatorOpen}
+        onClose={() => setCreatorOpen(false)}
+        accessSession={accessSession}
+        onAccessSessionChange={handleAccessSessionChange}
+        onInviteQuotaUpdate={handleInviteQuotaUpdate}
+        onTelemetryGenerated={setLatestTelemetry}
+      />
     </div>
   );
 }

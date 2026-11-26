@@ -8,10 +8,6 @@ import {
   ALLOWED_THEME_IDS,
   SUPPORTED_PROVIDER_IDS,
 } from '../shared/config/index.ts';
-import {
-  DESIGN_V2_PATH,
-  isDesignV2Path,
-} from '../web-app/src/config/designRoutes.ts';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 
@@ -301,13 +297,19 @@ test('modernized assets and ES2023 TypeScript baseline stay intact', () => {
   );
 });
 
-test('parallel /v2 design route matches accurately and preserves existing SITE_TEMPLATE copy', () => {
-  assert.equal(DESIGN_V2_PATH, '/v2');
-  assert.equal(isDesignV2Path('/v2'), true);
-  assert.equal(isDesignV2Path('/v2/'), true);
-  assert.equal(isDesignV2Path('/V2'), true);
-  assert.equal(isDesignV2Path('/'), false);
-  assert.equal(isDesignV2Path('/admin'), false);
+test('promoted V2 UX removes parallel /v2 files and preserves existing SITE_TEMPLATE copy', () => {
+  assert.equal(
+    fs.existsSync(path.join(ROOT_DIR, 'web-app', 'src', 'components', 'v2')),
+    false,
+    'Parallel web-app/src/components/v2 directory must stay removed after promotion'
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(ROOT_DIR, 'web-app', 'src', 'config', 'designRoutes.ts')
+    ),
+    false,
+    'Parallel web-app/src/config/designRoutes.ts must stay removed after promotion'
+  );
 
   const templateSrc = fs.readFileSync(
     path.join(ROOT_DIR, 'web-app', 'src', 'config', 'siteTemplate.ts'),

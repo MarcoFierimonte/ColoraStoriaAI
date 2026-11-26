@@ -38,7 +38,7 @@
   --cs-shadow-dialog: 6px 6px 0 var(--cs-border);
 
   /* Layout & self-hosted typography */
-  --cs-container-max: 980px;
+  --cs-container-max: 1120px;
   --cs-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --cs-font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --cs-font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
