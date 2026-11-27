@@ -46,9 +46,9 @@ Guida rapida, chiara e senza gergo inutile per capire **cos’è**, **a cosa ser
 - **Cos’è:** Un’unica cartella condivisa tra client e server (*Single Source of Truth*) per evitare costanti duplicate o disallineate.
 - **Come e dov’è usato:** `shared/config/limits.ts` centralizza tipi MIME accettati, limite `12 MB`, risoluzione minima `400×400 px`, `10–15` foto libro, `16` pagine proiettate, lista dei 6 temi (`ALLOWED_THEME_IDS`) e provider (`SUPPORTED_PROVIDER_IDS`). `shared/types/coloring.ts` definisce invece tutti i DTO delle API. Sia `backend/` sia `web-app/` importano da qui.
 
-### Prompt Versionati (`prompts/`)
-- **Cos’è:** Le istruzioni testuali inviate all’AI tenute in file separati dal codice sorgente, divise per versione (`v1`, `v2`, ecc.).
-- **Come e dov’è usato:** `prompts/config.json` sceglie la versione attiva (`"latest"` o bloccata). Il modulo `backend/src/modules/prompts/` li legge da disco (`FilesystemPromptRepository`), permettendo all’Admin di testare nuove versioni dal menu a tendina senza modificare il codice del server.
+### Prompt Versionati (`prompts/` — `v4` attiva con varianti per tema)
+- **Cos’è:** Le istruzioni testuali inviate all’AI tenute in file separati dal codice sorgente, divise per versione (`v1`..`v4`). Dalla `v4`, ogni tema in `themes.json` definisce un pool strutturato di 5 scenari/composizioni diverse e dettagli secondari attivati solo per le fasce d’età più grandi (`5-7`, `8+`).
+- **Come e dov’è usato:** `prompts/config.json` sceglie la versione attiva (`"latest"` → `v4`). `FilesystemPromptRepository` seleziona casualmente una variante ad ogni generazione utente (o la ruota deterministicamente per ciascuna immagine nei run Batch/Standard tramite `ColoraStoriaPromptCatalogResolver.resolveItemPrompt`), garantendo varietà reale tra i disegni.
 
 ### `NODE_ENV` esplicito (`development` vs `production`)
 - **Cos’è:** La variabile standard di Node.js che dice al server se sta girando sul PC di sviluppo oppure online davanti agli utenti reali.

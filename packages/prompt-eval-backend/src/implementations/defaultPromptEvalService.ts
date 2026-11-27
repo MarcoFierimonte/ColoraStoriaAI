@@ -728,6 +728,13 @@ export class DefaultPromptEvalService implements PromptEvalService {
               thumbnailDataUrl: undefined,
             };
 
+        const itemPromptText =
+          input.promptSource === 'catalog' &&
+          catalogId &&
+          this.catalogResolver?.resolveItemPrompt
+            ? this.catalogResolver.resolveItemPrompt(catalogId, promptParams, i)
+            : undefined;
+
         preparedImages.push({
           id: itemId,
           index: i,
@@ -737,6 +744,7 @@ export class DefaultPromptEvalService implements PromptEvalService {
           width: prepared.width || undefined,
           height: prepared.height || undefined,
           thumbnailDataUrl: prepared.thumbnailDataUrl,
+          ...(itemPromptText ? { promptText: itemPromptText } : {}),
         });
 
         initialItems.push({
@@ -928,7 +936,10 @@ export class DefaultPromptEvalService implements PromptEvalService {
           result = await provider.executeStandardItem({
             modality: input.modality,
             model,
-            promptText,
+            promptText:
+              (input.modality === 'image'
+                ? preparedImages[idx]?.promptText
+                : preparedTexts[idx]?.promptText) ?? promptText,
             outputFormatHint,
             image: input.modality === 'image' ? preparedImages[idx] : undefined,
             textInput: input.modality === 'text' ? preparedTexts[idx] : undefined,

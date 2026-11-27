@@ -48,6 +48,11 @@ export interface PromptCatalogResolver {
     catalogId: string,
     params: Record<string, string>
   ): ResolvedPromptPreview;
+  resolveItemPrompt?(
+    catalogId: string,
+    params: Record<string, string>,
+    itemIndex: number
+  ): string;
 }
 
 export interface PreparedImagePayload {
@@ -75,6 +80,8 @@ export interface PromptEvalImageInput {
   width?: number;
   height?: number;
   thumbnailDataUrl?: string;
+  /** Optional per-item prompt override (e.g., rotated scene variants). */
+  promptText?: string;
 }
 
 export interface PromptEvalTextInput {
@@ -82,6 +89,8 @@ export interface PromptEvalTextInput {
   index: number;
   name: string;
   text: string;
+  /** Optional per-item prompt override. */
+  promptText?: string;
 }
 
 export interface ProviderStandardItemRequest {

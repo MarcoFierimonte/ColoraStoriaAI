@@ -125,6 +125,22 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
     catalogId: string,
     params: Record<string, string>
   ): ResolvedPromptPreview {
+    return this.resolveInternal(catalogId, params, 0);
+  }
+
+  resolveItemPrompt(
+    catalogId: string,
+    params: Record<string, string>,
+    itemIndex: number
+  ): string {
+    return this.resolveInternal(catalogId, params, itemIndex).promptText;
+  }
+
+  private resolveInternal(
+    catalogId: string,
+    params: Record<string, string>,
+    variationIndex: number
+  ): ResolvedPromptPreview {
     if (catalogId !== COLORASTORIA_CATALOG_ID) {
       throw new PromptEvalError(
         `Catalogo prompt "${catalogId}" non trovato.`,
@@ -175,6 +191,7 @@ export class ColoraStoriaPromptCatalogResolver implements PromptCatalogResolver 
         themeId,
         ageGroup,
         versionOverride,
+        variationIndex,
       });
     } catch (error) {
       throw new PromptEvalError(

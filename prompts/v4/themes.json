@@ -1,0 +1,74 @@
+{
+  "pirati": {
+    "setting": "Original pirate adventure.",
+    "costume": "If people appear in the photo, dress them in a simple pirate vest and sash belt (never add pirate hats, bandanas, or eye patches onto heads; keep real hair and any real cap from the photo untouched).",
+    "variants": [
+      "Ground the subject on the tilted wooden deck of a friendly sailing ship beside a big wooden ship wheel, with gentle ocean waves and puffy clouds across an open white sky.",
+      "Ground the subject on a sunny sandy cove beach next to a chunky open treasure chest overflowing with big round coins, with calm ocean water and a small island on the horizon.",
+      "Stage the subject beside a wooden dock pier with a cheerful classic pirate sailboat anchored in the calm bay and a playful dolphin leaping out of the waves.",
+      "Ground the subject on a rocky seaside headland with a friendly parrot perched on a wooden barrel nearby and a tall striped lighthouse across the calm water.",
+      "Stage the subject on a cozy sandy sandbar beside a rolled-up treasure map and giant seashells, with a friendly wooden rowboat resting at the water's edge."
+    ],
+    "secondaryDetails": "Additional storybook details: drifting seagulls, a spyglass or anchor, extra seashells, bobbing barrels, and a distant palm island on the horizon."
+  },
+  "unicorni": {
+    "setting": "Enchanted unicorn meadow.",
+    "costume": "If people appear in the photo, dress them in a simple fairytale tunic or dress (never add crowns, horns, or flower wreaths onto heads; keep real hair and any real cap/headband from the photo untouched).",
+    "variants": [
+      "Ground the subject on a gentle grassy meadow path beside a friendly smiling unicorn with a flowing wavy mane, with a bold simple rainbow arching across an open white sky.",
+      "Ground the subject next to a calm curving woodland brook crossed by a small rounded stone bridge, where a cute baby unicorn peeks curiously from the grassy bank.",
+      "Ground the subject in a sunny hilltop clearing beneath a single graceful tree on one side while a winged unicorn glides joyfully across the open sky above puffy clouds.",
+      "Ground the subject along a garden trail lined with oversized cheerful storybook flowers and big smooth mushrooms, with a friendly unicorn nuzzling a flower nearby.",
+      "Ground the subject beside a sparkling smooth waterfall pool on a grassy ledge, with a gentle unicorn standing proudly by the water and simple bold stars in the sky."
+    ],
+    "secondaryDetails": "Additional storybook details: fluttering butterflies, extra meadow blossoms, twinkling star shapes, fluffy clouds, and a small fairytale turret on a distant hill."
+  },
+  "draghi": {
+    "setting": "Original dragon kingdom.",
+    "costume": "If people appear in the photo, dress them in a simple medieval explorer tunic with a short cape (never add helmets, hoods, or hats onto heads; keep real hair and any real cap from the photo untouched).",
+    "variants": [
+      "Ground the subject on a smooth stone path beside a big friendly chubby dragon with small open wings sitting happily on the grass, with rounded mountain hills in the distance.",
+      "Ground the subject in a breezy hilltop meadow where a playful baby dragon puffs big round cartoon cloud rings into the open white sky.",
+      "Ground the subject near a curved stone bridge over a gentle mountain stream, with a cheerful long-tailed dragon waving from a sunny boulder on the opposite bank.",
+      "Ground the subject beside the wide arched entrance of a cozy crystal cave framed by big geometric gems, with a gentle smiling dragon peeking out warmly.",
+      "Ground the subject on a grassy highland ridge overlooking rolling pine hills while a friendly winged dragon glides overhead across an open sky."
+    ],
+    "secondaryDetails": "Additional storybook details: a distant stone castle tower on a cliff, large crystal clusters, rounded pine trees, and drifting clouds."
+  },
+  "spazio": {
+    "setting": "Space adventure (keep the space sky background pure white, never filled black).",
+    "costume": "If people appear in the photo, dress them in a simple astronaut suit from the neck down with NO helmet on their head (keep real hair and any real cap/glasses from the photo completely uncovered).",
+    "variants": [
+      "Ground the subject on a gentle curved moon surface with smooth rounded craters, with a classic friendly striped rocket ship parked nearby and a big ringed planet in the open white sky.",
+      "Stage the subject floating playfully in low gravity next to a giant smiling crescent moon, bold five-pointed stars, and a small friendly satellite.",
+      "Ground the subject on a whimsical bumpy planet next to a cute friendly little alien waving hello beside a chunky moon rover buggy.",
+      "Ground the subject outside a cozy domed space station with round porthole windows on a curved asteroid hill, with two varied planets drifting in the sky.",
+      "Ground the subject on a wide planetary ridge watching a friendly swooping comet with a bold ribbon tail streak past giant stars and a ringed planet."
+    ],
+    "secondaryDetails": "Additional storybook details: extra floating asteroids, a second tiny alien waving from a crater, orbital rings, and scattered bold stars."
+  },
+  "dinosauri": {
+    "setting": "Prehistoric dinosaur world.",
+    "costume": "If people appear in the photo, dress them in a simple safari explorer vest (never add explorer hats or helmets onto heads; keep real hair and any real cap from the photo untouched).",
+    "variants": [
+      "Ground the subject on a wide mossy prehistoric trail meeting a friendly baby Triceratops peeking curiously beside a smooth boulder, with a single tall palm tree on one side and wide open white sky.",
+      "Ground the subject near a calm prehistoric stream with smooth stepping stones and big lily pads, while a friendly smiling Stegosaurus with rounded back plates stands on the opposite bank.",
+      "Stage the subject in a sunny open prehistoric valley where a tall gentle Brachiosaurus on the left stretches up to nibble leaves from a tall tree, leaving wide open rolling hills on the right.",
+      "Ground the subject in a bright grassy prehistoric meadow with a goofy friendly little T-Rex with tiny arms waving nearby and two simple gliding Pterodactyls high in the open white sky.",
+      "Ground the subject in a sunny prehistoric clearing beside a friendly round-shelled Ankylosaurus and two big cracked eggs with a tiny baby dinosaur peeking out, backed by gentle rounded hills."
+    ],
+    "secondaryDetails": "Additional storybook details: a distant steaming volcano on the horizon, prehistoric dragonfly or butterfly, giant fossil footprints on the trail, and layered fern clusters."
+  },
+  "principessa": {
+    "setting": "Fairytale kingdom.",
+    "costume": "If people appear in the photo, dress them in a simple royal gown, tunic, or cape (never add crowns, tiaras, or veils onto heads; keep real hair and any real cap/headband from the photo untouched).",
+    "variants": [
+      "Ground the subject on a winding garden courtyard path leading toward a cheerful storybook castle with waving flags on a distant hill, framed loosely by a few big roses.",
+      "Ground the subject in a sunny royal meadow beside a friendly braided-mane pony standing near a classic stone garden archway.",
+      "Ground the subject on a smooth cobbled lane next to a whimsical rounded pumpkin carriage with big spoked wheels and gentle rolling hills behind.",
+      "Ground the subject beside a charming tiered stone garden fountain with curved water arcs and two cheerful little songbirds perched on the rim.",
+      "Ground the subject on a wide castle terrace overlooking gentle kingdom hills with two whimsical hot-air balloons drifting in the open white sky."
+    ],
+    "secondaryDetails": "Additional storybook details: fluttering butterflies, flowering hedge arches, decorative castle banners, and extra garden lanterns or blossoms."
+  }
+}

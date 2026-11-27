@@ -162,7 +162,8 @@ test('ColoraStoriaPromptCatalogResolver resolves fedele/creativa combinations, i
   assert.equal(catalogs.length, 1);
   assert.equal(catalogs[0].id, COLORASTORIA_CATALOG_ID);
   const versionField = catalogs[0].fields.find((f) => f.id === 'version');
-  assert.equal(versionField?.defaultValue, 'v3');
+  assert.equal(versionField?.defaultValue, 'v4');
+  assert.ok(versionField?.options?.some((opt) => opt.value === 'v4'));
   assert.ok(versionField?.options?.some((opt) => opt.value === 'v3'));
   assert.ok(versionField?.options?.some((opt) => opt.value === 'v2'));
   assert.equal(

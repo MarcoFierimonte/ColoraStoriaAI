@@ -32,7 +32,7 @@ const THEME_FORBIDDEN_TERMS_IN_FAITHFUL: Record<ThemeId, RegExp> = {
   unicorni: /Enchanted unicorn meadow/,
   draghi: /Original dragon kingdom/,
   spazio: /Space adventure/,
-  dinosauri: /Prehistoric jungle/,
+  dinosauri: /Prehistoric (jungle|dinosaur world)/,
   principessa: /Fairytale kingdom/,
 };
 
@@ -119,11 +119,11 @@ test('UI payload builder & FetchColoringApiClient strip theme and ageGroup in fe
 
 test('FilesystemPromptRepository isolates fedele from fantasy themes and builds all creativa theme/age combinations', () => {
   const repo = new FilesystemPromptRepository(parseServerConfig({}, []));
-  assert.equal(repo.getActiveVersion(), 'v3');
-  assert.deepEqual(repo.listVersions(), ['v1', 'v2', 'v3']);
+  assert.equal(repo.getActiveVersion(), 'v4');
+  assert.deepEqual(repo.listVersions(), ['v1', 'v2', 'v3', 'v4']);
 
   // Even if caller passes a leftover themeId, mode='fedele' must NOT include any fantasy theme
-  for (const versionOverride of ['v3', 'v2', 'v1']) {
+  for (const versionOverride of ['v4', 'v3', 'v2', 'v1']) {
     const faithful = repo.buildRasterPrompt({
       mode: 'fedele',
       themeId: 'pirati',
@@ -137,12 +137,12 @@ test('FilesystemPromptRepository isolates fedele from fantasy themes and builds 
     assert.doesNotMatch(faithful.prompt, /AGE COMPLEXITY/i);
   }
 
-  // Verify v3 packaging/logo cleanup & pure solid black ink rules in fedele mode
-  const faithfulV3 = repo.buildRasterPrompt({ mode: 'fedele' });
-  assert.equal(faithfulV3.version, 'v3');
-  assert.match(faithfulV3.prompt, /retail cardboard boxes/i);
-  assert.match(faithfulV3.prompt, /hangtags/i);
-  assert.match(faithfulV3.prompt, /Zero grey lines/i);
+  // Verify v4 packaging/logo cleanup & pure solid black ink rules in fedele mode
+  const faithfulV4 = repo.buildRasterPrompt({ mode: 'fedele' });
+  assert.equal(faithfulV4.version, 'v4');
+  assert.match(faithfulV4.prompt, /retail cardboard boxes/i);
+  assert.match(faithfulV4.prompt, /hangtags/i);
+  assert.match(faithfulV4.prompt, /ZERO grey lines/i);
 
   for (const themeId of ALLOWED_THEME_IDS) {
     const built = repo.buildRasterPrompt({
@@ -150,7 +150,7 @@ test('FilesystemPromptRepository isolates fedele from fantasy themes and builds 
       themeId,
       ageGroup: '3-4',
     });
-    assert.equal(built.version, 'v3');
+    assert.equal(built.version, 'v4');
     assert.match(built.prompt, /CREATIVE FANTASY MODE/i);
     assert.match(built.prompt, /Preserve any real glasses, baseball caps/i);
     assert.doesNotMatch(built.prompt, /FAITHFUL PHOTO MODE/i);

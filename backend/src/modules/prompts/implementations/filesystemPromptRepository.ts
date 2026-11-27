@@ -12,6 +12,7 @@ import type {
   PromptBuildOptions,
   PromptBundle,
   PromptRepository,
+  ThemePromptEntry,
 } from '../promptRepository.interface.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -110,7 +111,7 @@ export class FilesystemPromptRepository implements PromptRepository {
       .trim();
     const themes = JSON.parse(
       fs.readFileSync(path.join(versionDir, 'themes.json'), 'utf8')
-    ) as Record<ThemeId, string>;
+    ) as Record<ThemeId, ThemePromptEntry>;
 
     const modesPath = path.join(versionDir, 'modes.json');
     const modes = fs.existsSync(modesPath)
@@ -160,20 +161,26 @@ export class FilesystemPromptRepository implements PromptRepository {
       if (!options.themeId) {
         throw new Error('Tema mancante per la modalità creativa.');
       }
-      const themeBlock = bundle.themes[options.themeId];
-      if (!themeBlock) {
+      const rawThemeEntry = bundle.themes[options.themeId];
+      if (!rawThemeEntry) {
         throw new Error(
           `Blocco tema "${options.themeId}" mancante nella versione prompt ${bundle.version}`
         );
       }
 
+      const themeBlock = this.renderThemeEntry(
+        rawThemeEntry,
+        options.ageGroup,
+        options.variationIndex
+      );
+
       if (bundle.modes?.creativa) {
         parts.push(
           bundle.basePrompt,
-          `${bundle.modes.creativa.trim()} ${themeBlock.trim()}`
+          `${bundle.modes.creativa.trim()} ${themeBlock}`
         );
       } else {
-        parts.push(`${bundle.basePrompt}\n${themeBlock.trim()}`);
+        parts.push(`${bundle.basePrompt}\n${themeBlock}`);
       }
       if (options.ageGroup && bundle.ages?.[options.ageGroup]) {
         parts.push(bundle.ages[options.ageGroup].trim());
@@ -184,6 +191,40 @@ export class FilesystemPromptRepository implements PromptRepository {
       version: bundle.version,
       prompt: parts.join('\n\n'),
     };
+  }
+
+  private renderThemeEntry(
+    entry: ThemePromptEntry,
+    ageGroup?: ColoringAgeGroup,
+    variationIndex?: number
+  ): string {
+    if (typeof entry === 'string') {
+      return entry.trim();
+    }
+
+    const segments: string[] = [];
+    if (entry.setting?.trim()) {
+      segments.push(entry.setting.trim());
+    }
+    if (entry.costume?.trim()) {
+      segments.push(entry.costume.trim());
+    }
+    const variants = (entry.variants ?? [])
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (variants.length > 0) {
+      const idx =
+        typeof variationIndex === 'number' && Number.isFinite(variationIndex)
+          ? ((Math.trunc(variationIndex) % variants.length) + variants.length) %
+            variants.length
+          : Math.floor(Math.random() * variants.length);
+      segments.push(variants[idx]);
+    }
+    const includeSecondary = ageGroup === '5-7' || ageGroup === '8+';
+    if (includeSecondary && entry.secondaryDetails?.trim()) {
+      segments.push(entry.secondaryDetails.trim());
+    }
+    return segments.join(' ');
   }
 
   buildSvgPrompt(options: PromptBuildOptions): BuiltPrompt {

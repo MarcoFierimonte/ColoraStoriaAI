@@ -39,12 +39,25 @@ for (const version of versionDirs) {
 
   const defaultAgeBlock = ages?.['3-4'] ? `\n\n${String(ages['3-4']).trim()}` : '';
 
-  for (const [styleKey, themeBlock] of Object.entries(themes)) {
+  for (const [styleKey, rawTheme] of Object.entries(themes)) {
+    const themeBlock =
+      typeof rawTheme === 'string'
+        ? rawTheme.trim()
+        : [
+            rawTheme.setting?.trim(),
+            rawTheme.costume?.trim(),
+            Array.isArray(rawTheme.variants) && rawTheme.variants[0]
+              ? String(rawTheme.variants[0]).trim()
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+
     if (modes?.creativa) {
       manualPrompts[styleKey] =
-        `${basePrompt}\n\n${String(modes.creativa).trim()} ${String(themeBlock).trim()}${defaultAgeBlock}`;
+        `${basePrompt}\n\n${String(modes.creativa).trim()} ${themeBlock}${defaultAgeBlock}`;
     } else {
-      manualPrompts[styleKey] = `${basePrompt}\n${String(themeBlock).trim()}`;
+      manualPrompts[styleKey] = `${basePrompt}\n${themeBlock}`;
     }
   }
 

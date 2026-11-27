@@ -646,6 +646,7 @@ export class GeminiPromptEvalProvider implements PromptExecutionProvider {
                 responseSchema: buildSvgResponseSchema(),
               };
 
+        const itemPromptText = img.promptText ?? request.promptText;
         inlinedRequests.push({
           contents: [
             {
@@ -657,7 +658,7 @@ export class GeminiPromptEvalProvider implements PromptExecutionProvider {
                     mimeType: img.mimeType,
                   },
                 },
-                { text: request.promptText },
+                { text: itemPromptText },
               ],
             },
           ],
@@ -682,7 +683,7 @@ export class GeminiPromptEvalProvider implements PromptExecutionProvider {
                         data: base64Data,
                       },
                     },
-                    { text: request.promptText },
+                    { text: itemPromptText },
                   ],
                 },
               ],

@@ -79,8 +79,8 @@ test('ALLOWED_THEME_IDS and SUPPORTED_PROVIDER_IDS match firestore.rules', () =>
   );
 });
 
-test('prompts/v2 and prompts/v3 modes.json and ages.json match shared/config constants', () => {
-  for (const version of ['v2', 'v3'] as const) {
+test('prompts/v2, v3, and v4 modes.json and ages.json match shared/config constants', () => {
+  for (const version of ['v2', 'v3', 'v4'] as const) {
     const modesPath = path.join(ROOT_DIR, 'prompts', version, 'modes.json');
     const modesObj = JSON.parse(fs.readFileSync(modesPath, 'utf8')) as Record<
       string,
@@ -101,6 +101,61 @@ test('prompts/v2 and prompts/v3 modes.json and ages.json match shared/config con
       Object.keys(agesObj).sort(),
       ALLOWED_AGE_GROUPS.toSorted(),
       `prompts/${version}/ages.json keys must match ALLOWED_AGE_GROUPS`
+    );
+  }
+});
+
+test('prompts/v4 themes have >=4 distinct variants and gate secondaryDetails to 5-7 and 8+ only', async () => {
+  const { FilesystemPromptRepository } = await import(
+    '../backend/src/modules/prompts/implementations/filesystemPromptRepository.ts'
+  );
+  const repo = new FilesystemPromptRepository();
+  assert.equal(repo.getActiveVersion(), 'v4');
+
+  const themesRaw = JSON.parse(
+    fs.readFileSync(path.join(ROOT_DIR, 'prompts', 'v4', 'themes.json'), 'utf8')
+  ) as Record<
+    string,
+    { setting: string; variants: string[]; secondaryDetails?: string }
+  >;
+
+  for (const themeId of ALLOWED_THEME_IDS) {
+    const entry = themesRaw[themeId];
+    assert.ok(entry && Array.isArray(entry.variants) && entry.variants.length >= 4);
+    assert.ok(entry.secondaryDetails && entry.secondaryDetails.length > 0);
+
+    const p0 = repo.buildRasterPrompt({
+      mode: 'creativa',
+      themeId,
+      ageGroup: '3-4',
+      versionOverride: 'v4',
+      variationIndex: 0,
+    }).prompt;
+    const p1 = repo.buildRasterPrompt({
+      mode: 'creativa',
+      themeId,
+      ageGroup: '3-4',
+      versionOverride: 'v4',
+      variationIndex: 1,
+    }).prompt;
+    assert.notEqual(p0, p1, `v4 ${themeId} variationIndex 0 and 1 must differ`);
+    assert.equal(
+      p0.includes(entry.secondaryDetails),
+      false,
+      `v4 ${themeId} age 3-4 must omit secondaryDetails`
+    );
+
+    const pOlder = repo.buildRasterPrompt({
+      mode: 'creativa',
+      themeId,
+      ageGroup: '5-7',
+      versionOverride: 'v4',
+      variationIndex: 0,
+    }).prompt;
+    assert.equal(
+      pOlder.includes(entry.secondaryDetails),
+      true,
+      `v4 ${themeId} age 5-7 must include secondaryDetails`
     );
   }
 });
